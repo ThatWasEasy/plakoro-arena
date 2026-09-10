@@ -124,15 +124,33 @@ function signedText(value) {
 // figure, so the line reads as its arithmetic rather than as four loose statistics: the
 // printed damage first, then what the character die is worth on top, then whatever the move
 // costs or gives back in own HP. Parts worth nothing are dropped instead of printing zeroes.
+//
+// One entry is not an addend: the damage subtotal restates what the two damage parts before
+// it come to, because once a move also charges its own HP the reader can no longer see what
+// it actually deals without adding two figures in their head. Unsigned is what marks it as a
+// running total — every term that really is added to the line carries its sign.
+//
+// It earns its place only when it says something neither neighbour already does, which needs
+// both halves of the sum present AND something non-damage after it. With no character-die
+// share it would merely repeat the printed damage; with nothing following it, it would be the
+// last number on the line, where the damage total is already the only thing on show. That
+// also keeps the line at today's length everywhere except the one case it exists to help —
+// worth having, since it is set `nowrap` in a grid column it must not outgrow.
 function breakdownText(result) {
   const parts = [`${t('diceBuilder.moveOdds.evPartBase')} ${evText(result.evDamageBase)}`]
-  if (clean(result.evDamageChara) !== 0) {
+  const splitDamage = clean(result.evDamageChara) !== 0
+  const hasDefensive = clean(result.evDefensive) !== 0
+  const hasSelf = clean(result.evSelf) !== 0
+  if (splitDamage) {
     parts.push(`${t('diceBuilder.moveOdds.evPartChara')} ${signedText(result.evDamageChara)}`)
   }
-  if (clean(result.evDefensive) !== 0) {
+  if (splitDamage && (hasDefensive || hasSelf)) {
+    parts.push(`${t('diceBuilder.moveOdds.evPartDamageTotal')} ${evText(result.evDamage)}`)
+  }
+  if (hasDefensive) {
     parts.push(`${t('diceBuilder.moveOdds.evPartDefensive')} ${signedText(result.evDefensive)}`)
   }
-  if (clean(result.evSelf) !== 0) {
+  if (hasSelf) {
     parts.push(`${t('diceBuilder.moveOdds.evPartSelf')} ${signedText(-result.evSelf)}`)
   }
   return parts.join('　')
