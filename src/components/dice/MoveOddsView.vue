@@ -84,9 +84,10 @@ const selfHp = computed(() => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 })
 
-// Why a move's figure is qualified, in the order moveExpectedValue reports them.
+// Why a move's figure is qualified, in the order moveExpectedValue reports them. `tempo` is
+// deliberately absent: the move's own card sits directly below the figure and already spells
+// out what a dice-count change or a move lock does, so repeating it here says nothing.
 const NOTE_LABEL_KEYS = {
-  tempo: 'noteTempo',
   defensive: 'noteDefensive',
   needsHp: 'noteNeedsHp',
   needsPrev: 'noteNeedsPrev',
@@ -140,6 +141,10 @@ const moveRows = computed(() => {
       mv,
       odds,
       evs,
+      // Drives whether the own-HP line is shown or merely held open — the cards sit in a
+      // two-column grid, so a line that appears on one move and not its neighbour would
+      // knock the two cards out of alignment.
+      hasSelfChange: evs.some(result => result.evSelf !== 0),
       noteKeys: noteKinds.map(kind => NOTE_LABEL_KEYS[kind]).filter(Boolean),
       // Per dice set, since the joint figure depends on that set's own success rate.
       charaEffects: mv.chara.map(ce => {
@@ -302,10 +307,20 @@ const moveRows = computed(() => {
               </div>
             </div>
 
-            <!-- only worth breaking out when the move costs its user HP or gives some back -->
+            <!-- only says anything when the move costs its user HP or gives some back, but the
+                 row is held open either way so every card in the grid starts at the same height -->
             <div
-              v-if="row.evs.some(result => result.evSelf !== 0)"
-              style="display:flex; justify-content:flex-end; gap:0.5rem; padding:0 0.125rem; font-size:0.5625rem; font-weight:700; color:var(--sub);"
+              :style="{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.5rem',
+                padding: '0 0.125rem',
+                fontSize: '0.5625rem',
+                fontWeight: 700,
+                color: 'var(--sub)',
+                visibility: row.hasSelfChange ? 'visible' : 'hidden'
+              }"
+              :aria-hidden="!row.hasSelfChange"
             >
               <span v-for="(result, si) in row.evs" :key="si" style="white-space:nowrap;">
                 <span v-if="hasCompare">{{ setLabels[si] }} </span>

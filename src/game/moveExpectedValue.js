@@ -21,8 +21,11 @@ import { CHARA_DIE_FACE_COUNT, canPayCost, enumerateRolls, payableCount } from '
 
 // Why a move's value is only part of the story, keyed by effect type so the UI can explain
 // each marker it draws.
+// `tempo` marks an effect this model knows about and deliberately values at zero, as
+// distinct from one it doesn't recognise. A caller with the move's card already on screen
+// has nothing to gain by surfacing it — the card says what the effect does.
 export const NOTE_TEMPO = 'tempo'             // real effect, but it moves dice/moves, not HP
-export const NOTE_DEFENSIVE = 'defensive'     // damage reduction: HP-shaped, counted only on request
+export const NOTE_DEFENSIVE = 'defensive'     // damage reduction, credited as HP on request
 export const NOTE_NEEDS_HP = 'needsHp'        // conditional on the caster's remaining HP
 export const NOTE_NEEDS_PREV = 'needsPrev'    // conditional on what happened last turn
 export const NOTE_MIRROR_DICE = 'mirrorDice'  // valued by assuming the opponent's dice match ours
@@ -44,10 +47,13 @@ function addNote(state, type, kind) {
 
 // Damage reduction is the one non-damage effect that trades in the same currency as the rest
 // of the model — 20 damage not taken is 20 HP kept — but only if the opponent was going to
-// land that much anyway. Counting it is therefore the caller's call.
+// land that much anyway. Counting it is therefore the caller's call, and it's only worth
+// noting when it is counted: the card already states the reduction, so the fact worth adding
+// is that the figure includes it.
 function addDefensive(state, value, env, type) {
+  if (!env.countDefensiveValue) return
   addNote(state, type, NOTE_DEFENSIVE)
-  if (env.countDefensiveValue) state.defensive += Math.abs(value)
+  state.defensive += Math.abs(value)
 }
 
 function applyEffect(eff, state, env) {

@@ -196,7 +196,6 @@
       "prevSelfFailed": "Your energy dice failed last turn",
       "prevPrereqSucceeded": "The prerequisite move landed last turn",
       "evHint": "Expected value = average of (damage dealt − damage taken by yourself), multiplied by the success rate. Healing counts as a gain. Weakness is left out.",
-      "noteTempo": "Also has a non-damage effect (dice count, move lock, etc.)",
       "noteDefensive": "Includes damage reduction",
       "noteNeedsHp": "Counted once you enter remaining HP",
       "noteNeedsPrev": "Based on the assumptions above",
