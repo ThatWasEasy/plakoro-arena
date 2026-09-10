@@ -29,10 +29,12 @@ const VISIBLE_MODES = MODES.filter(m => m.enabled !== false)
 
 <template>
   <div class="board select-board mode-select">
-    <!-- Wrapping rows rather than one tall column: a single column divides the fixed stage
-         height by however many modes there are, so each new one shrinks every card until they
-         stop fitting (which is exactly what happened at five). Wrapping adds a row instead, so
-         the cards keep a workable size no matter how many there are. -->
+    <!-- Two to a row, with the rows dividing whatever height the stage leaves. An earlier
+         version wrapped a flex container and capped each card at a height tuned to three
+         rows; the eighth mode made a fourth row, four capped rows came to more than the
+         stage's 23.4rem, and .board clips its overflow — so the two newest modes simply
+         weren't on screen. Grid rows of minmax(0, 1fr) can't overflow however many there
+         are, which is what this file claims in its first comment. -->
     <div class="mode-grid">
       <button
         v-for="m in VISIBLE_MODES"
@@ -69,23 +71,24 @@ const VISIBLE_MODES = MODES.filter(m => m.enabled !== false)
   min-height: 0;
   width: 100%;
   max-width: 26rem;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* The rows share out the height that's left, so a new mode makes every row shorter rather
+     than pushing the last one off the bottom. */
+  grid-auto-rows: minmax(0, 1fr);
+  align-items: center;
   align-content: center;
   justify-content: center;
   gap: 0.5rem;
 }
 
 .mode-card {
-  /* Two per row: basis is half the track minus its share of the gap, and the matching max-width
-     stops a lone card on the last row from stretching to full width. */
-  flex: 1 1 calc(50% - 0.25rem);
-  max-width: calc(50% - 0.25rem);
   min-width: 0;
   min-height: 0;
-  /* Caps the row height so three rows always clear the stage, while flex-basis still lets the
-     cards breathe when there are fewer of them. */
+  /* An upper bound only, for when there are few enough modes that a row would otherwise be
+     tall enough to look silly. The rows no longer depend on it to fit. */
   max-height: 5.5rem;
+  height: 100%;
   padding: 0.5rem;
   gap: 0.25rem;
   overflow: hidden;

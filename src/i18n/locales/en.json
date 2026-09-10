@@ -423,8 +423,7 @@
     "main": "Main",
     "secondary": "Sub",
     "weakness": "Weak to",
-    "colorlessOnly": "colourless only",
-    "assumptions": "Main and sub are the energy types this Pokémon's own moves are paid in, counted by how many moves ask for each (colourless excluded). They are not the type printed on the card — イーブイ is printed colourless, but four of its moves are paid in flying. A tie is shown as a tie."
+    "colorlessOnly": "colourless only"
   },
   "moveAdvisor": {
     "title": "Move recommendations",
