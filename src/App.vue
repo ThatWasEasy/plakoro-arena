@@ -19,6 +19,8 @@ import DiceBuilderApp from './components/dice/DiceBuilderApp.vue'
 import StoreInfoApp from './components/StoreInfoApp.vue'
 import TournamentApp from './components/tournament/TournamentApp.vue'
 import TierListApp from './components/TierListApp.vue'
+import TypeChartApp from './components/TypeChartApp.vue'
+import MoveAdvisorApp from './components/MoveAdvisorApp.vue'
 // d3 (scale/shape/array) rides along with this view — code-split so only players who open the
 // price log pay for it, the same treatment the 3D dice tray gets.
 const PriceLogApp = defineAsyncComponent(() => import('./components/pricelog/PriceLogApp.vue'))
@@ -110,6 +112,10 @@ onMounted(() => {
       <TournamentApp v-else-if="mode === 'tournament'" @back="mode = null" />
 
       <TierListApp v-else-if="mode === 'tierList'" @back="mode = null" />
+
+      <TypeChartApp v-else-if="mode === 'typeChart'" @back="mode = null" />
+
+      <MoveAdvisorApp v-else-if="mode === 'moveAdvisor'" @back="mode = null" />
 
       <SoloApp v-else />
 

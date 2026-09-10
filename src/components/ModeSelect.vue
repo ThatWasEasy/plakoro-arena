@@ -19,7 +19,9 @@ const MODES = [
   // sources need a login to snapshot, so the figures would go stale without anyone noticing.
   { key: 'priceLog', icon: '💰', enabled: false },
   { key: 'tournament', icon: '📋' },
-  { key: 'tierList', icon: '📊' }
+  { key: 'tierList', icon: '📊' },
+  { key: 'typeChart', icon: '🔰' },
+  { key: 'moveAdvisor', icon: '🃏' }
 ]
 
 const VISIBLE_MODES = MODES.filter(m => m.enabled !== false)

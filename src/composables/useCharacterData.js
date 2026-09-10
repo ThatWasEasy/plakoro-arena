@@ -106,6 +106,14 @@ const CHARACTERS_BASE = charaRaw.map(c => {
   }
 })
 
+// The moves exactly as printed, before any translation overlay.
+//
+// A screen that helps a player pick cards out of a physical box has to name them the way the
+// box does, and the cards are printed in Japanese. Showing only the translated name would
+// leave the reader holding a recommendation they can't match to a card, which is the one job
+// that screen has.
+export const printedMoves = MOVES_BASE
+
 function localizedMoves(locale) {
   const overlay = TRANSLATIONS[locale] && TRANSLATIONS[locale].waza
   if (!overlay) return MOVES_BASE
