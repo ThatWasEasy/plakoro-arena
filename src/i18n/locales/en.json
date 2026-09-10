@@ -79,7 +79,8 @@
     "diceBuilder": "Dice Assembly Sim",
     "storeInfo": "Stores & Events",
     "priceLog": "Market",
-    "tournament": "Tournament Scheduler"
+    "tournament": "Tournament Scheduler",
+    "tierList": "Expected-value ranking"
   },
   "priceLog": {
     "title": {
@@ -203,7 +204,11 @@
       "evPartChara": "Char. die",
       "evPartDamageTotal": "Dmg",
       "evPartSelf": "Own HP",
-      "evPartDefensive": "Reduction"
+      "evPartDefensive": "Reduction",
+      "countTempo": "Count what it denies the opponent",
+      "tempoCalculating": "(working…)",
+      "evPartTempo": "Tempo",
+      "enemyLastDamageLabel": "Opponent's last move"
     },
     "showCumulativeProb": "Show cumulative odds",
     "showExactProb": "Show exact odds",
@@ -391,5 +396,13 @@
       "notice": "No move available — they're sealed or were used last turn.",
       "button": "Skip Turn"
     }
+  },
+  "tierList": {
+    "title": "Expected-value ranking",
+    "hint": "Each Pokémon on three pure dice built for them, scored by the average of their {n} best moves",
+    "countTempo": "Count what a move denies the opponent",
+    "calculating": "working…",
+    "fewMoves": "this Pokémon has only {n} moves",
+    "assumptions": "Every Pokémon is assumed to throw three pure dice of whichever type its own moves ask for most. Weakness and the opposing Pokémon are left out. Tap a row to see the moves behind the figure."
   }
 }

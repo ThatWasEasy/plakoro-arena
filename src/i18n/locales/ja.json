@@ -79,7 +79,8 @@
     "diceBuilder": "ダイス組立シミュレーター",
     "storeInfo": "店舗＆大会情報",
     "priceLog": "取引マーケット",
-    "tournament": "トーナメント編成"
+    "tournament": "トーナメント編成",
+    "tierList": "期待値ランキング"
   },
   "priceLog": {
     "title": {
@@ -203,7 +204,11 @@
       "evPartChara": "キャラコロ",
       "evPartDamageTotal": "与ダメ計",
       "evPartSelf": "自分のHP",
-      "evPartDefensive": "軽減"
+      "evPartDefensive": "軽減",
+      "countTempo": "相手の妨害も価値として計算",
+      "tempoCalculating": "（計算中…）",
+      "evPartTempo": "テンポ",
+      "enemyLastDamageLabel": "相手の前のワザのダメージ"
     },
     "showCumulativeProb": "累計確率で表示",
     "showExactProb": "ちょうどの確率で表示",
@@ -391,5 +396,13 @@
       "notice": "出せる技がない（封じられている、または前ターン使用）。",
       "button": "ターンをスキップ"
     }
+  },
+  "tierList": {
+    "title": "期待値ランキング",
+    "hint": "各ポケモンに合わせた単色ダイス3個で、期待値の高いワザ上位{n}つの平均を並べます",
+    "countTempo": "相手の妨害も価値として計算",
+    "calculating": "計算中…",
+    "fewMoves": "このポケモンのワザは{n}つだけです",
+    "assumptions": "各ポケモンは自分のワザが最も要求するタイプで組んだ単色ダイス3個を振る前提です。弱点と相手のポケモンは計算に入れていません。行をタップすると上位ワザの内訳が開きます"
   }
 }

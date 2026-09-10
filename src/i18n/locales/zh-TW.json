@@ -79,7 +79,8 @@
     "diceBuilder": "模擬組骰",
     "storeInfo": "店家與比賽資訊",
     "priceLog": "交易市場",
-    "tournament": "賽程編排"
+    "tournament": "賽程編排",
+    "tierList": "期望效益排行"
   },
   "priceLog": {
     "title": {
@@ -203,7 +204,11 @@
       "evPartChara": "角色骰",
       "evPartDamageTotal": "傷害總共",
       "evPartSelf": "自身 HP",
-      "evPartDefensive": "減傷"
+      "evPartDefensive": "減傷",
+      "countTempo": "把干擾對手折算成傷害",
+      "tempoCalculating": "（計算中…）",
+      "evPartTempo": "干擾",
+      "enemyLastDamageLabel": "對手上一招白板"
     },
     "showCumulativeProb": "顯示累計機率",
     "showExactProb": "顯示恰好機率",
@@ -391,5 +396,13 @@
       "notice": "沒有可用的招式（已被封印或上回合使用過）。",
       "button": "跳過這回合"
     }
+  },
+  "tierList": {
+    "title": "期望效益排行",
+    "hint": "每隻寶可夢都套用適合自己的純屬骰 3 顆，取期望效益最高的 {n} 招平均",
+    "countTempo": "把干擾對手折算成傷害",
+    "calculating": "計算中…",
+    "fewMoves": "這隻寶可夢只有 {n} 招",
+    "assumptions": "每隻寶可夢都假設帶著「自己招式最常要求的屬性」所組成的 3 顆純屬骰。不計弱點、也不指定對手。點一列可以展開背後那幾招"
   }
 }

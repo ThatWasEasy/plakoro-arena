@@ -18,7 +18,8 @@ const MODES = [
   // Hidden 2026-08-28: the market data behind it isn't maintainable by hand yet — most listing
   // sources need a login to snapshot, so the figures would go stale without anyone noticing.
   { key: 'priceLog', icon: '💰', enabled: false },
-  { key: 'tournament', icon: '📋' }
+  { key: 'tournament', icon: '📋' },
+  { key: 'tierList', icon: '📊' }
 ]
 
 const VISIBLE_MODES = MODES.filter(m => m.enabled !== false)

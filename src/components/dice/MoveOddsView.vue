@@ -1,10 +1,12 @@
 <script setup>
-import { computed, inject, ref } from 'vue'
+import { computed, inject, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { typeBgColor } from '../../data/constants'
 import { asset } from '../../data/assetPath'
 import { enumerateRolls, charaEffectOdds, jointOdds } from '../../game/energyPayment'
 import { moveExpectedValue } from '../../game/moveExpectedValue'
+import { buildTempoTable } from '../../game/tempoValue'
+import { ASSUMED_ENEMY_LAST_DAMAGE } from '../../game/suggestedDice'
 import MoveCard from '../MoveCard.vue'
 
 // Which dice sets exist upstream, and their labels, so this view can report a move's odds
@@ -67,20 +69,60 @@ const rollsPerSet = computed(() =>
 const showCounts = ref(false)
 
 // Premises the expected value depends on but the dice can't supply: a few moves only pay out
-// below an HP threshold or after a particular previous turn, and damage reduction is only
-// worth counting as HP if the player wants it counted.
+// below an HP threshold or after a particular previous turn, and the two kinds of non-damage
+// worth are only counted if the player wants them counted.
+//
+// They all start on. The figures a player comes here for are "what is each of these moves
+// worth", and the fullest reading of that is the useful default — anyone who wants the bare
+// damage can switch a premise off, which is a cheaper action than discovering that six
+// switches were quietly suppressing part of every number. 40 HP is the threshold the printed
+// low-HP moves key off, so it's the value at which that premise means anything.
 const showSettings = ref(false)
-const sortByEv = ref(false)
-const countDefensiveValue = ref(false)
-const selfHpText = ref('')
-const prevEnemyFailed = ref(false)
-const prevSelfFailed = ref(false)
-const prevPrereqSucceeded = ref(false)
+const sortByEv = ref(true)
+const countDefensiveValue = ref(true)
+const countTempoValue = ref(true)
+const selfHpText = ref('40')
+const enemyLastDamageText = ref(String(ASSUMED_ENEMY_LAST_DAMAGE))
+const prevEnemyFailed = ref(true)
+const prevSelfFailed = ref(true)
+const prevPrereqSucceeded = ref(true)
+
+// Pricing what a move denies the opponent means running the whole roster against itself
+// several times over — a few hundred milliseconds, enough to drop a frame. It's held outside
+// the reactive graph and built once after the first paint, so the list appears immediately
+// and the tempo terms join it a moment later rather than delaying everything.
+const tempoTable = shallowRef(null)
+const tempoPending = ref(false)
+
+function ensureTempoTable() {
+  if (tempoTable.value || tempoPending.value) return
+  tempoPending.value = true
+  setTimeout(() => {
+    tempoTable.value = buildTempoTable(characters.value, moves.value)
+    tempoPending.value = false
+  }, 0)
+}
+
+onMounted(() => {
+  if (countTempoValue.value) ensureTempoTable()
+})
+watch(countTempoValue, on => {
+  if (on) ensureTempoTable()
+})
+
+const waitingForTempo = computed(() => countTempoValue.value && !tempoTable.value)
 
 // Left blank, HP conditions stay unmet and say so on the affected moves, rather than the
 // view quietly picking a number on the player's behalf.
 const selfHp = computed(() => {
   const parsed = parseInt(selfHpText.value, 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+})
+
+// Cleared, the move that copies the opponent's last attack goes back to being uncountable
+// rather than the view inventing a number for it.
+const enemyLastDamage = computed(() => {
+  const parsed = parseInt(enemyLastDamageText.value, 10)
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 })
 
@@ -131,7 +173,8 @@ function signedText(value) {
 // running total — every term that really is added to the line carries its sign.
 //
 // It earns its place only when it says something neither neighbour already does, which needs
-// both halves of the sum present AND something non-damage after it. With no character-die
+// both halves of the sum present AND something non-damage after it (own HP, damage
+// reduction, or what the move denies the opponent). With no character-die
 // share it would merely repeat the printed damage; with nothing following it, it would be the
 // last number on the line, where the damage total is already the only thing on show. That
 // also keeps the line at today's length everywhere except the one case it exists to help —
@@ -141,10 +184,11 @@ function breakdownText(result) {
   const splitDamage = clean(result.evDamageChara) !== 0
   const hasDefensive = clean(result.evDefensive) !== 0
   const hasSelf = clean(result.evSelf) !== 0
+  const hasTempo = clean(result.evTempo) !== 0
   if (splitDamage) {
     parts.push(`${t('diceBuilder.moveOdds.evPartChara')} ${signedText(result.evDamageChara)}`)
   }
-  if (splitDamage && (hasDefensive || hasSelf)) {
+  if (splitDamage && (hasDefensive || hasSelf || hasTempo)) {
     parts.push(`${t('diceBuilder.moveOdds.evPartDamageTotal')} ${evText(result.evDamage)}`)
   }
   if (hasDefensive) {
@@ -153,12 +197,16 @@ function breakdownText(result) {
   if (hasSelf) {
     parts.push(`${t('diceBuilder.moveOdds.evPartSelf')} ${signedText(-result.evSelf)}`)
   }
+  if (clean(result.evTempo) !== 0) {
+    parts.push(`${t('diceBuilder.moveOdds.evPartTempo')} ${signedText(result.evTempo)}`)
+  }
   return parts.join('　')
 }
 
 // Nothing to break down when the printed damage is the whole story.
 function hasBreakdown(result) {
-  return clean(result.evDamageChara) !== 0 || clean(result.evSelf) !== 0 || clean(result.evDefensive) !== 0
+  return clean(result.evDamageChara) !== 0 || clean(result.evSelf) !== 0 ||
+    clean(result.evDefensive) !== 0 || clean(result.evTempo) !== 0
 }
 
 // Every move the character has, in the order the roster defines — including ones that are
@@ -175,12 +223,14 @@ const moveRows = computed(() => {
       // so it assumes a mirror of this set and flags that it did.
       enemyDice: props.sets[si].dice,
       selfHp: selfHp.value,
+      enemyLastDamage: enemyLastDamage.value,
       prev: {
         enemyMoveFailed: prevEnemyFailed.value,
         selfMoveFailed: prevSelfFailed.value,
         prereqMoveSucceeded: prevPrereqSucceeded.value
       },
-      countDefensiveValue: countDefensiveValue.value
+      countDefensiveValue: countDefensiveValue.value,
+      tempoValues: countTempoValue.value ? tempoTable.value : null
     }))
     const odds = evs.map(result => result.odds)
     const noteKinds = [...new Set(evs.flatMap(result => result.notes.map(note => note.kind)))]
@@ -286,6 +336,21 @@ const moveRows = computed(() => {
           <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
             <input type="checkbox" v-model="countDefensiveValue" style="width:0.75rem; height:0.75rem; margin:0;">
             {{ t('diceBuilder.moveOdds.countDefensive') }}
+          </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="countTempoValue" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.countTempo') }}
+            <span v-if="waitingForTempo" style="font-weight:700;">{{ t('diceBuilder.moveOdds.tempoCalculating') }}</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub);">
+            {{ t('diceBuilder.moveOdds.enemyLastDamageLabel') }}
+            <input
+              type="number"
+              min="0"
+              v-model="enemyLastDamageText"
+              :placeholder="t('diceBuilder.moveOdds.selfHpAny')"
+              style="width:4.5rem; font-size:0.625rem; font-weight:800; padding:0.125rem 0.25rem; border:0.0625rem solid var(--line); border-radius:0.25rem; background:#fff; color:var(--ink);"
+            >
           </label>
           <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub);">
             {{ t('diceBuilder.moveOdds.selfHpLabel') }}

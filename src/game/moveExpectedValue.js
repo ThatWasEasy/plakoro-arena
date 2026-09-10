@@ -21,10 +21,12 @@ import { CHARA_DIE_FACE_COUNT, canPayCost, enumerateRolls, payableCount } from '
 
 // Why a move's value is only part of the story, keyed by effect type so the UI can explain
 // each marker it draws.
-// `tempo` marks an effect this model knows about and deliberately values at zero, as
-// distinct from one it doesn't recognise. A caller with the move's card already on screen
-// has nothing to gain by surfacing it — the card says what the effect does.
-export const NOTE_TEMPO = 'tempo'             // real effect, but it moves dice/moves, not HP
+// `tempo` marks an effect that changes what the players can do rather than their HP. Left
+// to itself it is worth zero here, and the marker distinguishes that deliberate zero from an
+// effect this model doesn't recognise at all. Given a table from tempoValue.js it is priced
+// instead — see `tempoWorth`. Either way a caller with the move's card already on screen has
+// nothing to gain by surfacing the marker; the card says what the effect does.
+export const NOTE_TEMPO = 'tempo'             // changes what can be done, not HP directly
 export const NOTE_DEFENSIVE = 'defensive'     // damage reduction, credited as HP on request
 export const NOTE_NEEDS_HP = 'needsHp'        // conditional on the caster's remaining HP
 export const NOTE_NEEDS_PREV = 'needsPrev'    // conditional on what happened last turn
@@ -43,6 +45,46 @@ function faceCountOf(orientationList) {
 
 function addNote(state, type, kind) {
   if (!state.notes.has(type)) state.notes.set(type, kind)
+}
+
+/**
+ * What one dice- or move-denial effect is worth to whoever casts it, read out of a table
+ * built by buildTempoTable. Interpreting effect types is this module's job, which is why the
+ * lookup lives here rather than next to the table — it keeps the dependency one-way.
+ *
+ * Anything the table doesn't cover is worth nothing, damage effects included: those are
+ * already counted as damage and must not be paid for twice.
+ */
+export function tempoWorth(type, value, table) {
+  if (!table) return 0
+  switch (type) {
+    case 'MOD_DICE_ENEMY':
+      return value <= -2 ? table.denyDice2 : value <= -1 ? table.denyDice1 : 0
+    case 'MOD_DICE-CHARADICE_ENEMY':
+      return table.denyDice2AndChara
+    case 'MOD_CHARADICE_ENEMY':
+      return table.denyCharaDie
+    case 'MOD_NULLIFY_TAKEN':
+      return table.nullifyDamage
+    case 'SPECIAL_BIND_WAZA':
+      return table.bindMove
+    case 'MOD_DICE_STEAL':
+      return table.denyDice1 + table.gainDice1
+    // The only one that can come out negative: a few moves cost the caster their own dice.
+    case 'MOD_DICE_SELF':
+      if (value >= 2) return table.gainDice2
+      if (value >= 1) return table.gainDice1
+      if (value <= -2) return -table.denyDice2
+      if (value <= -1) return -table.denyDice1
+      return 0
+    default:
+      return 0
+  }
+}
+
+function addTempo(state, type, value, env) {
+  addNote(state, type, NOTE_TEMPO)
+  state.tempo += tempoWorth(type, value, env.tempoValues)
 }
 
 // Damage reduction is the one non-damage effect that trades in the same currency as the rest
@@ -120,8 +162,9 @@ function applyEffect(eff, state, env) {
     return
   }
 
+  // Pinning a character die to a chosen face isn't in the table, so it stays a known zero.
   if (/^FIX_CHARADICE/.test(type)) {
-    addNote(state, type, NOTE_TEMPO)
+    addTempo(state, type, value, env)
     return
   }
 
@@ -149,9 +192,15 @@ function applyEffect(eff, state, env) {
       }
       break
     }
-    // Copies whatever the opponent last cast, so its damage lives on a card this view can't see.
+    // Copies the number printed on whatever the opponent last cast, which lives on a card
+    // this view can't see — so it's worth nothing until the caller states what that number
+    // was. Assignment, not addition: the copy replaces the move's own printed damage (which
+    // is 0 on the one move that does this) rather than adding to it, matching
+    // computeDisplayDamage. Anything the copied move's own character die would have done is
+    // explicitly not copied, so only the printed figure carries over.
     case 'DAMAGE_COPY_LAST':
-      addNote(state, type, NOTE_UNKNOWN)
+      if (env.enemyLastDamage === null) addNote(state, type, NOTE_UNKNOWN)
+      else state.damage = env.enemyLastDamage * value
       break
     // Recasts the whole move on a hit; resolved as a renewal equation by the caller, since the
     // repeat re-rolls energy as well as the character die.
@@ -161,18 +210,16 @@ function applyEffect(eff, state, env) {
     case 'MOD_REDUCE_TAKEN':
       addDefensive(state, value, env, type)
       break
-    // "Take no damage next turn" is worth exactly what the opponent would have dealt, which
-    // this view has no way to know.
+    // Everything that takes something away from the opponent's next turn, or hands something
+    // to the caster's own: worth nothing without a table, priced against the roster with one.
     case 'MOD_NULLIFY_TAKEN':
-      addNote(state, type, NOTE_UNKNOWN)
-      break
     case 'MOD_DICE_SELF':
     case 'MOD_DICE_ENEMY':
     case 'MOD_DICE_STEAL':
     case 'MOD_CHARADICE_ENEMY':
     case 'MOD_DICE-CHARADICE_ENEMY':
     case 'SPECIAL_BIND_WAZA':
-      addNote(state, type, NOTE_TEMPO)
+      addTempo(state, type, value, env)
       break
     // Weakness is out of the model entirely, so suppressing it is already the default.
     case 'SPECIAL_IGNORE_WEAKNESS':
@@ -185,7 +232,7 @@ function applyEffect(eff, state, env) {
 // One outcome of the character die: the move's own effect plus whichever character-die entry
 // (if any) that face belongs to, resolved in the order resolveTurn queues them.
 function resolveBranch(mv, ce, env) {
-  const state = { damage: mv.baseDamage, self: 0, defensive: 0, repeats: false, notes: new Map() }
+  const state = { damage: mv.baseDamage, self: 0, defensive: 0, tempo: 0, repeats: false, notes: new Map() }
   if (mv.effectType) applyEffect({ type: mv.effectType, value: mv.effectValue }, state, env)
   if (ce && ce.type) applyEffect({ type: ce.type, value: ce.value }, state, env)
   return state
@@ -262,6 +309,9 @@ export function largestTypePileMean(dice) {
  *                                      that makes them roll; omitted means "don't guess"
  * @param {boolean} [options.charaDiceInPlay]  false when the character die is blocked
  * @param {number|null} [options.selfHp]  remaining HP, or null to leave HP conditions unmet
+ * @param {number|null} [options.enemyLastDamage]  printed damage of the opponent's last
+ *                                                  move, for the one move that copies it;
+ *                                                  null leaves it uncounted
  * @param {object} [options.prev]  which previous-turn premises hold
  * @param {boolean} [options.countDefensiveValue]  credit damage reduction as HP kept
  */
@@ -271,8 +321,10 @@ export function moveExpectedValue(mv, options) {
     enemyDice = null,
     charaDiceInPlay = true,
     selfHp = null,
+    enemyLastDamage = null,
     prev = {},
-    countDefensiveValue = false
+    countDefensiveValue = false,
+    tempoValues = null
   } = options
 
   const odds = payableCount(rolls, mv.cost)
@@ -285,7 +337,9 @@ export function moveExpectedValue(mv, options) {
   const env = {
     charaHits: CHARA_DIE_FACE_COUNT,
     selfHp,
+    enemyLastDamage,
     countDefensiveValue,
+    tempoValues,
     prev: {
       enemyMoveFailed: false,
       selfMoveFailed: false,
@@ -310,6 +364,7 @@ export function moveExpectedValue(mv, options) {
   let damageOnHit = 0
   let selfOnHit = 0
   let defensiveOnHit = 0
+  let tempoOnHit = 0
 
   const branches = buildBranches(mv, charaDiceInPlay).map(branch => {
     const state = resolveBranch(mv, branch.ce, { ...env, charaHits: branch.hits })
@@ -318,6 +373,7 @@ export function moveExpectedValue(mv, options) {
     damageOnHit += branch.weight * damage
     selfOnHit += branch.weight * state.self
     defensiveOnHit += branch.weight * state.defensive
+    tempoOnHit += branch.weight * state.tempo
     if (state.repeats) repeatFaces += branch.hits
     state.notes.forEach((kind, type) => addNote({ notes }, type, kind))
     return {
@@ -325,13 +381,14 @@ export function moveExpectedValue(mv, options) {
       probability: branch.weight,
       damage,
       self: state.self,
-      net: damage - state.self + state.defensive
+      net: damage - state.self + state.defensive + state.tempo
     }
   })
 
   let evDamage = pSuccess * damageOnHit
   let evSelf = pSuccess * selfOnHit
   let evDefensive = pSuccess * defensiveOnHit
+  let evTempo = pSuccess * tempoOnHit
 
   // What a successful cast deals before the character die contributes anything: the printed
   // damage plus the move's own effect. It is worked out directly rather than read off the
@@ -349,10 +406,11 @@ export function moveExpectedValue(mv, options) {
       evDamage *= casts
       evSelf *= casts
       evDefensive *= casts
+      evTempo *= casts
     }
   }
 
-  // The four figures add up to `ev` exactly (evSelf counts against it), so a caller can lay
+  // The five figures add up to `ev` exactly (evSelf counts against it), so a caller can lay
   // them out as a decomposition of the headline rather than as unrelated statistics. Extra
   // casts won by a repeat effect land in the character-die share, which is where they came
   // from — the baseline is deliberately left unscaled by the repeat factor.
@@ -364,7 +422,8 @@ export function moveExpectedValue(mv, options) {
     evDamageChara: evDamage - evDamageBase,
     evSelf,
     evDefensive,
-    ev: evDamage - evSelf + evDefensive,
+    evTempo,
+    ev: evDamage - evSelf + evDefensive + evTempo,
     branches,
     notes: [...notes].map(([type, kind]) => ({ type, kind }))
   }
