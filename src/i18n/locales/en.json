@@ -430,7 +430,6 @@
     "title": "Move recommendations",
     "hint": "Pick up to {team} Pokémon to see the {deck} moves worth the most for each",
     "floor": "at least one {n}-energy move",
-    "floorWhy": "Insurance against an opponent taking an energy die away. A move used last turn can't be used again this turn, so only the best two get cast — the other two slots are usually free, and the floor costs nothing to meet.",
     "calculating": "working…",
     "empty": "Pick a Pokémon above",
     "dice": "{n} dice",

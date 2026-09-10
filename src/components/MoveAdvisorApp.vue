@@ -108,8 +108,6 @@ function effectLines(mv) {
       </label>
       <span v-if="tempoPending" class="ma-note">{{ t('moveAdvisor.calculating') }}</span>
     </div>
-    <div class="center-hint" style="padding:0 0.75rem 0.5rem; line-height:1.6;">{{ t('moveAdvisor.floorWhy') }}</div>
-
     <div v-if="teams.length === 0" class="center-hint" style="padding:1.5rem 0.75rem;">{{ t('moveAdvisor.empty') }}</div>
 
     <div v-else class="ma-teams">
