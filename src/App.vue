@@ -37,6 +37,23 @@ const { isLoading, loadError } = characterData
 const mode = ref(null)
 const appVersion = __APP_VERSION__
 
+// A mode can be entered carrying a request from the mode that opened it — the tier list hands
+// the dice builder a character and the build its figure assumed. `from` is where "back" goes,
+// so a screen opened from another screen returns there rather than dropping the player home
+// with their place in a fifteen-row table lost.
+const modeRequest = ref(null)
+
+function openMode(key, request = null) {
+  modeRequest.value = request
+  mode.value = key
+}
+
+function leaveMode() {
+  const back = modeRequest.value ? modeRequest.value.from : null
+  modeRequest.value = null
+  mode.value = back || null
+}
+
 // The duel and solo modes fill the screen and have no back button of their own (unlike the
 // dice builder and store info, which each end their own flow), so they get a shared one here.
 // It asks first: both modes hold real progress, and the button sits near the screen edge where
@@ -51,7 +68,7 @@ function exitToHome() {
   // same for itself in SoloApp's onUnmounted, since its state is created inside that component.
   battle.resetGame()
   showExitConfirm.value = false
-  mode.value = null
+  leaveMode()
 }
 
 const stageRef = ref(null)
@@ -88,7 +105,7 @@ onMounted(() => {
         <button class="btn" @click="characterData.loadData()">{{ t('app.retry') }}</button>
       </div>
 
-      <ModeSelect v-else-if="mode === null" @pick="mode = $event" />
+      <ModeSelect v-else-if="mode === null" @pick="openMode($event)" />
 
       <template v-else-if="mode === 'duel'">
         <SelectBoard v-if="state.phase === 'select'" />
@@ -103,19 +120,23 @@ onMounted(() => {
         <TurnCutIn v-if="state.turnCutIn" />
       </template>
 
-      <DiceBuilderApp v-else-if="mode === 'diceBuilder'" @back="mode = null" />
+      <DiceBuilderApp v-else-if="mode === 'diceBuilder'" :open-odds="modeRequest" @back="leaveMode()" />
 
-      <StoreInfoApp v-else-if="mode === 'storeInfo'" @back="mode = null" />
+      <StoreInfoApp v-else-if="mode === 'storeInfo'" @back="leaveMode()" />
 
-      <PriceLogApp v-else-if="mode === 'priceLog'" @back="mode = null" />
+      <PriceLogApp v-else-if="mode === 'priceLog'" @back="leaveMode()" />
 
-      <TournamentApp v-else-if="mode === 'tournament'" @back="mode = null" />
+      <TournamentApp v-else-if="mode === 'tournament'" @back="leaveMode()" />
 
-      <TierListApp v-else-if="mode === 'tierList'" @back="mode = null" />
+      <TierListApp
+        v-else-if="mode === 'tierList'"
+        @back="leaveMode()"
+        @inspect="openMode('diceBuilder', $event)"
+      />
 
-      <TypeChartApp v-else-if="mode === 'typeChart'" @back="mode = null" />
+      <TypeChartApp v-else-if="mode === 'typeChart'" @back="leaveMode()" />
 
-      <MoveAdvisorApp v-else-if="mode === 'moveAdvisor'" @back="mode = null" />
+      <MoveAdvisorApp v-else-if="mode === 'moveAdvisor'" @back="leaveMode()" />
 
       <SoloApp v-else />
 

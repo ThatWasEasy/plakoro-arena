@@ -13,14 +13,18 @@ import MoveCard from '../MoveCard.vue'
 // under each configuration side by side.
 const props = defineProps({
   sets: { type: Array, required: true },
-  setLabels: { type: Array, required: true }
+  setLabels: { type: Array, required: true },
+  // Set when another screen opened this view for one character, so it lands on that
+  // character's moves instead of the picker. Read once, at setup: after that the selection is
+  // the player's, including their going back to the picker.
+  initialCharacterId: { type: String, default: null }
 })
 const emit = defineEmits(['back'])
 
 const { characters, moves } = inject('characterData')
 const { t } = useI18n()
 
-const selectedCharacterId = ref(null)
+const selectedCharacterId = ref(props.initialCharacterId)
 const selectedCharacter = computed(() =>
   characters.value.find(c => c.id === selectedCharacterId.value) || null
 )
