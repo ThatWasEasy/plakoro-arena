@@ -85,8 +85,6 @@ const rows = computed(() =>
       </div>
     </div>
 
-    <div class="center-hint" style="padding:0.5rem 0.75rem 0; line-height:1.6;">{{ t('typeChart.assumptions') }}</div>
-
     <div style="padding:0.625rem 0 0.75rem;">
       <button class="btn secondary" @click="emit('back')">{{ t('common.back') }}</button>
     </div>
