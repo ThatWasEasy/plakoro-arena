@@ -3,7 +3,8 @@ import { computed, inject, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { typeBgColor } from '../../data/constants'
 import { asset } from '../../data/assetPath'
-import { enumerateRolls, payableCount, charaEffectOdds, jointOdds } from '../../game/energyPayment'
+import { enumerateRolls, charaEffectOdds, jointOdds } from '../../game/energyPayment'
+import { moveExpectedValue } from '../../game/moveExpectedValue'
 import MoveCard from '../MoveCard.vue'
 
 // Which dice sets exist upstream, and their labels, so this view can report a move's odds
@@ -65,6 +66,35 @@ const rollsPerSet = computed(() =>
 
 const showCounts = ref(false)
 
+// Premises the expected value depends on but the dice can't supply: a few moves only pay out
+// below an HP threshold or after a particular previous turn, and damage reduction is only
+// worth counting as HP if the player wants it counted.
+const showSettings = ref(false)
+const sortByEv = ref(false)
+const countDefensiveValue = ref(false)
+const selfHpText = ref('')
+const prevEnemyFailed = ref(false)
+const prevSelfFailed = ref(false)
+const prevPrereqSucceeded = ref(false)
+
+// Left blank, HP conditions stay unmet and say so on the affected moves, rather than the
+// view quietly picking a number on the player's behalf.
+const selfHp = computed(() => {
+  const parsed = parseInt(selfHpText.value, 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+})
+
+// Why a move's figure is qualified, in the order moveExpectedValue reports them.
+const NOTE_LABEL_KEYS = {
+  tempo: 'noteTempo',
+  defensive: 'noteDefensive',
+  needsHp: 'noteNeedsHp',
+  needsPrev: 'noteNeedsPrev',
+  mirrorDice: 'noteMirrorDice',
+  unknown: 'noteUnknown',
+  unsupported: 'noteUnsupported'
+}
+
 function pct(payable, total) {
   return (payable / total * 100).toFixed(1)
 }
@@ -74,16 +104,43 @@ function oddsText(payable, total) {
   return showCounts.value ? `${payable}/${total}（${percentage}）` : percentage
 }
 
+function evText(value) {
+  return value.toFixed(1)
+}
+
+// Own-HP change, so a heal reads as a gain rather than as negative self-damage.
+function signedText(value) {
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}`
+}
+
 // Every move the character has, in the order the roster defines — including ones that are
 // unpayable with the current dice, since "this build can't cast it at all" is the point.
 const moveRows = computed(() => {
   const character = selectedCharacter.value
   if (!character) return []
-  return character.moves.map(id => moves.value[id]).filter(Boolean).map(mv => {
-    const odds = rollsPerSet.value.map(rolls => payableCount(rolls, mv.cost))
+  const rows = character.moves.map(id => moves.value[id]).filter(Boolean).map(mv => {
+    // moveExpectedValue reports the payability it had to work out anyway, so the success
+    // rate and the expected value share a single pass over the roll space.
+    const evs = rollsPerSet.value.map((rolls, si) => moveExpectedValue(mv, {
+      rolls,
+      // The one move that makes the opponent throw energy dice has no other build to go on,
+      // so it assumes a mirror of this set and flags that it did.
+      enemyDice: props.sets[si].dice,
+      selfHp: selfHp.value,
+      prev: {
+        enemyMoveFailed: prevEnemyFailed.value,
+        selfMoveFailed: prevSelfFailed.value,
+        prereqMoveSucceeded: prevPrereqSucceeded.value
+      },
+      countDefensiveValue: countDefensiveValue.value
+    }))
+    const odds = evs.map(result => result.odds)
+    const noteKinds = [...new Set(evs.flatMap(result => result.notes.map(note => note.kind)))]
     return {
       mv,
       odds,
+      evs,
+      noteKeys: noteKinds.map(kind => NOTE_LABEL_KEYS[kind]).filter(Boolean),
       // Per dice set, since the joint figure depends on that set's own success rate.
       charaEffects: mv.chara.map(ce => {
         const charaOdds = charaEffectOdds(ce.orientations)
@@ -91,6 +148,10 @@ const moveRows = computed(() => {
       })
     }
   })
+  // Sorted on set A: with two builds side by side one order has to win, and A is the one the
+  // comparison is anchored to.
+  if (sortByEv.value) rows.sort((a, b) => b.evs[0].ev - a.evs[0].ev)
+  return rows
 })
 
 </script>
@@ -153,6 +214,54 @@ const moveRows = computed(() => {
             <input type="checkbox" v-model="showCounts" style="width:0.75rem; height:0.75rem; margin:0;">
             {{ t('diceBuilder.showCountsLabel') }}
           </label>
+          <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="showSettings = !showSettings">
+            {{ t('diceBuilder.moveOdds.settings') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- what the expected value is allowed to assume; folded away because the defaults are
+           the honest ones and most players never need to touch them -->
+      <div
+        v-if="showSettings"
+        style="width:100%; max-width:40rem; margin:0 0.625rem 0.5rem; padding:0.5rem 0.625rem; border:0.0625rem solid var(--line); border-radius:0.5rem; display:flex; flex-direction:column; gap:0.375rem;"
+      >
+        <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="sortByEv" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.sortByEv') }}
+          </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="countDefensiveValue" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.countDefensive') }}
+          </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub);">
+            {{ t('diceBuilder.moveOdds.selfHpLabel') }}
+            <input
+              type="number"
+              min="0"
+              v-model="selfHpText"
+              :placeholder="t('diceBuilder.moveOdds.selfHpAny')"
+              style="width:4.5rem; font-size:0.625rem; font-weight:800; padding:0.125rem 0.25rem; border:0.0625rem solid var(--line); border-radius:0.25rem; background:#fff; color:var(--ink);"
+            >
+          </label>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.1875rem;">
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="prevEnemyFailed" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.prevEnemyFailed') }}
+          </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="prevSelfFailed" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.prevSelfFailed') }}
+          </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="prevPrereqSucceeded" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.prevPrereqSucceeded') }}
+          </label>
+        </div>
+        <div style="font-size:0.5625rem; font-weight:600; color:var(--sub); line-height:1.5;">
+          {{ t('diceBuilder.moveOdds.evHint') }}
         </div>
       </div>
 
@@ -178,7 +287,42 @@ const moveRows = computed(() => {
               </div>
             </div>
 
+            <!-- the headline figure: what the move is worth per cast, success rate included -->
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.375rem; padding:0 0.125rem;">
+              <span style="font-size:0.625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.expectedValue') }}</span>
+              <div style="display:flex; gap:0.5rem; flex-shrink:0;">
+                <span
+                  v-for="(result, si) in row.evs"
+                  :key="si"
+                  :style="{ display: 'flex', alignItems: 'baseline', gap: '0.1875rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--sub)', whiteSpace: 'nowrap' }"
+                >
+                  <span v-if="hasCompare" style="font-weight:800;">{{ setLabels[si] }}</span>
+                  <span :style="{ fontSize: '1.25rem', fontWeight: 900, color: result.ev === 0 ? 'var(--line)' : 'var(--ink)' }">{{ evText(result.ev) }}</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- only worth breaking out when the move costs its user HP or gives some back -->
+            <div
+              v-if="row.evs.some(result => result.evSelf !== 0)"
+              style="display:flex; justify-content:flex-end; gap:0.5rem; padding:0 0.125rem; font-size:0.5625rem; font-weight:700; color:var(--sub);"
+            >
+              <span v-for="(result, si) in row.evs" :key="si" style="white-space:nowrap;">
+                <span v-if="hasCompare">{{ setLabels[si] }} </span>
+                {{ t('diceBuilder.moveOdds.evBreakdown', { damage: evText(result.evDamage), self: signedText(-result.evSelf) }) }}
+              </span>
+            </div>
+
             <div class="odds-card"><MoveCard :mv="row.mv" :clickable="false" /></div>
+
+            <!-- what the figure above had to assume, or had to leave out -->
+            <div v-if="row.noteKeys.length > 0" style="display:flex; flex-direction:column; gap:0.0625rem; padding:0 0.125rem;">
+              <div
+                v-for="key in row.noteKeys"
+                :key="key"
+                style="font-size:0.5rem; font-weight:700; color:var(--sub); line-height:1.4;"
+              >＊{{ t(`diceBuilder.moveOdds.${key}`) }}</div>
+            </div>
 
             <!-- character-die odds, keyed to the orientation icons on the card's lower half.
                  Reported separately because it rides on a different die from the energy cost. -->
