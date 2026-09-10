@@ -3,7 +3,8 @@ import { computed, inject, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { typeBgColor } from '../data/constants'
 import { asset } from '../data/assetPath'
-import { rankCharacters, DEFAULT_TOP_N, METRIC_TOP_N, METRIC_PER_TURN } from '../game/characterRanking'
+import { rankCharacters, METRIC_TOP_N, METRIC_PER_TURN } from '../game/characterRanking'
+import { SUSTAINABLE_SLOTS } from '../game/turnValue'
 import { buildTempoTable } from '../game/tempoValue'
 
 const emit = defineEmits(['back'])
@@ -19,10 +20,12 @@ const { t } = useI18n()
 const countIndirect = ref(true)
 const expandedId = ref(null)
 
-// Two questions, not one. The top-N average asks how strong a character's best moves are;
-// the per-turn value asks what an average turn is worth, which is the reading that handles
-// a conditional move honestly — it counts fully in the HP band where it can be cast, and
-// not at all in the bands where it can't.
+// Three readings of the same rotation. Two slots is what the no-repeat rule forces, so it
+// is the default; three covers the opponent locking one of them out. The per-turn view adds
+// HP bands on top, which is the only thing that separates it from the plain average — for a
+// character with no conditional moves the two agree exactly, and so they should.
+const SLOTS_OPTIONS = [SUSTAINABLE_SLOTS, SUSTAINABLE_SLOTS + 1]
+const slots = ref(SUSTAINABLE_SLOTS)
 const metric = ref(METRIC_TOP_N)
 const perTurn = computed(() => metric.value === METRIC_PER_TURN)
 
@@ -53,7 +56,7 @@ const waitingForTempo = computed(() => countIndirect.value && !tempoTable.value)
 
 const rows = computed(() =>
   rankCharacters(characters.value, moves.value, {
-    topN: DEFAULT_TOP_N,
+    topN: slots.value,
     metric: metric.value,
     countDefensiveValue: countIndirect.value,
     tempoValues: countIndirect.value ? tempoTable.value : null
@@ -74,17 +77,22 @@ function toggle(id) {
 <template>
   <div class="board select-board" style="overflow-y:auto; align-items:center;">
     <div class="modal-title" style="margin:0.5rem 0 0.25rem;">{{ t('tierList.title') }}</div>
-    <div class="center-hint" style="padding-bottom:0.375rem;">{{ perTurn ? t('tierList.hintPerTurn') : t('tierList.hint', { n: DEFAULT_TOP_N }) }}</div>
+    <div class="center-hint" style="padding-bottom:0.375rem;">{{ perTurn ? t('tierList.hintPerTurn', { n: slots }) : t('tierList.hint', { n: slots }) }}</div>
 
     <div style="width:100%; max-width:34rem; padding:0 0.625rem 0.5rem; display:flex; align-items:center; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
-      <div style="display:flex; gap:0.25rem;">
+      <div style="display:flex; gap:0.25rem; flex-wrap:wrap;">
         <button
-          v-for="option in [METRIC_TOP_N, METRIC_PER_TURN]"
+          v-for="option in SLOTS_OPTIONS"
           :key="option"
           class="btn secondary"
-          :style="{ padding: '0.1875rem 0.5rem', fontSize: '0.625rem', opacity: metric === option ? 1 : 0.5 }"
-          @click="metric = option"
-        >{{ option === METRIC_TOP_N ? t('tierList.metricTopN', { n: DEFAULT_TOP_N }) : t('tierList.metricPerTurn') }}</button>
+          :style="{ padding: '0.1875rem 0.5rem', fontSize: '0.625rem', opacity: slots === option ? 1 : 0.5 }"
+          @click="slots = option"
+        >{{ t('tierList.metricTopN', { n: option }) }}</button>
+        <button
+          class="btn secondary"
+          :style="{ padding: '0.1875rem 0.5rem', fontSize: '0.625rem', opacity: perTurn ? 1 : 0.5 }"
+          @click="metric = perTurn ? METRIC_TOP_N : METRIC_PER_TURN"
+        >{{ t('tierList.metricPerTurn') }}</button>
       </div>
       <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
         <input type="checkbox" v-model="countIndirect" style="width:0.75rem; height:0.75rem; margin:0;">
@@ -121,22 +129,31 @@ function toggle(id) {
         </div>
 
         <div v-if="expandedId === row.character.id" class="tier-detail">
-          <div v-for="(entry, ei) in row.top" :key="ei" class="tier-move">
-            <!-- in the per-turn reading each entry is a stretch of the game, so it says
-                 which stretch and how much of the game that is -->
-            <span v-if="perTurn" class="tier-move-band">{{ entry.above ? t('tierList.bandHealthy') : t('tierList.bandBelow', { hp: entry.hp }) }} {{ Math.round(entry.weight * 100) }}%</span>
+          <div
+            v-for="(entry, ei) in row.top"
+            :key="ei"
+            class="tier-move"
+            :style="perTurn && entry.leadOfBand && ei > 0 ? 'margin-top:0.1875rem;' : ''"
+          >
+            <!-- in the per-turn reading the rows come in bands, so only the first of each
+                 pair repeats the band's label and share of the game -->
+            <span v-if="perTurn" class="tier-move-band">
+              <template v-if="entry.leadOfBand">{{ entry.above ? t('tierList.bandHealthy') : t('tierList.bandBelow', { hp: entry.hp }) }} {{ Math.round(entry.weight * 100) }}%</template>
+            </span>
             <span class="tier-move-type"><img :src="asset(`image/ICON/${entry.mv.type}.png`)" class="img-icon" :alt="entry.mv.type"></span>
             <span class="tier-move-name">{{ entry.mv.name }}</span>
             <span class="tier-move-ev">{{ entry.ev.toFixed(1) }}</span>
           </div>
-          <div v-if="!perTurn && row.moveCount < DEFAULT_TOP_N" class="tier-move-note">{{ t('tierList.fewMoves', { n: row.moveCount }) }}</div>
+          <div v-if="!perTurn && row.moveCount < slots" class="tier-move-note">{{ t('tierList.fewMoves', { n: row.moveCount }) }}</div>
         </div>
       </div>
     </div>
 
-    <div style="width:100%; max-width:34rem; padding:0.625rem 0.75rem 0; font-size:0.5rem; font-weight:700; color:var(--sub); line-height:1.6;">
-      {{ t('tierList.assumptions') }}
-      {{ t('tierList.premiseNote') }}
+    <div style="width:100%; max-width:34rem; padding:0.625rem 0.75rem 0; font-size:0.5rem; font-weight:700; color:var(--sub); line-height:1.6; display:flex; flex-direction:column; gap:0.25rem;">
+      <div>{{ t('tierList.assumptions') }}</div>
+      <div>{{ t('tierList.rotationNote') }}</div>
+      <div>{{ t('tierList.premiseNote') }}</div>
+      <div>{{ t('tierList.disclaimer') }}</div>
     </div>
 
     <div style="display:flex; justify-content:center; padding:0.875rem 0 0.25rem;">

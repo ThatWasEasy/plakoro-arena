@@ -80,7 +80,7 @@
     "storeInfo": "Stores & Events",
     "priceLog": "Market",
     "tournament": "Tournament Scheduler",
-    "tierList": "Expected-value ranking"
+    "tierList": "Character strength ranking"
   },
   "priceLog": {
     "title": {
@@ -398,17 +398,19 @@
     }
   },
   "tierList": {
-    "title": "Expected-value ranking",
-    "hint": "Each Pokémon on three pure dice built for them, scored by the average of their {n} best moves",
+    "title": "Character strength ranking",
+    "hint": "Each Pokémon on three pure dice built for them, scored by alternating their {n} best moves",
     "calculating": "working…",
     "fewMoves": "this Pokémon has only {n} moves",
     "assumptions": "Every Pokémon is assumed to throw three pure dice of whichever type its own moves ask for most. Weakness and the opposing Pokémon are left out. Tap a row to see the moves behind the figure.",
     "countIndirect": "Count worth that is not damage (reduction, denial)",
     "metricTopN": "Top {n} average",
     "metricPerTurn": "Per turn",
-    "hintPerTurn": "The game split into HP bands, each scored by the best move castable there and weighted by how much of a game is spent in it",
+    "hintPerTurn": "The game split into HP bands, each scored by alternating the {n} best moves castable there, weighted by how much of a game is spent in it",
     "bandHealthy": "healthy",
     "bandBelow": "{hp} HP or less",
-    "premiseNote": "Conditional moves: a condition you can set up yourself is priced with the turn it costs to set up, and a condition nobody elects is weighted by how often it holds. Those frequencies come from the card pool — 25% of turns below 40 HP, 50% below 80, and a 16% chance the dice failed last turn."
+    "premiseNote": "Conditional moves: a condition you can set up yourself is priced with the turn it costs to set up, and a condition nobody elects is weighted by how often it holds. Those frequencies come from the card pool — 25% of turns below 40 HP, 50% below 80, and a 16% chance the dice failed last turn.",
+    "disclaimer": "These figures are a guide only — a real match is a good deal more complicated.",
+    "rotationNote": "A move cannot be cast twice running — last turn’s move is locked out — so this is the average of the best two alternating rather than the single best repeated. Three slots covers the opponent locking one of them out."
   }
 }

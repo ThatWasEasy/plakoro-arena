@@ -26,6 +26,7 @@
 //     Three passes reach a fixed point.
 import { enumerateRolls } from './energyPayment'
 import { ASSUMED_ENEMY_LAST_DAMAGE, suggestedBuild } from './suggestedDice'
+import { sustainableValue } from './turnValue'
 import { moveExpectedValue } from './moveExpectedValue'
 
 // A normal turn throws 3 energy dice (the first turn of a game throws 2, which this doesn't
@@ -35,11 +36,12 @@ const MAX_DICE = NORMAL_DICE + 2
 const DECK_SIZE = 4
 const PASSES = 3
 
-// Best value the owner can commit to, under whatever restriction is being priced.
+// What the owner can sustain, under whatever restriction is being priced. The no-repeat
+// rule applies to them as much as to anyone, so this is their best two alternating.
 function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, nullifyDamage = false, bannedId = null } = {}) {
   if (dieCount <= 0) return 0
   const rolls = enumerateRolls(dice.slice(0, dieCount))
-  let best = 0
+  const scores = []
   deck.forEach(mv => {
     if (bannedId !== null && mv.id === bannedId) return
     const result = moveExpectedValue(mv, {
@@ -51,10 +53,9 @@ function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceI
     })
     // Nullification stops the damage reaching its target; whatever the move does to its own
     // caster, and whatever tempo it buys, still happens.
-    const value = nullifyDamage ? result.ev - result.evDamage : result.ev
-    if (value > best) best = value
+    scores.push(nullifyDamage ? result.ev - result.evDamage : result.ev)
   })
-  return best
+  return sustainableValue(scores)
 }
 
 function tableFromPass(roster, previous) {

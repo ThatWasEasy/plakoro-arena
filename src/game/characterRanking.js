@@ -33,8 +33,11 @@
 import { enumerateRolls } from './energyPayment'
 import { moveExpectedValue } from './moveExpectedValue'
 import { ASSUMED_ENEMY_LAST_DAMAGE, suggestedBuild } from './suggestedDice'
+import { SUSTAINABLE_SLOTS, sustainableTop } from './turnValue'
 
-export const DEFAULT_TOP_N = 3
+// Two, because that is what the no-repeat rule forces — see turnValue.js. A third slot is
+// offered rather than assumed, for the case where the opponent locks one of them out.
+export const DEFAULT_TOP_N = SUSTAINABLE_SLOTS
 export const METRIC_TOP_N = 'topN'
 export const METRIC_PER_TURN = 'perTurn'
 
@@ -181,10 +184,17 @@ export function rankCharacters(characters, movesById, options = {}) {
           // The healthy band is "above every threshold", which for this character means its
           // own starting HP — enough for each condition to read as false rather than unknown.
           const bandHp = band.above ? character.hp : band.hp
-          const scored = build.moveList
-            .map(mv => ({ mv, ev: valueAt(mv, bandHp) }))
-            .sort((a, b) => b.ev - a.ev)
-          return { ...band, hp: bandHp, above: !!band.above, best: scored[0] }
+          const scored = build.moveList.map(mv => ({ mv, ev: valueAt(mv, bandHp) }))
+          // The rotation applies inside a band as much as anywhere: taking the maximum here
+          // would let one move be cast every turn of that stretch.
+          const rotation = sustainableTop(scored, topN)
+          return {
+            ...band,
+            hp: bandHp,
+            above: !!band.above,
+            rotation,
+            value: rotation.reduce((sum, e) => sum + e.ev, 0) / rotation.length
+          }
         })
         return {
           character,
@@ -192,9 +202,13 @@ export function rankCharacters(characters, movesById, options = {}) {
           secondaryType: build.secondaryType,
           metric,
           bands: detail,
-          top: detail.map(band => ({ mv: band.best.mv, ev: band.best.ev, weight: band.weight, hp: band.hp, above: band.above })),
+          top: detail.flatMap(band => band.rotation.map((entry, i) => ({
+            mv: entry.mv, ev: entry.ev, weight: band.weight, hp: band.hp, above: band.above,
+            // Only the first row of a band repeats its label, so the pair reads as a pair.
+            leadOfBand: i === 0, bandValue: band.value
+          }))),
           moveCount: build.moveList.length,
-          average: detail.reduce((sum, band) => sum + band.weight * band.best.ev, 0)
+          average: detail.reduce((sum, band) => sum + band.weight * band.value, 0)
         }
       }
 
