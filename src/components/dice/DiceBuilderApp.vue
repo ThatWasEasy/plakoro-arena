@@ -185,51 +185,84 @@ function pickType(type) {
 }
 
 // --- quick pure-type apply ---
-// Sets every die's round/square sockets to the same single type in one go, plus whichever
-// fixed face the picked type actually belongs to (skip the convex face for a concave-pool
-// type, and vice versa — the fixed face on the OTHER pool is left as-is since the picked
-// type can never legally sit there). Applies to every die of the targeted set(s), regardless
-// of the "same as die 1" checkboxes.
-const showQuickApply = ref(false)
-// With two sets in play the type pick is only half the decision, so it parks here while the
-// second step (which set to apply it to) is answered. Single-set mode applies immediately.
-const quickApplyType = ref(null)
+// Sets a die's round and square sockets to one type in one go, plus the fixed face that type
+// belongs to (a convex-pool type can never sit on the concave face, or the other way round).
+//
+// That leaves the other fixed face still holding whatever it held, which is why there is a
+// second step: picking 火 fills both sockets and the convex face, and the concave face can
+// then be pinned to one of 悪/闘/超/飛 so the die is single-purpose in both halves. Skipping
+// that step leaves the face untouched, which is what this used to do unconditionally.
+//
+// `target` is null when the whole build is the subject (which set is asked at the end), or
+// {setIndex, dieIndex} when one die's own button opened it.
+// `step` walks 'main' -> 'opposite' -> 'set', skipping any step with only one answer.
+const quickApply = ref(null)
 
-function applyPureType(type, setIndexes) {
-  const isConvexType = CONVEX_TYPES.includes(type)
-  setIndexes.forEach(si => {
-    sets.value[si].dice.forEach(die => {
-      if (isConvexType) {
-        die.convexType = type
-      } else {
-        die.concaveType = type
-      }
-      die.singleSlots[0].type = type
-      die.singleSlots[1].type = type
-      die.dualSlots[0].types = [type, type]
-      die.dualSlots[1].types = [type, type]
-    })
-  })
-}
-
-function pickQuickApplyType(type) {
-  if (!hasCompare.value) {
-    applyPureType(type, [0])
-    closeQuickApply()
-    return
-  }
-  quickApplyType.value = type
-}
-
-function confirmQuickApply(setIndexes) {
-  if (quickApplyType.value === null) return
-  applyPureType(quickApplyType.value, setIndexes)
-  closeQuickApply()
+function openQuickApply(target = null) {
+  quickApply.value = { target, step: 'main', mainType: null, oppositeType: null }
 }
 
 function closeQuickApply() {
-  showQuickApply.value = false
-  quickApplyType.value = null
+  quickApply.value = null
+}
+
+// The second step always draws from the pool the first pick didn't come from.
+const quickApplyOppositeIsConcave = computed(() =>
+  !!quickApply.value && !!quickApply.value.mainType && CONVEX_TYPES.includes(quickApply.value.mainType)
+)
+const quickApplyOppositeOptions = computed(() =>
+  quickApplyOppositeIsConcave.value ? CONCAVE_TYPES : CONVEX_TYPES
+)
+
+function applyPureType(die, mainType, oppositeType) {
+  if (CONVEX_TYPES.includes(mainType)) {
+    die.convexType = mainType
+    if (oppositeType) die.concaveType = oppositeType
+  } else {
+    die.concaveType = mainType
+    if (oppositeType) die.convexType = oppositeType
+  }
+  die.singleSlots[0].type = mainType
+  die.singleSlots[1].type = mainType
+  die.dualSlots[0].types = [mainType, mainType]
+  die.dualSlots[1].types = [mainType, mainType]
+}
+
+function commitQuickApply(setIndexes) {
+  const qa = quickApply.value
+  if (!qa || qa.mainType === null) return
+  const dieIndex = qa.target ? qa.target.dieIndex : null
+  setIndexes.forEach(si => {
+    const set = sets.value[si]
+    const indexes = dieIndex === null ? set.dice.map((_, di) => di) : [dieIndex]
+    indexes.forEach(di => {
+      // Aiming at one locked die is a statement that it should differ from die 1, so the
+      // lock comes off — otherwise the next edit to die 1 would quietly undo this.
+      if (dieIndex !== null && di > 0 && set.sameAsDie1[di - 1]) set.sameAsDie1[di - 1] = false
+      applyPureType(set.dice[di], qa.mainType, qa.oppositeType)
+    })
+  })
+  closeQuickApply()
+}
+
+function pickQuickApplyMain(type) {
+  quickApply.value.mainType = type
+  quickApply.value.step = 'opposite'
+}
+
+// `type` is null when the player opts to leave the opposite face as it is.
+function pickQuickApplyOpposite(type) {
+  const qa = quickApply.value
+  qa.oppositeType = type
+  if (qa.target) {
+    commitQuickApply([qa.target.setIndex])
+    return
+  }
+  if (!hasCompare.value) {
+    commitQuickApply([0])
+    return
+  }
+  qa.step = 'set'
 }
 
 // --- roll simulation ---
@@ -698,6 +731,12 @@ function openProbTable() {
                 <input type="checkbox" :checked="set.sameAsDie1[di - 1]" @change="onToggleSame(si, di, $event.target.checked)" style="width:0.75rem; height:0.75rem; margin:0;">
                 {{ t('diceBuilder.sameAsDie1Short') }}
               </label>
+              <!-- sits with the other per-die control, so which die it acts on needs no asking -->
+              <button
+                class="btn secondary"
+                style="padding:0.125rem 0.375rem; font-size:0.625rem; line-height:1.3;"
+                @click="openQuickApply({ setIndex: si, dieIndex: di })"
+              >{{ t('diceBuilder.quickApplyDieButton') }}</button>
             </div>
             <div v-for="row in FACE_ROWS" :key="row.key" style="display:flex; justify-content:center; cursor:pointer;" @click="openPicker(si, di, row.key)">
               <div
@@ -723,7 +762,7 @@ function openProbTable() {
 
     <div style="display:flex; gap:0.625rem; justify-content:center; flex-wrap:wrap; padding:0.875rem 0 0.25rem;">
       <button class="btn" @click="openDiceRoll3D">{{ t('diceBuilder.rollButton') }}</button>
-      <button class="btn secondary" @click="showQuickApply = true">{{ t('diceBuilder.quickApplyButton') }}</button>
+      <button class="btn secondary" @click="openQuickApply()">{{ t('diceBuilder.quickApplyButton') }}</button>
       <button class="btn secondary" @click="openProbTable">{{ t('diceBuilder.probButton') }}</button>
       <button class="btn secondary" @click="showMoveOdds = true">{{ t('diceBuilder.moveOddsButton') }}</button>
       <button class="btn secondary" @click="emit('back')">{{ t('common.back') }}</button>
@@ -777,7 +816,7 @@ function openProbTable() {
     </div>
   </div>
 
-  <div v-if="showQuickApply" class="modal-overlay" @click.self="closeQuickApply">
+  <div v-if="quickApply" class="modal-overlay" @click.self="closeQuickApply">
     <div class="modal-sheet" style="max-height:75%; position:relative;">
       <button
         @click="closeQuickApply"
@@ -785,13 +824,19 @@ function openProbTable() {
       >✕</button>
       <div class="modal-title">{{ t('diceBuilder.quickApplyTitle') }}</div>
 
-      <template v-if="quickApplyType === null">
+      <!-- opened from a die's own button, so say which one it will change -->
+      <div v-if="quickApply.target" style="font-size:0.75rem; font-weight:800; color:var(--ink); text-align:center; margin:-0.25rem 0 0.5rem;">
+        <template v-if="hasCompare">{{ t('diceBuilder.set', { label: SET_LABELS[quickApply.target.setIndex] }) }} · </template>{{ t('diceBuilder.die', { n: quickApply.target.dieIndex + 1 }) }}
+      </div>
+
+      <template v-if="quickApply.step === 'main'">
         <div style="font-size:0.75rem; color:var(--sub); text-align:center; margin:-0.25rem 0 0.625rem;">{{ t('diceBuilder.quickApplyHint') }}</div>
+        <div style="font-size:0.8125rem; font-weight:800; color:var(--sub); text-align:center; padding-bottom:0.375rem;">{{ t('diceBuilder.quickApplyStepMain') }}</div>
         <div style="display:flex; flex-wrap:wrap; gap:0.625rem; justify-content:center;">
           <div
             v-for="ty in CHIP_TYPES"
             :key="ty"
-            @click="pickQuickApplyType(ty)"
+            @click="pickQuickApplyMain(ty)"
             style="width:2.75rem; height:2.75rem; border-radius:0.5rem; overflow:hidden; background:#fff; cursor:pointer; border:0.125rem solid var(--line);"
           >
             <img :src="asset(`image/ICON/${ty}.png`)" class="img-icon" :alt="ty">
@@ -799,16 +844,40 @@ function openProbTable() {
         </div>
       </template>
 
+      <!-- the fixed face the first pick couldn't reach, since the two faces draw from
+           different pools and no single type can fill both -->
+      <template v-else-if="quickApply.step === 'opposite'">
+        <div style="font-size:0.8125rem; font-weight:800; color:var(--sub); text-align:center; padding-bottom:0.375rem;">
+          {{ t('diceBuilder.quickApplyStepOpposite', { face: t('diceBuilder.face.' + (quickApplyOppositeIsConcave ? 'concave' : 'convex')) }) }}
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:0.625rem; justify-content:center;">
+          <div
+            v-for="ty in quickApplyOppositeOptions"
+            :key="ty"
+            @click="pickQuickApplyOpposite(ty)"
+            style="width:2.75rem; height:2.75rem; border-radius:0.5rem; overflow:hidden; background:#fff; cursor:pointer; border:0.125rem solid var(--line);"
+          >
+            <img :src="asset(`image/ICON/${ty}.png`)" class="img-icon" :alt="ty">
+          </div>
+        </div>
+        <div style="display:flex; justify-content:center; padding-top:0.75rem;">
+          <button class="btn secondary" @click="pickQuickApplyOpposite(null)">{{ t('diceBuilder.quickApplyKeepOpposite') }}</button>
+        </div>
+      </template>
+
       <template v-else>
         <div style="display:flex; align-items:center; justify-content:center; gap:0.5rem; margin:-0.25rem 0 0.75rem;">
           <div style="width:2.25rem; height:2.25rem; border-radius:0.5rem; overflow:hidden; background:#fff; border:0.1875rem solid #AEFF3E; flex-shrink:0;">
-            <img :src="asset(`image/ICON/${quickApplyType}.png`)" class="img-icon" :alt="quickApplyType">
+            <img :src="asset(`image/ICON/${quickApply.mainType}.png`)" class="img-icon" :alt="quickApply.mainType">
+          </div>
+          <div v-if="quickApply.oppositeType" style="width:2.25rem; height:2.25rem; border-radius:0.5rem; overflow:hidden; background:#fff; border:0.1875rem solid #AEFF3E; flex-shrink:0;">
+            <img :src="asset(`image/ICON/${quickApply.oppositeType}.png`)" class="img-icon" :alt="quickApply.oppositeType">
           </div>
           <span style="font-size:0.8125rem; font-weight:800; color:var(--sub);">{{ t('diceBuilder.applyToLabel') }}</span>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:0.625rem; justify-content:center;">
-          <button v-for="(label, si) in SET_LABELS" :key="si" class="btn secondary" @click="confirmQuickApply([si])">{{ t('diceBuilder.set', { label }) }}</button>
-          <button class="btn" @click="confirmQuickApply([0, 1])">{{ t('diceBuilder.applyToBoth') }}</button>
+          <button v-for="(label, si) in SET_LABELS" :key="si" class="btn secondary" @click="commitQuickApply([si])">{{ t('diceBuilder.set', { label }) }}</button>
+          <button class="btn" @click="commitQuickApply([0, 1])">{{ t('diceBuilder.applyToBoth') }}</button>
         </div>
       </template>
     </div>

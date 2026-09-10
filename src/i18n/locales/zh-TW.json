@@ -163,7 +163,7 @@
     "throwButton": "擲出骰子",
     "quickApplyButton": "快速套用純屬骰",
     "quickApplyTitle": "快速套用純屬骰",
-    "quickApplyHint": "選一種能量，骰子1~3的圓槽、方槽都會替換成該能量；若該能量屬於凸面固定池則凸槽也替換（凹槽不變），若屬於凹面固定池則凹槽也替換（凸槽不變）",
+    "quickApplyHint": "先選主能量，再選副能量",
     "charaDie": "角色骰",
     "set": "骰組{label}",
     "addCompare": "新增一組骰子來比較",
@@ -195,11 +195,9 @@
       "prevSelfFailed": "上一個自己回合，自己能量骰失敗",
       "prevPrereqSucceeded": "上一個自己回合，指定招式成功",
       "evHint": "期望效益＝（對手扣血 − 自己扣血）的平均，再乘上成功率；回血算加分。不計弱點加成。下方的組成相加就是期望效益",
-      "noteDefensive": "含減傷效果",
       "noteNeedsHp": "填入剩餘 HP 後才會計入",
       "noteNeedsPrev": "依上方前提條件計算",
       "noteMirrorDice": "假設對手骰組與本組相同",
-      "noteUnknown": "部分效益取決於對手，未計入",
       "noteUnsupported": "有未支援的效果，未計入",
       "evPartBase": "白板",
       "evPartChara": "角色骰",
@@ -217,7 +215,11 @@
       "dualHint": "分別為上下兩格選擇能量類型",
       "dualSlotLabel": "能量{n}",
       "close": "關閉"
-    }
+    },
+    "quickApplyDieButton": "純屬骰",
+    "quickApplyStepMain": "① 主能量",
+    "quickApplyStepOpposite": "② 副能量（{face}）",
+    "quickApplyKeepOpposite": "跳過"
   },
   "tournament": {
     "listTitle": "賽程編排",

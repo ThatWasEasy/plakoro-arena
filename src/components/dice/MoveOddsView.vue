@@ -84,15 +84,16 @@ const selfHp = computed(() => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 })
 
-// Why a move's figure is qualified, in the order moveExpectedValue reports them. `tempo` is
-// deliberately absent: the move's own card sits directly below the figure and already spells
-// out what a dice-count change or a move lock does, so repeating it here says nothing.
+// A note earns its line only by saying something the screen doesn't already. The move's own
+// card sits directly below the figure and the breakdown sits directly above it, so anything
+// those two already state is left out: `tempo` (the card spells out what a dice-count change
+// or move lock does), `unknown` (the card says it copies the opponent's move, or nullifies
+// their damage), and `defensive` (the breakdown itemises the reduction as a number). What is
+// left is the four things only the calculation knows about its own assumptions.
 const NOTE_LABEL_KEYS = {
-  defensive: 'noteDefensive',
   needsHp: 'noteNeedsHp',
   needsPrev: 'noteNeedsPrev',
   mirrorDice: 'noteMirrorDice',
-  unknown: 'noteUnknown',
   unsupported: 'noteUnsupported'
 }
 

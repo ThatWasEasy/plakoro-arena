@@ -163,7 +163,7 @@
     "throwButton": "投げる",
     "quickApplyButton": "単色ダイスを一括適用",
     "quickApplyTitle": "単色ダイスを一括適用",
-    "quickApplyHint": "エネルギーを1つ選ぶと、ダイス1~3の丸穴・角穴が全てそのタイプになります。凸面プールのタイプなら凸面も変わり（凹面は不変）、凹面プールのタイプなら凹面も変わります（凸面は不変）",
+    "quickApplyHint": "まず主エネルギー、次に副エネルギーを選びます",
     "charaDie": "キャラダイス",
     "set": "ダイスセット{label}",
     "addCompare": "比較用のダイスセットを追加",
@@ -195,11 +195,9 @@
       "prevSelfFailed": "前の自分の番、自分のエネコロが失敗した",
       "prevPrereqSucceeded": "前の自分の番、指定のワザが成功した",
       "evHint": "期待値＝（相手に与えるダメージ − 自分が受けるダメージ）の平均に成功率を掛けた値。回復はプラスとして数えます。弱点は計算に入れません。下段の内訳は足すと期待値になります",
-      "noteDefensive": "ダメージ軽減を含む",
       "noteNeedsHp": "残りHPを入れると計算されます",
       "noteNeedsPrev": "上の前提条件に基づく数値",
       "noteMirrorDice": "相手のダイスもこの構成と同じと仮定",
-      "noteUnknown": "相手次第の効果があり、計算に含めていません",
       "noteUnsupported": "未対応の効果があり、計算に含めていません",
       "evPartBase": "ワザ",
       "evPartChara": "キャラコロ",
@@ -217,7 +215,11 @@
       "dualHint": "上下それぞれでエネルギータイプを選択",
       "dualSlotLabel": "エネルギー{n}",
       "close": "閉じる"
-    }
+    },
+    "quickApplyDieButton": "単色",
+    "quickApplyStepMain": "① 主エネルギー",
+    "quickApplyStepOpposite": "② 副エネルギー（{face}）",
+    "quickApplyKeepOpposite": "スキップ"
   },
   "tournament": {
     "listTitle": "トーナメント編成",

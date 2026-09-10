@@ -163,7 +163,7 @@
     "throwButton": "Throw Dice",
     "quickApplyButton": "Quick Apply Pure Die",
     "quickApplyTitle": "Quick Apply Pure Die",
-    "quickApplyHint": "Pick one energy type to fill Dice 1-3's round and square sockets. If it's a convex-pool type, the convex face gets it too (concave stays); if it's a concave-pool type, the concave face gets it too (convex stays)",
+    "quickApplyHint": "Pick the main energy, then the secondary one.",
     "charaDie": "Character Die",
     "set": "Set {label}",
     "addCompare": "Add a set to compare",
@@ -195,11 +195,9 @@
       "prevSelfFailed": "Your energy dice failed last turn",
       "prevPrereqSucceeded": "The prerequisite move landed last turn",
       "evHint": "Expected value = average of (damage dealt − damage taken by yourself), multiplied by the success rate. Healing counts as a gain. Weakness is left out. The parts underneath add up to the figure.",
-      "noteDefensive": "Includes damage reduction",
       "noteNeedsHp": "Counted once you enter remaining HP",
       "noteNeedsPrev": "Based on the assumptions above",
       "noteMirrorDice": "Assumes the opponent rolls this same build",
-      "noteUnknown": "Part of its value depends on the opponent, so it is left out",
       "noteUnsupported": "Has an unsupported effect, left out",
       "evPartBase": "Base",
       "evPartChara": "Char. die",
@@ -217,7 +215,11 @@
       "dualHint": "Pick an energy type for each half",
       "dualSlotLabel": "Energy {n}",
       "close": "Close"
-    }
+    },
+    "quickApplyDieButton": "Pure",
+    "quickApplyStepMain": "1. Main energy",
+    "quickApplyStepOpposite": "2. Secondary energy ({face})",
+    "quickApplyKeepOpposite": "Skip"
   },
   "tournament": {
     "listTitle": "Tournament Scheduler",
