@@ -136,11 +136,12 @@ function effectLines(mv) {
           <span class="ma-move-type"><img :src="asset(`image/ICON/${entry.mv.type}.png`)" class="img-icon" :alt="entry.mv.type"></span>
 
           <span class="ma-move-body">
+            <!-- Name, cost and damage on one line: they are what a player matches against the
+                 card in their hand, and stacking them left the right half of the row empty
+                 while the damage floated off the pips' baseline. -->
             <span class="ma-move-line">
               <span class="ma-move-name">{{ printedName(entry.mv) }}</span>
               <span v-if="translatedName(entry.mv)" class="ma-move-alt">{{ translatedName(entry.mv) }}</span>
-            </span>
-            <span class="ma-move-line">
               <span class="ma-cost">
                 <span v-for="(type, ci) in entry.mv.cost" :key="ci" class="ma-cost-pip">
                   <img :src="asset(`image/ICON/${type}.png`)" class="img-icon" :alt="type">
@@ -149,8 +150,12 @@ function effectLines(mv) {
               </span>
               <span class="ma-damage">{{ entry.mv.baseDamage }}</span>
             </span>
+            <!-- The die label gets a fixed width so every effect's text starts at the same
+                 place: 立上 is two characters and 下逆左右 is four, and left to themselves the
+                 sentences step in and out down the card. -->
             <span v-for="(line, li) in effectLines(entry.mv)" :key="li" class="ma-effect">
-              <span v-if="line.orientations" class="ma-effect-die">{{ line.orientations.join('') }}</span>{{ line.text }}
+              <span class="ma-effect-die">{{ line.orientations ? line.orientations.join('') : '' }}</span>
+              <span class="ma-effect-text">{{ line.text }}</span>
             </span>
           </span>
 
@@ -288,20 +293,30 @@ function effectLines(mv) {
 .ma-slot { font-size: 0.5625rem; font-weight: 900; color: var(--sub); min-width: 0.625rem; padding-top: 0.125rem; }
 .ma-move-type { width: 0.875rem; height: 0.875rem; flex-shrink: 0; padding-top: 0.0625rem; }
 .ma-move-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.0625rem; }
-.ma-move-line { display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
+.ma-move-line { display: flex; align-items: center; gap: 0.3125rem; flex-wrap: wrap; }
 .ma-move-name { font-size: 0.6875rem; font-weight: 900; color: var(--ink); }
 .ma-move-alt { font-size: 0.5625rem; font-weight: 700; color: var(--sub); }
 .ma-cost { display: inline-flex; align-items: center; gap: 0.0625rem; }
-.ma-cost-pip { width: 0.75rem; height: 0.75rem; }
-.ma-damage { font-size: 0.625rem; font-weight: 900; color: var(--ink); }
+.ma-cost-pip { width: 0.8125rem; height: 0.8125rem; display: block; }
+.ma-damage { font-size: 0.6875rem; font-weight: 900; color: var(--ink); }
 
 .ma-effect {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
   font-size: 0.5625rem;
   font-weight: 700;
   color: var(--sub);
   line-height: 1.5;
 }
 
-.ma-effect-die { font-weight: 900; color: var(--ink); padding-right: 0.1875rem; }
+.ma-effect-die {
+  font-weight: 900;
+  color: var(--ink);
+  min-width: 2.5rem;
+  flex-shrink: 0;
+}
+
+.ma-effect-text { min-width: 0; }
 .ma-ev { font-size: 0.75rem; font-weight: 900; color: var(--ink); min-width: 2rem; text-align: right; flex-shrink: 0; }
 </style>
