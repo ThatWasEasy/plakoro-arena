@@ -105,13 +105,41 @@ function oddsText(payable, total) {
   return showCounts.value ? `${payable}/${total}（${percentage}）` : percentage
 }
 
-function evText(value) {
-  return value.toFixed(1)
+// Rounding leaves the odd -0.00000001 behind, which would print as a startling "-0.0".
+function clean(value) {
+  return Math.abs(value) < 0.05 ? 0 : value
 }
 
-// Own-HP change, so a heal reads as a gain rather than as negative self-damage.
+function evText(value) {
+  return clean(value).toFixed(1)
+}
+
 function signedText(value) {
-  return `${value > 0 ? '+' : ''}${value.toFixed(1)}`
+  const rounded = clean(value)
+  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(1)}`
+}
+
+// Where a move's expected value comes from. The parts are signed and add up to the headline
+// figure, so the line reads as its arithmetic rather than as four loose statistics: the
+// printed damage first, then what the character die is worth on top, then whatever the move
+// costs or gives back in own HP. Parts worth nothing are dropped instead of printing zeroes.
+function breakdownText(result) {
+  const parts = [`${t('diceBuilder.moveOdds.evPartBase')} ${evText(result.evDamageBase)}`]
+  if (clean(result.evDamageChara) !== 0) {
+    parts.push(`${t('diceBuilder.moveOdds.evPartChara')} ${signedText(result.evDamageChara)}`)
+  }
+  if (clean(result.evDefensive) !== 0) {
+    parts.push(`${t('diceBuilder.moveOdds.evPartDefensive')} ${signedText(result.evDefensive)}`)
+  }
+  if (clean(result.evSelf) !== 0) {
+    parts.push(`${t('diceBuilder.moveOdds.evPartSelf')} ${signedText(-result.evSelf)}`)
+  }
+  return parts.join('　')
+}
+
+// Nothing to break down when the printed damage is the whole story.
+function hasBreakdown(result) {
+  return clean(result.evDamageChara) !== 0 || clean(result.evSelf) !== 0 || clean(result.evDefensive) !== 0
 }
 
 // Every move the character has, in the order the roster defines — including ones that are
@@ -141,10 +169,10 @@ const moveRows = computed(() => {
       mv,
       odds,
       evs,
-      // Drives whether the own-HP line is shown or merely held open — the cards sit in a
+      // Drives whether the breakdown is shown or merely held open — the cards sit in a
       // two-column grid, so a line that appears on one move and not its neighbour would
       // knock the two cards out of alignment.
-      hasSelfChange: evs.some(result => result.evSelf !== 0),
+      showBreakdown: evs.some(hasBreakdown),
       noteKeys: noteKinds.map(kind => NOTE_LABEL_KEYS[kind]).filter(Boolean),
       // Per dice set, since the joint figure depends on that set's own success rate.
       charaEffects: mv.chara.map(ce => {
@@ -307,25 +335,25 @@ const moveRows = computed(() => {
               </div>
             </div>
 
-            <!-- only says anything when the move costs its user HP or gives some back, but the
-                 row is held open either way so every card in the grid starts at the same height -->
+            <!-- where that figure came from. One line per dice set whether or not it has
+                 anything to say, so every card in the grid starts at the same height. -->
             <div
               :style="{
                 display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '0.5rem',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '0.0625rem',
                 padding: '0 0.125rem',
                 fontSize: '0.5625rem',
                 fontWeight: 700,
                 color: 'var(--sub)',
-                visibility: row.hasSelfChange ? 'visible' : 'hidden'
+                visibility: row.showBreakdown ? 'visible' : 'hidden'
               }"
-              :aria-hidden="!row.hasSelfChange"
+              :aria-hidden="!row.showBreakdown"
             >
-              <span v-for="(result, si) in row.evs" :key="si" style="white-space:nowrap;">
-                <span v-if="hasCompare">{{ setLabels[si] }} </span>
-                {{ t('diceBuilder.moveOdds.evBreakdown', { damage: evText(result.evDamage), self: signedText(-result.evSelf) }) }}
-              </span>
+              <div v-for="(result, si) in row.evs" :key="si" style="white-space:nowrap;">
+                <span v-if="hasCompare" style="font-weight:800;">{{ setLabels[si] }} </span>{{ breakdownText(result) }}
+              </div>
             </div>
 
             <div class="odds-card"><MoveCard :mv="row.mv" :clickable="false" /></div>

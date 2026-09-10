@@ -333,6 +333,13 @@ export function moveExpectedValue(mv, options) {
   let evSelf = pSuccess * selfOnHit
   let evDefensive = pSuccess * defensiveOnHit
 
+  // What a successful cast deals before the character die contributes anything: the printed
+  // damage plus the move's own effect. It is worked out directly rather than read off the
+  // "die missed" branch, because a move whose effect entries cover all six faces — or which
+  // throws the die several times of its own accord — has no such branch to read.
+  const baseline = resolveBranch(mv, null, { ...env, charaHits: 0 })
+  const evDamageBase = pSuccess * Math.max(baseline.damage, 0)
+
   // A repeat is a fresh cast of the same move — new energy roll, new character die — so the
   // total is the fixed point of "value of one cast, plus another whole go at probability q".
   if (repeatFaces > 0) {
@@ -345,10 +352,16 @@ export function moveExpectedValue(mv, options) {
     }
   }
 
+  // The four figures add up to `ev` exactly (evSelf counts against it), so a caller can lay
+  // them out as a decomposition of the headline rather than as unrelated statistics. Extra
+  // casts won by a repeat effect land in the character-die share, which is where they came
+  // from — the baseline is deliberately left unscaled by the repeat factor.
   return {
     odds,
     pSuccess,
     evDamage,
+    evDamageBase,
+    evDamageChara: evDamage - evDamageBase,
     evSelf,
     evDefensive,
     ev: evDamage - evSelf + evDefensive,
