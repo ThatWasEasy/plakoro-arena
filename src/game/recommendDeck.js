@@ -19,6 +19,14 @@
 // knowable here — inventing a weight would bury a guess inside a figure that looks derived.
 // So: best rotation at full dice decides it, and among decks that tie there, the one that
 // still functions a die down wins. A player who wants more than a tie-break has the floors.
+//
+// The tie-break applies whether or not a floor is set, and that is not an optimisation to be
+// skipped when nothing asks for it. Running it only under a floor made setting a floor do two
+// things at once: ファイヤー already carries a two-energy move at rank three, so asking for
+// one changed nothing about whether the deck qualified — and yet the fourth slot still moved,
+// because the request had quietly switched the tie-break on as well. A toggle has to mean the
+// one thing it says, and the denied-dice figures have to be on screen whether or not a floor
+// put them there.
 import { enumerateRolls } from './energyPayment'
 import { ASSUMED_ENEMY_LAST_DAMAGE, suggestedBuild } from './suggestedDice'
 import { moveExpectedValue } from './moveExpectedValue'
@@ -150,13 +158,11 @@ export function chooseDeck(entries, options = {}) {
   const unmet = costFloors.filter(cost => !entries.some(entry => (entry.mv.cost || []).length === cost))
   const floors = costFloors.filter(cost => !unmet.includes(cost))
 
-  if (floors.length === 0) return { deck: entries.slice(0, size), unmet }
-
   const counts = dieCounts.filter(count => entries.every(entry => entry.evAt[count] !== undefined))
   let best = null
   let bestScore = null
   for (const deck of combinations(entries, size)) {
-    if (!floors.every(cost => deck.some(entry => (entry.mv.cost || []).length === cost))) continue
+    if (floors.length > 0 && !floors.every(cost => deck.some(entry => (entry.mv.cost || []).length === cost))) continue
     const score = rotationValues(deck, counts)
     if (best === null || better(score, bestScore)) {
       best = deck
@@ -177,13 +183,9 @@ export function recommendDeck(character, movesById, options = {}) {
   const { costFloors = [], size = DECK_SIZE, ...scoreOptions } = options
   // scoreMoves builds the evaluation env itself, so anything it doesn't name is dropped
   // silently — every option this function accepts has to be one scoreMoves destructures.
-  // The denied-dice figures are only computed when something will read them: they cost a full
-  // re-evaluation of every move, and with no floors set the rotation at full dice settles the
-  // deck on its own.
-  const dieCounts = costFloors.length > 0 ? JUDGED_DICE : [NORMAL_DICE]
-  const scored = scoreMoves(character, movesById, { ...scoreOptions, dieCounts })
+  const scored = scoreMoves(character, movesById, { ...scoreOptions, dieCounts: JUDGED_DICE })
   if (!scored) return null
-  const { deck, unmet } = chooseDeck(scored.entries, { size, costFloors, dieCounts })
+  const { deck, unmet } = chooseDeck(scored.entries, { size, costFloors, dieCounts: JUDGED_DICE })
   return {
     character,
     build: scored.build,
@@ -192,6 +194,6 @@ export function recommendDeck(character, movesById, options = {}) {
     unmet,
     // What the deck is actually worth, and what is left of it a die down — the pair a player
     // is trading between when they set a floor.
-    rotation: rotationValues(deck, dieCounts)
+    rotation: rotationValues(deck, JUDGED_DICE)
   }
 }
