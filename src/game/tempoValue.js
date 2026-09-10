@@ -58,7 +58,7 @@ export const REFERENCE_COUNT = 5
 
 // What the owner can sustain, under whatever restriction is being priced. The no-repeat
 // rule applies to them as much as to anyone, so this is their best two alternating.
-function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, nullifyDamage = false, bannedId = null } = {}) {
+function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, nullifyDamage = false, bannedId = null, countDefensiveValue = true } = {}) {
   if (dieCount <= 0) return 0
   const rolls = enumerateRolls(dice.slice(0, dieCount))
   const scores = []
@@ -69,6 +69,7 @@ function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceI
       enemyDice: dice.slice(0, NORMAL_DICE),
       charaDiceInPlay,
       tempoValues: table,
+      countDefensiveValue,
       enemyLastDamage: ASSUMED_ENEMY_LAST_DAMAGE
     })
     // Nullification stops the damage reaching its target; whatever the move does to its own
@@ -106,14 +107,14 @@ function referenceMean(rows, key) {
   return Math.max(0, pool.reduce((sum, row) => sum + row[key], 0) / pool.length)
 }
 
-function tableFromPass(roster, previous) {
+function tableFromPass(roster, previous, countDefensiveValue) {
   const rows = []
   roster.forEach(({ dice, moveList }) => {
     const rolls = enumerateRolls(dice.slice(0, NORMAL_DICE))
     const scored = moveList
       .map(mv => ({
         mv,
-        ev: moveExpectedValue(mv, { rolls, enemyDice: dice.slice(0, NORMAL_DICE), tempoValues: previous, enemyLastDamage: ASSUMED_ENEMY_LAST_DAMAGE }).ev
+        ev: moveExpectedValue(mv, { rolls, enemyDice: dice.slice(0, NORMAL_DICE), tempoValues: previous, countDefensiveValue, enemyLastDamage: ASSUMED_ENEMY_LAST_DAMAGE }).ev
       }))
       .sort((a, b) => b.ev - a.ev)
     // The four moves they'd have brought, since a real opponent picks four, not the whole
@@ -121,7 +122,7 @@ function tableFromPass(roster, previous) {
     const deck = scored.slice(0, DECK_SIZE).map(entry => entry.mv)
     const topId = scored.length > 0 ? scored[0].mv.id : null
 
-    const at = opts => bestCommittable(deck, dice, previous, opts)
+    const at = opts => bestCommittable(deck, dice, previous, { ...opts, countDefensiveValue })
     const base = at({})
     rows.push({
       base,
@@ -154,7 +155,14 @@ function tableFromPass(roster, previous) {
  * @param {object} movesById   every move, keyed by id
  * @returns {object} values in HP, keyed by restriction
  */
-export function buildTempoTable(characters, movesById) {
+export function buildTempoTable(characters, movesById, options = {}) {
+  // Damage reduction is HP kept, and what a denial costs is measured in the same currency as
+  // everything the opponent could otherwise have done — so it counts here for the same reason
+  // it counts in the tier list. Leaving it out understated the baseline for the three
+  // characters built around it: イワーク's best committable turn is 26.3 without it and 34.5
+  // with, and a die taken from them is worth accordingly more.
+  const { countDefensiveValue = true } = options
+
   const roster = characters
     .map(character => suggestedBuild(character, movesById, MAX_DICE))
     .filter(Boolean)
@@ -163,7 +171,7 @@ export function buildTempoTable(characters, movesById) {
 
   let table = null
   for (let pass = 0; pass < PASSES; pass++) {
-    table = tableFromPass(roster, table)
+    table = tableFromPass(roster, table, countDefensiveValue)
   }
   return table
 }

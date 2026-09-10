@@ -47,6 +47,10 @@ export const JUDGED_DICE = [NORMAL_DICE, NORMAL_DICE - 1, NORMAL_DICE - 2]
  * @param {object} [options]
  * @param {object} [options.tempoValues]  table from buildTempoTable, or null to leave denial
  *                                        effects at zero
+ * @param {boolean} [options.countDefensiveValue]  credit damage reduction as HP kept. On by
+ *                                        default, matching the tier list: this screen asks
+ *                                        what to bring, and a move whose whole point is the
+ *                                        reduction is not worth zero to a player choosing it
  * @param {number[]} [options.dieCounts]  which die counts to value each move at. Defaults to
  *                                        a normal turn only — the extra counts cost a full
  *                                        re-evaluation each and are only worth paying for
@@ -58,6 +62,7 @@ export function scoreMoves(character, movesById, options = {}) {
   const {
     tempoValues = null,
     enemyLastDamage = ASSUMED_ENEMY_LAST_DAMAGE,
+    countDefensiveValue = true,
     dieCounts = [NORMAL_DICE]
   } = options
 
@@ -77,7 +82,9 @@ export function scoreMoves(character, movesById, options = {}) {
     dieCounts.forEach(count => {
       // No dice is no cast, not a free one.
       if (count <= 0) { evAt[count] = 0; return }
-      const scored = moveExpectedValue(mv, { rolls: rollsFor[count], enemyDice, tempoValues, enemyLastDamage })
+      const scored = moveExpectedValue(mv, {
+        rolls: rollsFor[count], enemyDice, tempoValues, enemyLastDamage, countDefensiveValue
+      })
       evAt[count] = scored.ev
       if (count === NORMAL_DICE) result = scored
     })
@@ -168,6 +175,8 @@ export function chooseDeck(entries, options = {}) {
  */
 export function recommendDeck(character, movesById, options = {}) {
   const { costFloors = [], size = DECK_SIZE, ...scoreOptions } = options
+  // scoreMoves builds the evaluation env itself, so anything it doesn't name is dropped
+  // silently — every option this function accepts has to be one scoreMoves destructures.
   // The denied-dice figures are only computed when something will read them: they cost a full
   // re-evaluation of every move, and with no floors set the rotation at full dice settles the
   // deck on its own.
