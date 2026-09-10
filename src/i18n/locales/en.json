@@ -413,7 +413,8 @@
     "bandBelow": "{hp} HP or less",
     "premiseNote": "Conditional moves: a condition you can set up yourself is priced with the turn it costs to set up, and a condition nobody elects is weighted by how often it holds. Those frequencies come from the card pool — 25% of turns below 40 HP, 50% below 80, and a 16% chance the dice failed last turn.",
     "disclaimer": "These figures are a guide only — a real match is a good deal more complicated.",
-    "rotationNote": "A move cannot be cast twice running — last turn’s move is locked out — so this is the average of the best two alternating rather than the single best repeated. Three slots covers the opponent locking one of them out."
+    "rotationNote": "A move cannot be cast twice running — last turn’s move is locked out — so this is the average of the best two alternating rather than the single best repeated. Three slots covers the opponent locking one of them out.",
+    "inspect": "Open in the odds table"
   },
   "typeChart": {
     "title": "Type matchups",

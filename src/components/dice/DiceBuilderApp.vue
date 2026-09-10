@@ -10,6 +10,12 @@ import MoveOddsView from './MoveOddsView.vue'
 // for it, instead of it loading for every player of the actual battle modes.
 const DiceRoll3DCanvas = defineAsyncComponent(() => import('./DiceRoll3DCanvas.vue'))
 
+// A character and the build another screen wants examined — see App.vue's modeRequest. The
+// dice are applied here rather than inside the odds view because this component owns them,
+// and an odds view that reached back to rewrite its parent's state would have two owners.
+const props = defineProps({
+  openOdds: { type: Object, default: null }
+})
 const emit = defineEmits(['back'])
 const { t } = useI18n()
 
@@ -397,6 +403,19 @@ function onDiceRolled(results) {
 // 216 outcomes get grouped/tallied by that resulting type set.
 const showProbTable = ref(false)
 const showMoveOdds = ref(false)
+
+// Opened from the tier list: set A becomes the three pure dice that ranking assumed, and the
+// odds view opens straight onto that character. Rebuilding the dice is the point — the figure
+// the player tapped was computed on this build, and landing them on whatever dice happened to
+// be left in the builder would show them a different number for the move they came to read.
+if (props.openOdds) {
+  const set = sets.value[0]
+  set.dice.forEach(die => applyPureType(die, props.openOdds.mainType, props.openOdds.secondaryType))
+  // Identical by construction, so the mirror locks say so rather than leaving three dice that
+  // merely happen to match until the player edits one.
+  set.sameAsDie1 = [true, true]
+  showMoveOdds.value = true
+}
 const TOTAL_ROLLS = ALL_FACE_KEYS.length ** 3
 
 function sortByChipOrder(types) {
@@ -550,7 +569,13 @@ function openProbTable() {
 </script>
 
 <template>
-  <MoveOddsView v-if="showMoveOdds" :sets="sets" :set-labels="SET_LABELS.slice(0, sets.length)" @back="showMoveOdds = false" />
+  <MoveOddsView
+    v-if="showMoveOdds"
+    :sets="sets"
+    :set-labels="SET_LABELS.slice(0, sets.length)"
+    :initial-character-id="openOdds ? openOdds.characterId : null"
+    @back="showMoveOdds = false"
+  />
 
   <div v-else-if="showDiceRoll3D" class="board select-board" style="display:flex; flex-direction:column; align-items:center; min-height:0;">
     <div class="modal-title" style="margin:0.5rem 0 0.25rem; flex-shrink:0;">{{ t('diceBuilder.rollButton') }}</div>

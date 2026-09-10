@@ -7,7 +7,7 @@ import { rankCharacters, METRIC_TOP_N, METRIC_PER_TURN } from '../game/character
 import { SUSTAINABLE_SLOTS } from '../game/turnValue'
 import { buildTempoTable } from '../game/tempoValue'
 
-const emit = defineEmits(['back'])
+const emit = defineEmits(['back', 'inspect'])
 const { characters, moves } = inject('characterData')
 const { t } = useI18n()
 
@@ -126,6 +126,21 @@ function toggle(id) {
             ></span>
           </span>
           <span class="tier-value">{{ row.average.toFixed(1) }}</span>
+          <!-- Straight to the odds table for this character, on the very build this figure
+               assumes. It stops the click reaching the row, whose job is expanding the
+               breakdown — the two are different questions and a row that did both on one tap
+               would answer neither reliably. -->
+          <button
+            class="tier-inspect"
+            :aria-label="t('tierList.inspect')"
+            :title="t('tierList.inspect')"
+            @click.stop="emit('inspect', {
+              from: 'tierList',
+              characterId: row.character.id,
+              mainType: row.mainType,
+              secondaryType: row.secondaryType
+            })"
+          >🎲</button>
         </div>
 
         <div v-if="expandedId === row.character.id" class="tier-detail">
@@ -230,6 +245,21 @@ function toggle(id) {
   text-align: right;
   flex-shrink: 0;
 }
+
+.tier-inspect {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.3125rem;
+  background: var(--line);
+  font-size: 0.6875rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tier-inspect:active { transform: scale(.92); }
 
 .tier-detail {
   display: flex;
