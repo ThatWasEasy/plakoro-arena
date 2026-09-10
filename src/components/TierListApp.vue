@@ -3,19 +3,28 @@ import { computed, inject, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { typeBgColor } from '../data/constants'
 import { asset } from '../data/assetPath'
-import { rankCharacters, DEFAULT_TOP_N } from '../game/characterRanking'
+import { rankCharacters, DEFAULT_TOP_N, METRIC_TOP_N, METRIC_PER_TURN } from '../game/characterRanking'
 import { buildTempoTable } from '../game/tempoValue'
 
 const emit = defineEmits(['back'])
 const { characters, moves } = inject('characterData')
 const { t } = useI18n()
 
-// Counting what a move denies the opponent is on by default here, unlike the odds view. That
-// view answers "what will this move do to their HP", where a strict reading is the honest
-// one; this one answers "how strong is this character", and a move like 10まんボルト that
-// costs its caster two dice next turn is genuinely worse than its printed damage suggests.
-const countTempo = ref(true)
+// Counting worth that isn't damage — reduction kept as HP, and what a move denies the
+// opponent — is on by default here, unlike the odds view. That view answers "what will this
+// move do to their HP", where a strict reading is the honest one; this one answers "how
+// strong is this character", and a move like 10まんボルト that costs its caster two dice next
+// turn is genuinely worse than its printed damage suggests. Both kinds ride one switch here
+// rather than the odds view's two: at this level they are the same assumption.
+const countIndirect = ref(true)
 const expandedId = ref(null)
+
+// Two questions, not one. The top-N average asks how strong a character's best moves are;
+// the per-turn value asks what an average turn is worth, which is the reading that handles
+// a conditional move honestly — it counts fully in the HP band where it can be cast, and
+// not at all in the bands where it can't.
+const metric = ref(METRIC_TOP_N)
+const perTurn = computed(() => metric.value === METRIC_PER_TURN)
 
 // Pricing the denial effects means evaluating the whole roster against itself several times
 // over, which is a few hundred milliseconds — long enough to drop a frame on the fixed stage.
@@ -34,18 +43,20 @@ function ensureTempoTable() {
 }
 
 onMounted(() => {
-  if (countTempo.value) ensureTempoTable()
+  if (countIndirect.value) ensureTempoTable()
 })
-watch(countTempo, on => {
+watch(countIndirect, on => {
   if (on) ensureTempoTable()
 })
 
-const waitingForTempo = computed(() => countTempo.value && !tempoTable.value)
+const waitingForTempo = computed(() => countIndirect.value && !tempoTable.value)
 
 const rows = computed(() =>
   rankCharacters(characters.value, moves.value, {
     topN: DEFAULT_TOP_N,
-    tempoValues: countTempo.value ? tempoTable.value : null
+    metric: metric.value,
+    countDefensiveValue: countIndirect.value,
+    tempoValues: countIndirect.value ? tempoTable.value : null
   })
 )
 
@@ -63,14 +74,23 @@ function toggle(id) {
 <template>
   <div class="board select-board" style="overflow-y:auto; align-items:center;">
     <div class="modal-title" style="margin:0.5rem 0 0.25rem;">{{ t('tierList.title') }}</div>
-    <div class="center-hint" style="padding-bottom:0.375rem;">{{ t('tierList.hint', { n: DEFAULT_TOP_N }) }}</div>
+    <div class="center-hint" style="padding-bottom:0.375rem;">{{ perTurn ? t('tierList.hintPerTurn') : t('tierList.hint', { n: DEFAULT_TOP_N }) }}</div>
 
     <div style="width:100%; max-width:34rem; padding:0 0.625rem 0.5rem; display:flex; align-items:center; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+      <div style="display:flex; gap:0.25rem;">
+        <button
+          v-for="option in [METRIC_TOP_N, METRIC_PER_TURN]"
+          :key="option"
+          class="btn secondary"
+          :style="{ padding: '0.1875rem 0.5rem', fontSize: '0.625rem', opacity: metric === option ? 1 : 0.5 }"
+          @click="metric = option"
+        >{{ option === METRIC_TOP_N ? t('tierList.metricTopN', { n: DEFAULT_TOP_N }) : t('tierList.metricPerTurn') }}</button>
+      </div>
       <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
-        <input type="checkbox" v-model="countTempo" style="width:0.75rem; height:0.75rem; margin:0;">
-        {{ t('tierList.countTempo') }}
+        <input type="checkbox" v-model="countIndirect" style="width:0.75rem; height:0.75rem; margin:0;">
+        {{ t('tierList.countIndirect') }}
+        <span v-if="waitingForTempo" style="font-weight:700;">{{ t('tierList.calculating') }}</span>
       </label>
-      <span v-if="waitingForTempo" style="font-size:0.625rem; font-weight:800; color:var(--sub);">{{ t('tierList.calculating') }}</span>
     </div>
 
     <div style="width:100%; max-width:34rem; padding:0 0.625rem; display:flex; flex-direction:column; gap:0.1875rem;">
@@ -101,18 +121,22 @@ function toggle(id) {
         </div>
 
         <div v-if="expandedId === row.character.id" class="tier-detail">
-          <div v-for="entry in row.top" :key="entry.mv.id" class="tier-move">
+          <div v-for="(entry, ei) in row.top" :key="ei" class="tier-move">
+            <!-- in the per-turn reading each entry is a stretch of the game, so it says
+                 which stretch and how much of the game that is -->
+            <span v-if="perTurn" class="tier-move-band">{{ entry.above ? t('tierList.bandHealthy') : t('tierList.bandBelow', { hp: entry.hp }) }} {{ Math.round(entry.weight * 100) }}%</span>
             <span class="tier-move-type"><img :src="asset(`image/ICON/${entry.mv.type}.png`)" class="img-icon" :alt="entry.mv.type"></span>
             <span class="tier-move-name">{{ entry.mv.name }}</span>
             <span class="tier-move-ev">{{ entry.ev.toFixed(1) }}</span>
           </div>
-          <div v-if="row.moveCount < DEFAULT_TOP_N" class="tier-move-note">{{ t('tierList.fewMoves', { n: row.moveCount }) }}</div>
+          <div v-if="!perTurn && row.moveCount < DEFAULT_TOP_N" class="tier-move-note">{{ t('tierList.fewMoves', { n: row.moveCount }) }}</div>
         </div>
       </div>
     </div>
 
     <div style="width:100%; max-width:34rem; padding:0.625rem 0.75rem 0; font-size:0.5rem; font-weight:700; color:var(--sub); line-height:1.6;">
       {{ t('tierList.assumptions') }}
+      {{ t('tierList.premiseNote') }}
     </div>
 
     <div style="display:flex; justify-content:center; padding:0.875rem 0 0.25rem;">
@@ -209,6 +233,7 @@ function toggle(id) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.tier-move-band { font-size: 0.5rem; font-weight: 800; color: var(--sub); min-width: 4.25rem; flex-shrink: 0; }
 .tier-move-ev { font-size: 0.6875rem; font-weight: 800; color: var(--ink); flex-shrink: 0; }
 .tier-move-note { font-size: 0.5rem; font-weight: 700; color: var(--sub); padding-top: 0.125rem; }
 </style>
