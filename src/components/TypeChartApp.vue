@@ -34,8 +34,12 @@ const rows = computed(() =>
       {{ uniformWeakness !== null ? t('typeChart.hint', { n: uniformWeakness }) : t('typeChart.hintMixed') }}
     </div>
 
-    <div style="width:100%; max-width:34rem; padding:0 0.625rem; display:flex; flex-direction:column; gap:0.1875rem;">
-      <div class="tc-head">
+    <!-- Two per row. A row is a name and three icons, which leaves half the stage empty in a
+         single column, and fifteen characters then need scrolling to compare. The stage is a
+         fixed logical width (see useStageLayout.js), so the pair always fits and there is no
+         breakpoint to fall back from — hence one header per column rather than one shared. -->
+    <div class="tc-grid">
+      <div v-for="col in 2" :key="`head${col}`" class="tc-head">
         <span class="tc-name-col">{{ t('typeChart.character') }}</span>
         <span class="tc-col">{{ t('typeChart.main') }}</span>
         <span class="tc-col">{{ t('typeChart.secondary') }}</span>
@@ -90,6 +94,16 @@ const rows = computed(() =>
 </template>
 
 <style scoped>
+.tc-grid {
+  width: 100%;
+  max-width: 40rem;
+  padding: 0 0.625rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.1875rem 0.375rem;
+  align-content: start;
+}
+
 .tc-head {
   display: flex;
   align-items: center;
@@ -144,11 +158,11 @@ const rows = computed(() =>
   align-items: center;
   justify-content: center;
   gap: 0.125rem;
-  width: 3.25rem;
+  width: 2.5rem;
   flex-shrink: 0;
 }
 
-.tc-weak-col { width: 3.75rem; }
+.tc-weak-col { width: 2.75rem; }
 
 .tc-type {
   display: inline-flex;
