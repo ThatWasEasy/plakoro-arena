@@ -54,13 +54,21 @@ function leaveMode() {
   mode.value = back || null
 }
 
-// The duel and solo modes fill the screen and have no back button of their own (unlike the
-// dice builder and store info, which each end their own flow), so they get a shared one here.
-// It asks first: both modes hold real progress, and the button sits near the screen edge where
-// a stray tap during play is easy.
-const HOME_EXIT_MODES = ['duel', 'solo']
-const canExitToHome = computed(() => HOME_EXIT_MODES.includes(mode.value))
+// Every mode gets a shared home button pinned to the stage's top-left corner. The tool modes
+// (dice builder, tier list, type chart, …) do have their own "back" at the foot of their
+// content, but the stage is a fixed 16:9 box and those pages run taller than it, so that button
+// often sits below the fold with nothing on screen hinting that the page scrolls — players
+// reported pages that just "end" with no way back. This one is position:absolute on the stage,
+// so it is always in view. Duel and solo hold real progress and ask first (the button sits near
+// the screen edge where a stray tap during play is easy); the tool modes simply leave.
+const CONFIRM_EXIT_MODES = ['duel', 'solo']
+const canExitToHome = computed(() => mode.value !== null)
 const showExitConfirm = ref(false)
+
+function onHomeExitClick() {
+  if (CONFIRM_EXIT_MODES.includes(mode.value)) showExitConfirm.value = true
+  else exitToHome()
+}
 
 function exitToHome() {
   // Battle state lives at module scope (a single shared reactive object), so leaving without
@@ -93,7 +101,7 @@ onMounted(() => {
         v-if="canExitToHome"
         class="home-exit-btn"
         :aria-label="t('app.backToHome')"
-        @click="showExitConfirm = true"
+        @click="onHomeExitClick"
       >←</button>
       <div style="position:absolute; right:0.375rem; bottom:0.25rem; z-index:300; font-size:0.625rem; font-weight:700; color:rgba(58,58,58,.5); pointer-events:none;">v{{ appVersion }}</div>
 
