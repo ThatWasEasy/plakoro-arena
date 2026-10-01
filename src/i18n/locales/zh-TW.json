@@ -197,7 +197,7 @@
       "prevEnemyFailed": "上一個對手回合，對手能量骰失敗",
       "prevSelfFailed": "上一個自己回合，自己能量骰失敗",
       "prevPrereqSucceeded": "上一個自己回合，指定招式成功",
-      "evHint": "期望效益＝（對手扣血 − 自己扣血）的平均，再乘上成功率；回血算加分。不計弱點加成。下方的組成相加就是期望效益（傷害總共為小計，不另外相加）",
+      "evHint": "期望效益＝（對手扣血 − 自己扣血）的平均，再乘上成功率；回血算加分。不計弱點加成。下方的組成相加就是期望效益（傷害總共為小計，不另外相加）。對手減傷會先從該次出招的總傷害扣掉（最低 0）再計算，劃掉的灰字是沒有減傷時的期望效益",
       "noteNeedsHp": "填入剩餘 HP 後才會計入",
       "noteNeedsPrev": "依上方前提條件計算",
       "noteMirrorDice": "假設對手骰組與本組相同",
@@ -210,7 +210,9 @@
       "countTempo": "把干擾對手折算成傷害",
       "tempoCalculating": "（計算中…）",
       "evPartTempo": "干擾",
-      "enemyLastDamageLabel": "對手上一招白板"
+      "enemyLastDamageLabel": "對手上一招白板",
+      "enemyReductionLabel": "對手減傷",
+      "enemyReductionActive": "對手減傷 −{n}"
     },
     "showCumulativeProb": "顯示累計機率",
     "showExactProb": "顯示恰好機率",

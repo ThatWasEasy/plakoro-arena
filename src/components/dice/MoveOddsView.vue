@@ -87,6 +87,10 @@ const countDefensiveValue = ref(true)
 const countTempoValue = ref(true)
 const selfHpText = ref('40')
 const enemyLastDamageText = ref(String(ASSUMED_ENEMY_LAST_DAMAGE))
+// The one exception to "all on": there is no shield up until the player says there is. Most
+// turns are played against none, and a shield only matters for the opponents who carry one
+// (イワーク, ミュウ, カイロス…), so it starts at 0 and is raised when facing them.
+const enemyReductionText = ref('0')
 const prevEnemyFailed = ref(true)
 const prevSelfFailed = ref(true)
 const prevPrereqSucceeded = ref(true)
@@ -130,6 +134,13 @@ const enemyLastDamage = computed(() => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 })
 
+// Cleared or nonsense, there is no shield — the same as 0 — rather than an unmet condition,
+// so the input never leaves the figures in limbo.
+const enemyReduction = computed(() => {
+  const parsed = parseInt(enemyReductionText.value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+})
+
 // A note earns its line only by saying something the screen doesn't already. The move's own
 // card sits directly below the figure and the breakdown sits directly above it, so anything
 // those two already state is left out: `tempo` (the card spells out what a dice-count change
@@ -159,6 +170,16 @@ function clean(value) {
 
 function evText(value) {
   return clean(value).toFixed(1)
+}
+
+// With a shield up, the headline is what gets through it; the figure it would have been is
+// kept beside it, struck through, so the reader sees the shield's cost move by move. Only
+// shown where it differs — a heal or a pure denial move is worth the same either way, and a
+// struck-through copy of the same number would say nothing.
+function unreducedText(result) {
+  if (enemyReduction.value === 0) return null
+  if (evText(result.evUnreduced) === evText(result.ev)) return null
+  return evText(result.evUnreduced)
 }
 
 function signedText(value) {
@@ -234,7 +255,8 @@ const moveRows = computed(() => {
         prereqMoveSucceeded: prevPrereqSucceeded.value
       },
       countDefensiveValue: countDefensiveValue.value,
-      tempoValues: countTempoValue.value ? tempoTable.value : null
+      tempoValues: countTempoValue.value ? tempoTable.value : null,
+      enemyReduction: enemyReduction.value
     }))
     const odds = evs.map(result => result.odds)
     const noteKinds = [...new Set(evs.flatMap(result => result.notes.map(note => note.kind)))]
@@ -347,6 +369,17 @@ const moveRows = computed(() => {
             <span v-if="waitingForTempo" style="font-weight:700;">{{ t('diceBuilder.moveOdds.tempoCalculating') }}</span>
           </label>
           <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub);">
+            {{ t('diceBuilder.moveOdds.enemyReductionLabel') }}
+            <input
+              type="number"
+              min="0"
+              step="10"
+              v-model="enemyReductionText"
+              placeholder="0"
+              style="width:4.5rem; font-size:0.625rem; font-weight:800; padding:0.125rem 0.25rem; border:0.0625rem solid var(--line); border-radius:0.25rem; background:#fff; color:var(--ink);"
+            >
+          </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub);">
             {{ t('diceBuilder.moveOdds.enemyLastDamageLabel') }}
             <input
               type="number"
@@ -389,6 +422,7 @@ const moveRows = computed(() => {
       <div style="width:100%; max-width:40rem; padding:0 0.625rem;">
         <div style="font-size:0.6875rem; font-weight:800; color:var(--sub); padding:0 0.125rem 0.25rem; border-bottom:0.125rem solid var(--line); margin-bottom:0.5rem;">
           {{ t('diceBuilder.moveOdds.moveHeader', { n: activeCount }) }}
+          <span v-if="enemyReduction > 0" style="margin-left:0.5rem; color:var(--ink);">{{ t('diceBuilder.moveOdds.enemyReductionActive', { n: enemyReduction }) }}</span>
         </div>
 
         <div class="move-pick-list">
@@ -419,6 +453,7 @@ const moveRows = computed(() => {
                 >
                   <span v-if="hasCompare" style="font-weight:800;">{{ setLabels[si] }}</span>
                   <span :style="{ fontSize: '1.25rem', fontWeight: 900, color: result.ev === 0 ? 'var(--line)' : 'var(--ink)' }">{{ evText(result.ev) }}</span>
+                  <span v-if="unreducedText(result)" style="font-size:0.625rem; font-weight:700; text-decoration:line-through; color:var(--sub);">{{ unreducedText(result) }}</span>
                 </span>
               </div>
             </div>

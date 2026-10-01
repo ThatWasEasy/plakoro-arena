@@ -14,6 +14,14 @@
 // with the dice I've built?" — is not changed by a flat bonus that lands on whichever move
 // happens to match the defender's type.
 //
+// The opponent's damage reduction is the one thing about them a caller can state, because it
+// does change the answer: a shield that swallows a 20-damage jab whole barely dents a 60-damage
+// slam, so the order of a character's moves can flip while it is up. It is applied the way the
+// battle applies incomingDamageMod — once per cast, to the whole of that cast's damage, floored
+// at 0 — which makes it non-linear, so it is taken inside each character-die branch rather than
+// subtracted from the expectation afterwards. (Within a branch, damage that comes from several
+// sub-rolls is still collapsed to its mean before the floor, as it is everywhere else here.)
+//
 // An effect type with no handler is reported through `notes` rather than silently valued at
 // zero, so a new card pulled in by `npm run fetch-data` surfaces as unsupported instead of
 // quietly skewing the numbers.
@@ -314,6 +322,10 @@ export function largestTypePileMean(dice) {
  *                                                  null leaves it uncounted
  * @param {object} [options.prev]  which previous-turn premises hold
  * @param {boolean} [options.countDefensiveValue]  credit damage reduction as HP kept
+ * @param {object} [options.tempoValues]  table from buildTempoTable, to price denial effects
+ * @param {number} [options.enemyReduction]  damage the opponent shaves off each cast, as the
+ *                                            positive amount (a printed "-20" is 20); 0 for
+ *                                            no shield up
  */
 export function moveExpectedValue(mv, options) {
   const {
@@ -324,7 +336,8 @@ export function moveExpectedValue(mv, options) {
     enemyLastDamage = null,
     prev = {},
     countDefensiveValue = false,
-    tempoValues = null
+    tempoValues = null,
+    enemyReduction = 0
   } = options
 
   const odds = payableCount(rolls, mv.cost)
@@ -362,15 +375,19 @@ export function moveExpectedValue(mv, options) {
   const notes = new Map()
   let repeatFaces = 0
   let damageOnHit = 0
+  let unreducedOnHit = 0
   let selfOnHit = 0
   let defensiveOnHit = 0
   let tempoOnHit = 0
 
   const branches = buildBranches(mv, charaDiceInPlay).map(branch => {
     const state = resolveBranch(mv, branch.ce, { ...env, charaHits: branch.hits })
-    // Mirrors proceedToAnimateWithCtx: a move can't heal the opponent, so damage floors at 0.
-    const damage = Math.max(state.damage, 0)
+    // Mirrors proceedToAnimateWithCtx: a move can't heal the opponent, so damage floors at 0 —
+    // after the opponent's reduction has come off, which is what makes the floor bite.
+    const unreduced = Math.max(state.damage, 0)
+    const damage = Math.max(state.damage - enemyReduction, 0)
     damageOnHit += branch.weight * damage
+    unreducedOnHit += branch.weight * unreduced
     selfOnHit += branch.weight * state.self
     defensiveOnHit += branch.weight * state.defensive
     tempoOnHit += branch.weight * state.tempo
@@ -386,6 +403,7 @@ export function moveExpectedValue(mv, options) {
   })
 
   let evDamage = pSuccess * damageOnHit
+  let evDamageUnreduced = pSuccess * unreducedOnHit
   let evSelf = pSuccess * selfOnHit
   let evDefensive = pSuccess * defensiveOnHit
   let evTempo = pSuccess * tempoOnHit
@@ -395,7 +413,7 @@ export function moveExpectedValue(mv, options) {
   // "die missed" branch, because a move whose effect entries cover all six faces — or which
   // throws the die several times of its own accord — has no such branch to read.
   const baseline = resolveBranch(mv, null, { ...env, charaHits: 0 })
-  const evDamageBase = pSuccess * Math.max(baseline.damage, 0)
+  const evDamageBase = pSuccess * Math.max(baseline.damage - enemyReduction, 0)
 
   // A repeat is a fresh cast of the same move — new energy roll, new character die — so the
   // total is the fixed point of "value of one cast, plus another whole go at probability q".
@@ -404,6 +422,7 @@ export function moveExpectedValue(mv, options) {
     if (q < 1) {
       const casts = 1 / (1 - q)
       evDamage *= casts
+      evDamageUnreduced *= casts
       evSelf *= casts
       evDefensive *= casts
       evTempo *= casts
@@ -414,6 +433,11 @@ export function moveExpectedValue(mv, options) {
   // them out as a decomposition of the headline rather than as unrelated statistics. Extra
   // casts won by a repeat effect land in the character-die share, which is where they came
   // from — the baseline is deliberately left unscaled by the repeat factor.
+  //
+  // Every damage figure is what gets through the opponent's reduction. `evUnreduced` is the
+  // headline as it would read with no reduction up, so a caller can show what the shield cost
+  // without running the calculation twice.
+  const ev = evDamage - evSelf + evDefensive + evTempo
   return {
     odds,
     pSuccess,
@@ -423,7 +447,8 @@ export function moveExpectedValue(mv, options) {
     evSelf,
     evDefensive,
     evTempo,
-    ev: evDamage - evSelf + evDefensive + evTempo,
+    ev,
+    evUnreduced: ev - evDamage + evDamageUnreduced,
     branches,
     notes: [...notes].map(([type, kind]) => ({ type, kind }))
   }
