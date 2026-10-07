@@ -9,10 +9,13 @@
 // player what a sub-roll actually produced, this takes its expectation instead. The two must
 // stay in step: any change to an effect's meaning there needs the matching change here.
 //
-// Weakness is deliberately excluded. The calculator has no opponent to look up a weakness on,
-// and the question it exists to answer — "which of this character's moves is worth casting
-// with the dice I've built?" — is not changed by a flat bonus that lands on whichever move
-// happens to match the defender's type.
+// Weakness is left out unless the caller says the opponent is weak, and then it is a flat
+// bonus on every move rather than only the ones whose type matches: the calculator has no
+// opponent to look a weakness up on, and the player asking "what if I hit them for +20?" is
+// asking it of every move at once. It is otherwise applied the way computeDisplayDamage applies
+// it — added to the cast's printed (or copied) damage, only when that is above 0, and never on
+// a move that ignores weakness — and it sits with the reduction in the same per-branch sum, so
+// the two meet before the floor exactly as they do in battle.
 //
 // The opponent's damage reduction is the one thing about them a caller can state, because it
 // does change the answer: a shield that swallows a 20-damage jab whole barely dents a 60-damage
@@ -229,12 +232,25 @@ function applyEffect(eff, state, env) {
     case 'SPECIAL_BIND_WAZA':
       addTempo(state, type, value, env)
       break
-    // Weakness is out of the model entirely, so suppressing it is already the default.
+    // Handled by weaknessBonus, which reads the move's effect type directly.
     case 'SPECIAL_IGNORE_WEAKNESS':
       break
     default:
       addNote(state, type, NOTE_UNSUPPORTED)
   }
+}
+
+// The weakness bonus one cast of this move collects, mirroring computeDisplayDamage minus its
+// type check: it rides on the printed figure — or, for the move that copies, on the copied
+// one — and only when that figure is above 0, so a move that deals its damage purely through
+// the character die gets none. A move that ignores weakness gets none either.
+function weaknessBonus(mv, env) {
+  if (!env.enemyWeakness) return 0
+  if (mv.effectType === 'SPECIAL_IGNORE_WEAKNESS') return 0
+  const printed = mv.effectType === 'DAMAGE_COPY_LAST'
+    ? (env.enemyLastDamage === null ? 0 : env.enemyLastDamage * mv.effectValue)
+    : mv.baseDamage
+  return printed > 0 ? env.enemyWeakness : 0
 }
 
 // One outcome of the character die: the move's own effect plus whichever character-die entry
@@ -326,6 +342,8 @@ export function largestTypePileMean(dice) {
  * @param {number} [options.enemyReduction]  damage the opponent shaves off each cast, as the
  *                                            positive amount (a printed "-20" is 20); 0 for
  *                                            no shield up
+ * @param {number} [options.enemyWeakness]  weakness bonus every damaging cast collects; 0 for
+ *                                           weakness left out
  */
 export function moveExpectedValue(mv, options) {
   const {
@@ -337,7 +355,8 @@ export function moveExpectedValue(mv, options) {
     prev = {},
     countDefensiveValue = false,
     tempoValues = null,
-    enemyReduction = 0
+    enemyReduction = 0,
+    enemyWeakness = 0
   } = options
 
   const odds = payableCount(rolls, mv.cost)
@@ -353,6 +372,7 @@ export function moveExpectedValue(mv, options) {
     enemyLastDamage,
     countDefensiveValue,
     tempoValues,
+    enemyWeakness,
     prev: {
       enemyMoveFailed: false,
       selfMoveFailed: false,
@@ -372,10 +392,14 @@ export function moveExpectedValue(mv, options) {
     }
   }
 
+  // Everything the opponent does to each cast's incoming damage, as one net figure: the battle
+  // adds both to the same running total before it floors, so they belong in one sum here too.
+  const opponentMod = weaknessBonus(mv, env) - enemyReduction
+
   const notes = new Map()
   let repeatFaces = 0
   let damageOnHit = 0
-  let unreducedOnHit = 0
+  let unmodifiedOnHit = 0
   let selfOnHit = 0
   let defensiveOnHit = 0
   let tempoOnHit = 0
@@ -383,11 +407,12 @@ export function moveExpectedValue(mv, options) {
   const branches = buildBranches(mv, charaDiceInPlay).map(branch => {
     const state = resolveBranch(mv, branch.ce, { ...env, charaHits: branch.hits })
     // Mirrors proceedToAnimateWithCtx: a move can't heal the opponent, so damage floors at 0 —
-    // after the opponent's reduction has come off, which is what makes the floor bite.
-    const unreduced = Math.max(state.damage, 0)
-    const damage = Math.max(state.damage - enemyReduction, 0)
+    // after the opponent's reduction and weakness have been applied, which is what makes the
+    // floor bite.
+    const unmodified = Math.max(state.damage, 0)
+    const damage = Math.max(state.damage + opponentMod, 0)
     damageOnHit += branch.weight * damage
-    unreducedOnHit += branch.weight * unreduced
+    unmodifiedOnHit += branch.weight * unmodified
     selfOnHit += branch.weight * state.self
     defensiveOnHit += branch.weight * state.defensive
     tempoOnHit += branch.weight * state.tempo
@@ -403,7 +428,7 @@ export function moveExpectedValue(mv, options) {
   })
 
   let evDamage = pSuccess * damageOnHit
-  let evDamageUnreduced = pSuccess * unreducedOnHit
+  let evDamageUnmodified = pSuccess * unmodifiedOnHit
   let evSelf = pSuccess * selfOnHit
   let evDefensive = pSuccess * defensiveOnHit
   let evTempo = pSuccess * tempoOnHit
@@ -413,7 +438,7 @@ export function moveExpectedValue(mv, options) {
   // "die missed" branch, because a move whose effect entries cover all six faces — or which
   // throws the die several times of its own accord — has no such branch to read.
   const baseline = resolveBranch(mv, null, { ...env, charaHits: 0 })
-  const evDamageBase = pSuccess * Math.max(baseline.damage - enemyReduction, 0)
+  const evDamageBase = pSuccess * Math.max(baseline.damage + opponentMod, 0)
 
   // A repeat is a fresh cast of the same move — new energy roll, new character die — so the
   // total is the fixed point of "value of one cast, plus another whole go at probability q".
@@ -422,7 +447,7 @@ export function moveExpectedValue(mv, options) {
     if (q < 1) {
       const casts = 1 / (1 - q)
       evDamage *= casts
-      evDamageUnreduced *= casts
+      evDamageUnmodified *= casts
       evSelf *= casts
       evDefensive *= casts
       evTempo *= casts
@@ -434,9 +459,9 @@ export function moveExpectedValue(mv, options) {
   // casts won by a repeat effect land in the character-die share, which is where they came
   // from — the baseline is deliberately left unscaled by the repeat factor.
   //
-  // Every damage figure is what gets through the opponent's reduction. `evUnreduced` is the
-  // headline as it would read with no reduction up, so a caller can show what the shield cost
-  // without running the calculation twice.
+  // Every damage figure is what lands after the opponent's reduction and weakness. `evUnmodified`
+  // is the headline as it would read with neither, so a caller can show what the matchup
+  // changed without running the calculation twice.
   const ev = evDamage - evSelf + evDefensive + evTempo
   return {
     odds,
@@ -448,7 +473,7 @@ export function moveExpectedValue(mv, options) {
     evDefensive,
     evTempo,
     ev,
-    evUnreduced: ev - evDamage + evDamageUnreduced,
+    evUnmodified: ev - evDamage + evDamageUnmodified,
     branches,
     notes: [...notes].map(([type, kind]) => ({ type, kind }))
   }
