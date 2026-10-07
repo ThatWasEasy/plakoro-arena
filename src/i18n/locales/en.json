@@ -197,7 +197,7 @@
       "prevEnemyFailed": "Opponent's energy dice failed last turn",
       "prevSelfFailed": "Your energy dice failed last turn",
       "prevPrereqSucceeded": "The prerequisite move landed last turn",
-      "evHint": "Expected value = average of (damage dealt − damage taken by yourself), multiplied by the success rate. Healing counts as a gain. Weakness is left out. The parts underneath add up to the figure (Dmg is a subtotal, not another part). The opponent's damage reduction comes off each cast (never below 0) before anything is averaged; the struck-through grey figure is the value with no reduction.",
+      "evHint": "Expected value = average of (damage dealt − damage taken by yourself), multiplied by the success rate. Healing counts as a gain. With weakness ticked, every move whose printed damage is above 0 adds the weakness bonus. The parts underneath add up to the figure (Dmg is a subtotal, not another part). The opponent's damage reduction and weakness apply to each cast (never below 0) before anything is averaged; the struck-through grey figure is the value with neither.",
       "noteNeedsHp": "Counted once you enter remaining HP",
       "noteNeedsPrev": "Based on the assumptions above",
       "noteMirrorDice": "Assumes the opponent rolls this same build",
@@ -212,7 +212,9 @@
       "evPartTempo": "Tempo",
       "enemyLastDamageLabel": "Opponent's last move",
       "enemyReductionLabel": "Opponent's damage reduction",
-      "enemyReductionActive": "Opponent reduces damage by {n}"
+      "enemyReductionActive": "Opponent reduces damage by {n}",
+      "enemyWeaknessLabel": "Hit weakness (+{n})",
+      "enemyWeaknessActive": "Weakness +{n}"
     },
     "showCumulativeProb": "Show cumulative odds",
     "showExactProb": "Show exact odds",

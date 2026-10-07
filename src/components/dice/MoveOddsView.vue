@@ -7,6 +7,7 @@ import { enumerateRolls, charaEffectOdds, jointOdds } from '../../game/energyPay
 import { moveExpectedValue } from '../../game/moveExpectedValue'
 import { buildTempoTable } from '../../game/tempoValue'
 import { ASSUMED_ENEMY_LAST_DAMAGE } from '../../game/suggestedDice'
+import { DEFAULT_WEAKNESS_DAMAGE } from '../../composables/useCharacterData'
 import MoveCard from '../MoveCard.vue'
 
 // Which dice sets exist upstream, and their labels, so this view can report a move's odds
@@ -91,6 +92,8 @@ const enemyLastDamageText = ref(String(ASSUMED_ENEMY_LAST_DAMAGE))
 // turns are played against none, and a shield only matters for the opponents who carry one
 // (イワーク, ミュウ, カイロス…), so it starts at 0 and is raised when facing them.
 const enemyReductionText = ref('0')
+// Off for the same reason: weakness depends on who is across the table.
+const enemyWeak = ref(false)
 const prevEnemyFailed = ref(true)
 const prevSelfFailed = ref(true)
 const prevPrereqSucceeded = ref(true)
@@ -141,6 +144,10 @@ const enemyReduction = computed(() => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
 })
 
+// Every printed weakness so far is +20, so the bonus is the card default rather than another
+// box to fill in.
+const enemyWeakness = computed(() => enemyWeak.value ? DEFAULT_WEAKNESS_DAMAGE : 0)
+
 // A note earns its line only by saying something the screen doesn't already. The move's own
 // card sits directly below the figure and the breakdown sits directly above it, so anything
 // those two already state is left out: `tempo` (the card spells out what a dice-count change
@@ -172,14 +179,15 @@ function evText(value) {
   return clean(value).toFixed(1)
 }
 
-// With a shield up, the headline is what gets through it; the figure it would have been is
-// kept beside it, struck through, so the reader sees the shield's cost move by move. Only
-// shown where it differs — a heal or a pure denial move is worth the same either way, and a
-// struck-through copy of the same number would say nothing.
-function unreducedText(result) {
-  if (enemyReduction.value === 0) return null
-  if (evText(result.evUnreduced) === evText(result.ev)) return null
-  return evText(result.evUnreduced)
+// With a shield up or a weakness picked, the headline is what lands after them; the figure it
+// would have been is kept beside it, struck through, so the reader sees what the matchup does
+// move by move. Only shown where it differs — a heal, a pure denial move, or a move of another
+// type is worth the same either way, and a struck-through copy of the same number would say
+// nothing.
+function unmodifiedText(result) {
+  if (enemyReduction.value === 0 && enemyWeakness.value === 0) return null
+  if (evText(result.evUnmodified) === evText(result.ev)) return null
+  return evText(result.evUnmodified)
 }
 
 function signedText(value) {
@@ -256,7 +264,8 @@ const moveRows = computed(() => {
       },
       countDefensiveValue: countDefensiveValue.value,
       tempoValues: countTempoValue.value ? tempoTable.value : null,
-      enemyReduction: enemyReduction.value
+      enemyReduction: enemyReduction.value,
+      enemyWeakness: enemyWeakness.value
     }))
     const odds = evs.map(result => result.odds)
     const noteKinds = [...new Set(evs.flatMap(result => result.notes.map(note => note.kind)))]
@@ -379,6 +388,10 @@ const moveRows = computed(() => {
               style="width:4.5rem; font-size:0.625rem; font-weight:800; padding:0.125rem 0.25rem; border:0.0625rem solid var(--line); border-radius:0.25rem; background:#fff; color:var(--ink);"
             >
           </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="enemyWeak" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.enemyWeaknessLabel', { n: DEFAULT_WEAKNESS_DAMAGE }) }}
+          </label>
           <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub);">
             {{ t('diceBuilder.moveOdds.enemyLastDamageLabel') }}
             <input
@@ -423,6 +436,7 @@ const moveRows = computed(() => {
         <div style="font-size:0.6875rem; font-weight:800; color:var(--sub); padding:0 0.125rem 0.25rem; border-bottom:0.125rem solid var(--line); margin-bottom:0.5rem;">
           {{ t('diceBuilder.moveOdds.moveHeader', { n: activeCount }) }}
           <span v-if="enemyReduction > 0" style="margin-left:0.5rem; color:var(--ink);">{{ t('diceBuilder.moveOdds.enemyReductionActive', { n: enemyReduction }) }}</span>
+          <span v-if="enemyWeakness > 0" style="margin-left:0.5rem; color:var(--ink);">{{ t('diceBuilder.moveOdds.enemyWeaknessActive', { n: enemyWeakness }) }}</span>
         </div>
 
         <div class="move-pick-list">
@@ -453,7 +467,7 @@ const moveRows = computed(() => {
                 >
                   <span v-if="hasCompare" style="font-weight:800;">{{ setLabels[si] }}</span>
                   <span :style="{ fontSize: '1.25rem', fontWeight: 900, color: result.ev === 0 ? 'var(--line)' : 'var(--ink)' }">{{ evText(result.ev) }}</span>
-                  <span v-if="unreducedText(result)" style="font-size:0.625rem; font-weight:700; text-decoration:line-through; color:var(--sub);">{{ unreducedText(result) }}</span>
+                  <span v-if="unmodifiedText(result)" style="font-size:0.625rem; font-weight:700; text-decoration:line-through; color:var(--sub);">{{ unmodifiedText(result) }}</span>
                 </span>
               </div>
             </div>
