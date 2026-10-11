@@ -2,6 +2,7 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { isAdminMode } from '../data/adminSession'
 
 const emit = defineEmits(['pick'])
 const { t } = useI18n()
@@ -34,20 +35,29 @@ const MODES = [
   // up front pushed the front page past the point where every card still fit.
   { key: 'tournament', group: 'tools' },
   { key: 'tierMaker', group: 'tools' },
-  { key: 'traitChart', group: 'tools' }
+  { key: 'traitChart', group: 'tools' },
+  // Only ever shown once admin mode is on (see App.vue's triple-tap-the-version-number entry
+  // point) — hidden rather than just inert, so its existence isn't a hint to someone poking
+  // around the menu who hasn't passed the PIN check.
+  { key: 'adminSwitch', group: 'tools', adminOnly: true },
+  { key: 'adminRewards', group: 'tools', adminOnly: true }
 ]
 
 const GROUPS = [{ key: 'tools' }]
 
 const openGroup = ref(null)
 
+function visible(m) {
+  return m.enabled !== false && (!m.adminOnly || isAdminMode.value)
+}
+
 const topLevel = computed(() => [
-  ...MODES.filter(m => m.enabled !== false && !m.group),
+  ...MODES.filter(m => visible(m) && !m.group),
   ...GROUPS.map(g => ({ ...g, isGroup: true }))
 ])
 
 const groupModes = computed(() =>
-  MODES.filter(m => m.enabled !== false && m.group === openGroup.value))
+  MODES.filter(m => visible(m) && m.group === openGroup.value))
 
 const cards = computed(() => (openGroup.value ? groupModes.value : topLevel.value))
 
@@ -116,9 +126,10 @@ const rows = computed(() => {
   <div class="board select-board mode-select">
     <h1 class="mode-wordmark">PLAKORO ARENA</h1>
 
-    <!-- A bounded box with real rows inside it, rather than cards left to wrap. The box's
-         height is whatever the stage leaves; the rows divide it between them, so adding a mode
-         makes every card a little shorter instead of pushing the last row off the bottom. -->
+    <!-- A bounded box with real rows inside it, rather than cards left to wrap. The box itself
+         is a fixed share of the screen (see .mode-grid); the rows divide that fixed height
+         between them, so adding a mode makes every card a little shorter rather than growing
+         the box and squeezing the ticker/credit below it. -->
     <div class="mode-grid">
       <div v-for="(row, i) in rows" :key="i" class="mode-row">
         <component
@@ -141,11 +152,7 @@ const rows = computed(() => {
     </div>
 
     <!-- The group's own mark, in the corner. Same destination as the Line card above, offered
-         as the thing people actually recognise rather than as a second labelled button.
-
-         In the flow rather than positioned over it: the rows above are `flex: 1 1 0` and will
-         give up the height, whereas anything absolute would sit on top of the last row the
-         moment the stage got short. -->
+         as the thing people actually recognise rather than as a second labelled button. -->
     <div class="mode-mark-row">
       <a
         class="mode-mark"
@@ -183,21 +190,27 @@ const rows = computed(() => {
 </template>
 
 <style scoped>
+/* Every direct child below (title, menu, Line mark, ticker, credit) claims a fixed share of this
+   column via `flex: <n> 1 0`, rather than being sized by its own content. That's the whole fix
+   for a bug this screen used to have: the menu's content (how many rows of mode cards it has)
+   used to decide how tall the menu's box was, which meant a longer menu could crowd the ticker
+   and credit text out of the space they needed — the exact opposite of what should determine
+   what. Every section now gets the same slice of the screen no matter what's inside it; content
+   fits (or is centred, or is capped) within its own slice instead of dictating it. */
 .mode-select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
 }
 
-/* The title screen's title. Sits outside the bounded box and takes a fixed share, so the rows
-   below divide whatever is left rather than being pushed off the bottom by it.
-   
-   Set large enough to read as the screen's title rather than a heading over a list. */
+/* Set large enough to read as the screen's title rather than a heading over a list. */
 .mode-wordmark {
-  flex-shrink: 0;
+  flex: 2 1 0%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin: 0;
-  padding: 1.75rem 0 0.75rem;
   /* rem, not vw: the app already scales its root font with the stage, so a viewport unit
      here would drift out of step with everything around it. */
   font-size: 1.75rem;
@@ -212,31 +225,26 @@ const rows = computed(() => {
   white-space: nowrap;
 }
 
-/* The bounded box. Takes what the stage leaves, and never more. */
 .mode-grid {
   --gap: 0.625rem;
-  /* Must stay `flex: 1`. The rows inside are `flex: 1 1 0`, which divides a definite height —
-     sizing this box to its content instead leaves them nothing to divide, which is what broke
-     the menu. The menu is kept subordinate to the title by capping the rows, not this box. */
-  flex: 1;
-  /* Without this the box refuses to shrink below its content and overflows the stage — the
-     same flex default (min-height:auto) that broke the single-column version. */
+  flex: 7 1 0%;
   min-height: 0;
   width: 100%;
   max-width: 23rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* Rows collect at the bottom of this slice rather than the middle of it, which is the only
+     thing "anchored toward the ticker" can mean now that the slice itself is fixed-size. */
+  justify-content: flex-end;
   gap: var(--gap);
   padding: 0.25rem 0;
 }
 
-/* One row. `flex: 1 1 0` with `min-height: 0` is what lets the rows share the box instead of
-   each insisting on its content's height — the whole reason the ninth card used to overflow. */
-/* Rows share whatever the box has. The cap is what keeps the menu subordinate to the title:
-   with only a few cards they would otherwise stretch to fill the screen again. */
+/* `flex: 1 1 0` divides .mode-grid's now-guaranteed-definite height evenly between rows; the cap
+   is what stops a short menu (one row, in the "more tools" group) from stretching to fill the
+   whole slice — the leftover goes to `justify-content: flex-end` above instead. */
 .mode-row {
-  flex: 1 1 0;
+  flex: 1 1 0%;
   min-height: 0;
   max-height: 3.25rem;
   display: flex;
@@ -277,13 +285,18 @@ const rows = computed(() => {
 .mode-back { flex-shrink: 0; padding-top: 0.875rem; }
 
 /* Full width so the mark lands on the board's right edge — the corner — rather than on the
-   right edge of the centred menu. */
+   right edge of the centred menu. Sized to its own content (`0 0 auto`) rather than a shared
+   ratio like its siblings: the mark+bubble's real height doesn't divide evenly into a slice of
+   the screen, and giving it a ratio anyway let the artwork overflow its box and bleed into the
+   ticker below. Fixed-content size here, with the grid/ticker/credit's ratios absorbing the
+   (small, roughly even) difference, is what actually keeps every section's content inside its
+   own box. */
 .mode-mark-row {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   width: 100%;
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  padding: 0.25rem 0 0.375rem;
 }
 
 /* Mark and bubble are one target: the whole thing is the invitation, so either half opens it. */
@@ -333,10 +346,10 @@ const rows = computed(() => {
 }
 
 .mode-ticker {
-  flex-shrink: 0;
-  width: 100%;
-  margin-top: 0.625rem;
-  padding: 0.3125rem 0;
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
   overflow: hidden;
   background: #1F1F1D;
   /* Full-bleed: the board has side padding, and a band that stops short of the edges reads as
@@ -396,6 +409,20 @@ const rows = computed(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Smaller and tighter than the shared .select-credit (used as-is on other select-board screens)
+   — the grid sitting closer to the ticker now leaves this less room, and clipped attribution
+   text is worse than small attribution text. */
+.mode-select .select-credit {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 0.3125rem;
+  line-height: 1.3;
+  padding: 0 0.5rem;
 }
 
 </style>
