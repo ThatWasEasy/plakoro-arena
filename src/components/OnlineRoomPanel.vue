@@ -57,9 +57,12 @@ function leave() {
 </template>
 
 <style scoped>
+/* Below both GlobalTopBar.vue (0.375rem–2.125rem) and the music player row its volume button can
+   open (2.375rem–~4.375rem when open) — reserved whether or not that panel actually happens to
+   be open right now, so this never has to know or care. */
 .online-room-panel {
   position: absolute;
-  top: 0.375rem;
+  top: 4.625rem;
   right: 0.375rem;
   z-index: 300;
 }
