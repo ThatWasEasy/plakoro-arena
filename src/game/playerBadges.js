@@ -52,9 +52,7 @@ function emptyRecord(player) {
     [GOLD]: 0,
     [SILVER]: 0,
     [BRONZE]: 0,
-    best: null,
-    streak: 0,
-    history: []
+    best: null
   }
 }
 
@@ -98,14 +96,6 @@ export function aggregatePlayers(tournaments = []) {
         else if (place === 3) rec[BRONZE]++
         if (rec.best === null || place < rec.best) rec.best = place
       }
-
-      rec.history.push({
-        tournamentId: tournament.id,
-        name: tournament.name || '',
-        date: tournament.createdAt || null,
-        place,
-        finished
-      })
     })
 
     // Counted from the matches rather than the standings, so an event still in progress
@@ -133,18 +123,6 @@ export function aggregatePlayers(tournaments = []) {
     })
   })
 
-  out.forEach(rec => {
-    // Newest first, the way someone would recite it.
-    rec.history.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
-    // Consecutive finished events won, counted from the most recent backwards.
-    let n = 0
-    for (const h of rec.history) {
-      if (!h.finished) continue
-      if (h.place === 1) n++
-      else break
-    }
-    rec.streak = n
-  })
   return out
 }
 
@@ -173,13 +151,12 @@ export function medalTally(rec) {
 // allowed to choose between.
 //
 // `rank` is what the title is worth, and the banner colours it accordingly. Without it every
-// title looked identical, so "新人" arrived in the same gold as "衛冕者" — which drains the
+// title looked identical, so "新人" arrived in the same gold as "不敗" — which drains the
 // gold of any meaning, since the whole point of a rare colour is that most people don't have
 // it. Two titles can share a rank; what must not happen is everything sharing one.
 export const TITLE_RANKS = ['legend', 'gold', 'epic', 'silver', 'bronze', 'plain']
 
 const TITLES = [
-  { key: 'dynasty',    rank: 'legend', test: r => r.streak >= 2 },
   { key: 'champion',   rank: 'gold',   test: r => r[GOLD] >= 1 },
   // Not a placement, so not a metal — a distinct colour of its own.
   { key: 'undefeated', rank: 'epic',   test: r => r.events >= 1 && r.losses === 0 && r.wins >= 3 },

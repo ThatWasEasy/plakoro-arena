@@ -104,7 +104,6 @@ CREATE TABLE players (
   bronze          INTEGER NOT NULL DEFAULT 0,
   podiums         INTEGER NOT NULL DEFAULT 0,
   best            INTEGER,
-  streak          INTEGER NOT NULL DEFAULT 0,
   stats_at        TIMESTAMPTZ
 );
 
@@ -389,18 +388,31 @@ WHERE s.code = players.code;
 
 想確認有沒有漂掉就比對 `players` 和 `player_stats`；修復就是再跑一次這段。另外開一個 `POST /api/records/rebuild` 做手動重建。
 
-`streak` 需要依賽事日期排序後往回數，view 表達起來彆扭，在應用層算完一起寫入。
-
 ### 3. 授予
 
+avatar／background／title 三種都要發，不是只有外觀兩種 —— 下面範例對齊前面「範例資料」那段：每個參賽者先拿 `participants` 這一層，`place = 1` 的人再疊加 `champion` 這一層。title 的 asset id（`m1-champion`）跟 avatar/background 的 asset id（`2026-9-champion`）命名方式不同，所以不能共用同一個字面值，拆成兩段 `UNION ALL`：
+
 ```sql
+-- 每個參賽者：出席外觀 + 出席稱號
 INSERT INTO player_unlocks (code, kind, asset, src)
-SELECT tp.code, k.kind, '2026-9-champion', 'auto:m1-place1'
-FROM tournament_players tp
-CROSS JOIN (VALUES ('avatar'), ('background')) AS k(kind)
-WHERE tp.tournament_id = $1 AND tp.place = 1
+SELECT tp.code, 'avatar',      '2026-9-participants', 'auto:m1-attend' FROM tournament_players tp WHERE tp.tournament_id = $1
+UNION ALL
+SELECT tp.code, 'background',  '2026-9-participants', 'auto:m1-attend' FROM tournament_players tp WHERE tp.tournament_id = $1
+UNION ALL
+SELECT tp.code, 'title',       'm1-attendee',         'auto:m1-attend' FROM tournament_players tp WHERE tp.tournament_id = $1
+ON CONFLICT (code, kind, asset) DO NOTHING;
+
+-- 冠軍：疊加冠軍外觀 + 冠軍稱號
+INSERT INTO player_unlocks (code, kind, asset, src)
+SELECT tp.code, 'avatar',      '2026-9-champion', 'auto:m1-place1' FROM tournament_players tp WHERE tp.tournament_id = $1 AND tp.place = 1
+UNION ALL
+SELECT tp.code, 'background',  '2026-9-champion', 'auto:m1-place1' FROM tournament_players tp WHERE tp.tournament_id = $1 AND tp.place = 1
+UNION ALL
+SELECT tp.code, 'title',       'm1-champion',     'auto:m1-place1' FROM tournament_players tp WHERE tp.tournament_id = $1 AND tp.place = 1
 ON CONFLICT (code, kind, asset) DO NOTHING;
 ```
+
+`tierOf()` 的 `winner`（第二、三名）層照同樣形狀再補一段，`place IN (2, 3)`、asset 換成當季的 `winner` 那組即可，這裡不重複列出。
 
 `ON CONFLICT DO NOTHING` 配上複合主鍵讓授予**冪等** —— 同一場重複上傳、或手動重跑授予，都不會產生重複列或覆蓋掉原本的 `at`。
 
@@ -621,5 +633,4 @@ UPDATE players SET ... FROM player_stats s WHERE s.code = players.code;   -- 見
 - **線上與線下勝率怎麼顯示**：資料已經分開存，顯示方式未定
 - **線上勝率的防刷**：跟朋友對打、快輸就斷線，都能灌水。等決定怎麼顯示時一起想
 - **現場走進來報名的人**：建議由主辦當場建立臨時選手列（有編號、無帳號），之後本人註冊時認領
-- **`FALLBACK_*` 與 `CURRENT_SEASON` 會脫鉤**：`nameplateAssets.js` 的 `FALLBACK_BACKGROUND` 取「檔名排序第一個 `-default`」，`defaultAsset()` 取「當季的 default」。現在都是 `2026-10-default` 純屬巧合，加了 `2027-1-default` 之後會變成新人拿舊季的旗、老選手拿新季的旗
 - **登入與註冊流程**：`claim_codes` 那段只是傾向，要另外討論。`auth_identities` 的形狀不受影響

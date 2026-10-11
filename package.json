@@ -1,14 +1,22 @@
 {
   "name": "plakoro-battle-vue",
   "private": true,
-  "version": "0.7.0.beta",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "fetch-data": "node scripts/fetch-data.mjs",
-    "fetch-product-images": "node scripts/fetch-product-images.mjs"
+    "fetch-product-images": "node scripts/fetch-product-images.mjs",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "node --env-file-if-exists=.env db/migrate.mjs",
+    "db:seed-admin-pin": "node --env-file-if-exists=.env db/seed-admin-pin.mjs",
+    "db:psql": "docker compose exec db psql -U plakoro -d plakoro",
+    "db:dump": "docker compose exec -T db pg_dump -U plakoro -d plakoro --no-owner --no-privileges > db/dump.sql",
+    "db:restore": "docker compose exec -T db psql -U plakoro -d plakoro < db/dump.sql",
+    "server:dev": "node --watch --env-file-if-exists=.env server/index.mjs"
   },
   "dependencies": {
     "cannon-es": "^0.20.0",
@@ -16,6 +24,8 @@
     "d3-scale": "^4.0.2",
     "d3-shape": "^3.2.0",
     "dagre": "^0.8.5",
+    "express": "^4.21.1",
+    "pg": "^8.13.1",
     "three": "^0.185.1",
     "trystero": "^0.25.4",
     "vue": "^3.4.31",

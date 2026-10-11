@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: plakoro
+      POSTGRES_PASSWORD: plakoro
+      POSTGRES_DB: plakoro
+    ports:
+      - '5432:5432'
+    volumes:
+      - plakoro-db:/var/lib/postgresql/data
+
+  # Web GUI for browsing/editing rows directly — http://localhost:8081, connects to `db`
+  # automatically. No login screen to fill in: the connection string is baked in via env.
+  pgweb:
+    image: sosedoff/pgweb
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://plakoro:plakoro@db:5432/plakoro?sslmode=disable
+    ports:
+      - '8081:8081'
+    depends_on:
+      - db
+
+volumes:
+  plakoro-db:

@@ -10,7 +10,7 @@
 // that no longer exists. The component resolves ids to images.
 import { titleOf, winRate, TITLE_RANKS } from './playerBadges'
 import {
-  BACKGROUND_IDS, AVATAR_IDS, FALLBACK_BACKGROUND, FALLBACK_AVATAR
+  BACKGROUND_IDS, AVATAR_IDS, FALLBACK_BACKGROUND, FALLBACK_AVATAR, CURRENT_SEASON
 } from '../data/nameplateAssets'
 
 export const NAMEPLATE_VERSION = 1
@@ -27,18 +27,18 @@ export const AVATARS = AVATAR_IDS
 export const EDITABLE_FIELDS = ['avatar', 'background']
 
 // Which tier a record earns. Artwork comes in seasonal sets — `2026-10-champion` and so on —
-// so the tier alone is not an id; `season` says which set to take it from.
-//
-// Only used when deriving a fresh nameplate. The mock store's are assigned by hand and do not
-// come through here.
-export const CURRENT_SEASON = '2026-10'
-
+// so the tier alone is not an id; `season` says which set to take it from. `CURRENT_SEASON`
+// itself lives in data/nameplateAssets.js, next to the fallback ids that have to track it.
 export function tierOf(record) {
   if (record.best === 1) return 'champion'
   if (record.best === 2 || record.best === 3) return 'winner'
   if (record.events > 0) return 'participants'
   return 'default'
 }
+
+// Lets a tier be compared rather than just named — "has this player reached at least winner?" —
+// which is what gates the profile screen's artwork pickers against `tierOfAsset()`.
+export const TIER_RANK = { default: 0, participants: 1, winner: 2, champion: 3 }
 
 export function defaultAsset(record, season = CURRENT_SEASON) {
   return `${season}-${tierOf(record)}`
