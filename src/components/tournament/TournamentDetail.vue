@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   computeStandings,
@@ -18,8 +18,11 @@ import {
 import { parsePlayerLine } from '../../data/tournaments'
 import { lookupNameplate } from '../../data/nameplateStore'
 import { renderRoundImage, renderStandingsImage, renderPlayerImage, sheetFileName, playerImageFileName } from '../../game/roundImage'
+import * as adminApi from '../../data/adminApi'
+import { adminToken, isAdminMode } from '../../data/adminSession'
 import TournamentLottery from './TournamentLottery.vue'
 import TournamentExportModal from './TournamentExportModal.vue'
+import TournamentUploadModal from './TournamentUploadModal.vue'
 import PlayerBanner from './PlayerBanner.vue'
 
 const props = defineProps({ tournament: { type: Object, required: true } })
@@ -206,6 +209,40 @@ function savePlayerImage(player) {
 // when complete — the point of exporting mid-event is to move it to another device, which is
 // exactly when it isn't finished.
 const exportOpen = ref(false)
+
+// Admin-only alternative destination for the same data — straight into the database rather than
+// a file. See TournamentUploadModal.vue.
+const uploadOpen = ref(false)
+
+// Whether this exact tournament (by id) already has a row in the database — checked once so the
+// button/modal can say "update" instead of "upload" and actually mean it, rather than leaving
+// the admin to trust that an upsert happened under a generic label. Re-checked right after a
+// successful upload too: the very first upload turns a brand-new tournament into an existing
+// one, and the label should flip immediately rather than waiting for a reload.
+const existsInDb = ref(false)
+async function checkExistsInDb() {
+  if (!isAdminMode.value) { existsInDb.value = false; return }
+  try {
+    const { tournaments } = await adminApi.listTournaments(adminToken.value)
+    existsInDb.value = tournaments.some(x => x.id === local.value.id)
+  } catch (e) {
+    existsInDb.value = false
+  }
+}
+onMounted(checkExistsInDb)
+
+// The server may have minted fresh codes for players who didn't have one yet (walk-ins) — apply
+// those back onto the local copy so a second upload of the same event reuses them instead of
+// creating a new player each time, then persist like any other edit.
+function onUploaded(assigned) {
+  const byId = new Map(assigned.map(a => [a.id, a.code]))
+  local.value.players.forEach(p => {
+    const code = byId.get(p.id)
+    if (code && p.code !== code) p.code = code
+  })
+  emit('update', local.value)
+  existsInDb.value = true
+}
 
 const rewindTarget = ref(null)
 const rewindLosses = computed(() => {
@@ -715,6 +752,12 @@ function generateNextRound() {
           style="padding:0.5rem 0.875rem; font-size:0.8125rem;"
           @click="exportOpen = true"
         >{{ t('tournament.export.button') }}</button>
+        <button
+          v-if="local.rounds.length && isAdminMode"
+          class="btn secondary"
+          style="padding:0.5rem 0.875rem; font-size:0.8125rem;"
+          @click="uploadOpen = true"
+        >{{ existsInDb ? t('admin.updateButton') : t('admin.uploadButton') }}</button>
         <button class="btn secondary" style="padding:0.5rem 0.875rem; font-size:0.8125rem;" @click="emit('back')">{{ t('common.back') }}</button>
       </div>
     </div>
@@ -750,6 +793,14 @@ function generateNextRound() {
       v-if="exportOpen"
       :tournament="local"
       @close="exportOpen = false"
+    />
+
+    <TournamentUploadModal
+      v-if="uploadOpen"
+      :tournament="local"
+      :exists-in-db="existsInDb"
+      @close="uploadOpen = false"
+      @uploaded="onUploaded"
     />
 
     <!-- Rewinding throws away recorded results, so it says how many before doing it. -->

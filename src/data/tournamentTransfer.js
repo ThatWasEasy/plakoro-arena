@@ -11,6 +11,7 @@
 //
 // Round-tripping has to be lossless: re-pairing a round from a half-restored tournament would
 // produce different pairings than the ones people actually played, and the standings with them.
+import { computeStandings, isRoundComplete, isTournamentComplete } from '../game/tournamentPairing'
 
 export const TRANSFER_FORMAT = 'plakoro-tournament'
 export const TRANSFER_VERSION = 2
@@ -21,7 +22,7 @@ function pad(n) {
   return String(n).padStart(2, '0')
 }
 
-function isoDate(value) {
+export function isoDate(value) {
   const d = new Date(value || Date.now())
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
@@ -108,7 +109,11 @@ export function parse(text) {
   return fromObject(data)
 }
 
-export function fromObject(data) {
+// `id` lets a caller override the fresh uuid below — used when pulling a tournament back from
+// the database (TournamentDownloadModal.vue), where the whole point is a *live* handle on that
+// same row: re-uploading it later has to update it, not fork a duplicate the way importing the
+// same file twice intentionally does.
+export function fromObject(data, { id } = {}) {
   if (!data || data.format !== TRANSFER_FORMAT) return { ok: false, reason: 'wrongFormat' }
   // Refusing a newer file is kinder than importing it partially: a future version could add a
   // field this build drops, and the loss would only surface much later.
@@ -168,10 +173,11 @@ export function fromObject(data) {
     ok: true,
     exportedAt: data.exportedAt,
     tournament: {
-      // A fresh id, so importing the same file twice makes two tournaments rather than one
-      // overwriting the other. Which is right here: the file is a record of an event, not a
-      // live handle on one.
-      id: crypto.randomUUID(),
+      // A fresh id by default, so importing the same file twice makes two tournaments rather
+      // than one overwriting the other — right for a file, which is a record of an event, not
+      // a live handle on one. `id` above overrides this for the one caller that wants the
+      // opposite.
+      id: id || crypto.randomUUID(),
       name: String(data.name || '').trim() || '(未命名)',
       createdAt: data.date ? new Date(`${data.date}T00:00:00`).toISOString() : new Date().toISOString(),
       ...(data.venue ? { venue: String(data.venue).trim() } : {}),
@@ -205,4 +211,50 @@ export function downloadText(text, name, type = 'application/json') {
   // Revoked on the next tick: doing it synchronously can cancel the download in some browsers
   // before it has read the blob.
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// --- server upload ---
+//
+// A second serialization, alongside the file-export one above — different audience, different
+// shape. The file export names players by text (`ref`) because a human opens it; the server
+// already has a real `players` table keyed by code, so this one carries the editor's internal
+// uuids instead and lets the server resolve/create codes itself. See POST /api/admin/tournaments
+// in server/index.mjs for the other half of this contract.
+
+// Same rule playerBadges.js's isFullyPlayed uses: the round count alone isn't enough, since a
+// Swiss event sitting on its final round with results unentered already satisfies that — every
+// match in every round has to actually have a result before a standing counts as final.
+export function isFullyPlayed(tournament) {
+  return isTournamentComplete(tournament) && (tournament.rounds || []).every(isRoundComplete)
+}
+
+export function buildUploadPayload(tournament, rewardPackageId) {
+  const finished = isFullyPlayed(tournament)
+  const placeOf = new Map()
+  if (finished) {
+    computeStandings(tournament).forEach((s, i) => placeOf.set(s.playerId, i + 1))
+  }
+  return {
+    id: tournament.id,
+    name: tournament.name || '',
+    date: isoDate(tournament.createdAt),
+    venue: tournament.venue || null,
+    format: tournament.format === 'elimination' ? 'elimination' : 'swiss',
+    totalRounds: tournament.format === 'swiss' ? tournament.swissTotalRounds : (tournament.rounds || []).length,
+    // Optional — see src/components/admin/AdminRewardsApp.vue and
+    // POST /api/admin/reward-packages. No package just means nothing gets granted.
+    rewardPackageId: rewardPackageId || null,
+    players: (tournament.players || []).map(p => ({
+      id: p.id,
+      code: p.code || null,
+      name: p.name,
+      place: placeOf.get(p.id) ?? null
+    })),
+    matches: (tournament.rounds || []).flatMap(r => r.matches.map(m => ({
+      round: r.roundNumber,
+      p1Id: m.player1Id,
+      p2Id: m.player2Id,
+      result: m.result
+    })))
+  }
 }
