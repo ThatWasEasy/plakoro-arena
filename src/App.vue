@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, onMounted, provide, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCharacterData } from './composables/useCharacterData'
 import { useBattleState } from './composables/useBattleState'
@@ -17,9 +17,17 @@ import ExtraRollOverlay from './components/ExtraRollOverlay.vue'
 import WinScreen from './components/WinScreen.vue'
 import Modal from './components/Modal.vue'
 import TurnCutIn from './components/TurnCutIn.vue'
-import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import GlobalTopBar from './components/GlobalTopBar.vue'
+import MusicPlayer from './components/MusicPlayer.vue'
+import { showMusicPlayer } from './data/musicPlayerUi'
+import { installButtonSfx } from './data/buttonSfx'
 import PlayerChip from './components/PlayerChip.vue'
 import PlayerProfileApp from './components/PlayerProfileApp.vue'
+import LoginApp from './components/auth/LoginApp.vue'
+import AdminPinModal from './components/admin/AdminPinModal.vue'
+import AdminSwitchApp from './components/admin/AdminSwitchApp.vue'
+import AdminRewardsApp from './components/admin/AdminRewardsApp.vue'
+import { isSignedIn } from './data/currentPlayer'
 import ModeSelect from './components/ModeSelect.vue'
 import SoloApp from './components/solo/SoloApp.vue'
 import DiceBuilderApp from './components/dice/DiceBuilderApp.vue'
@@ -84,6 +92,24 @@ function exitToHome() {
 const stageRef = ref(null)
 useStageLayout(stageRef)
 
+// The version number doubles as the admin-mode entry point: three taps within a second and a
+// half pop the PIN modal. Not a secret gesture so much as one nobody does by accident — a
+// visible button would invite every curious player to try it.
+const versionTapCount = ref(0)
+let versionTapTimer = null
+const showAdminPin = ref(false)
+
+function onVersionTap() {
+  versionTapCount.value++
+  clearTimeout(versionTapTimer)
+  if (versionTapCount.value >= 3) {
+    versionTapCount.value = 0
+    showAdminPin.value = true
+    return
+  }
+  versionTapTimer = setTimeout(() => { versionTapCount.value = 0 }, 1500)
+}
+
 const inBattleBoard = computed(() => ['moveSelect', 'diceRoll', 'resolve', 'effectPrompt', 'charaThrowTask', 'energyThrowTask', 'turnResultConfirm'].includes(state.phase))
 
 // Each side has their own modal slot (state.modals.A / .B) so opening one never closes the
@@ -102,20 +128,27 @@ watch(() => t('appTitle'), (title) => {
 onMounted(() => {
   characterData.loadData()
 })
+
+const uninstallButtonSfx = installButtonSfx()
+onBeforeUnmount(uninstallButtonSfx)
 </script>
 
 <template>
   <div id="stage" ref="stageRef">
     <div id="app">
-      <PlayerChip v-if="mode === null" @open="openMode('profile')" />
-      <LanguageSwitcher v-if="mode === null" />
+      <PlayerChip v-if="mode === null" @open="openMode(isSignedIn ? 'profile' : 'login')" />
+      <GlobalTopBar />
+      <MusicPlayer v-if="showMusicPlayer" />
       <button
         v-if="canExitToHome"
         class="home-exit-btn"
         :aria-label="t('app.backToHome')"
         @click="showExitConfirm = true"
       >←</button>
-      <div style="position:absolute; right:0.375rem; bottom:0.25rem; z-index:300; font-size:0.625rem; font-weight:700; color:rgba(58,58,58,.5); pointer-events:none;">v{{ appVersion }}</div>
+      <div
+        style="position:absolute; right:0.375rem; bottom:0.1875rem; z-index:300; font-size:0.5rem; font-weight:700; color:rgba(58,58,58,.5); cursor:default;"
+        @click="onVersionTap"
+      >v{{ appVersion }}</div>
 
       <div v-if="isLoading" style="display:flex; height:100%; align-items:center; justify-content:center; font-weight:800; font-size:1rem; color:var(--sub);">{{ t('app.loading') }}</div>
 
@@ -169,6 +202,12 @@ onMounted(() => {
 
       <PlayerProfileApp v-else-if="mode === 'profile'" @back="leaveMode()" />
 
+      <LoginApp v-else-if="mode === 'login'" @back="leaveMode()" @done="openMode('profile')" />
+
+      <AdminSwitchApp v-else-if="mode === 'adminSwitch'" @back="leaveMode()" />
+
+      <AdminRewardsApp v-else-if="mode === 'adminRewards'" @back="leaveMode()" />
+
       <SoloApp v-else />
 
       <!-- Above the language switcher's z-index so the switcher can't sit on top of it. -->
@@ -187,6 +226,8 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <AdminPinModal v-if="showAdminPin" @close="showAdminPin = false" />
     </div>
   </div>
 </template>
