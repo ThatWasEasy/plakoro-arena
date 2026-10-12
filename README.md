@@ -134,13 +134,13 @@ npm run fetch-data   # 從 Supabase 重新抓取角色與招式資料到 src/dat
 
 ```bash
 cp .env.example .env   # 第一次使用時
-npm run db:up          # 啟動本機 Postgres（docker compose，含資料保存用的 volume）
+npm run db:up          # 在 plakoro-arena-api repo 裡執行
 npm run db:migrate      # 套用 db/migrations/ 底下的 schema
 npm run db:psql         # 開 psql 互動視窗
 npm run db:down         # 關閉（資料還在 volume 裡，下次 db:up 會接著用）
 ```
 
-GUI：`npm run db:up` 會一併啟動 [pgweb](https://github.com/sosedoff/pgweb)，開 http://localhost:8081 就能直接瀏覽／編輯資料列，連線字串已經內建好，不用自己填。
+GUI：`npm run db:up          # 在 plakoro-arena-api repo 裡執行
 
 新增 schema 變更：在 `db/migrations/` 底下加一個新檔（例如 `0002_xxx.sql`），不要改已經套用過的舊檔——`db/migrate.mjs` 用 `schema_migrations` 表記錄套用過哪些檔案，照檔名順序只套用沒套用過的。
 
@@ -176,7 +176,7 @@ Schema 本身已經在 git 裡（`db/migrations/`），換機器只要重新跑�
 npm run db:dump      # 匯出目前這台的資料（含 schema）到 db/dump.sql
 # 把 db/dump.sql 傳到另一台機器（AirDrop／隨便一個雲端硬碟都行，這個檔案故意不進 git，
 # 因為裡面可能是你隨手測試用的假資料，沒有進版控的必要）
-npm run db:up         # 在新機器上，先啟動一個全新的空容器
+npm run db:up          # 在 plakoro-arena-api repo 裡執行
 npm run db:restore    # 直接 restore，連 schema 一起回來，不用先跑 db:migrate
 ```
 

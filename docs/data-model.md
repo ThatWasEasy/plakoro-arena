@@ -1,8 +1,13 @@
 # 資料模型規劃
 
-選手資料與賽事紀錄的資料庫設計。Schema 在 `db/migrations/`，API 在 `server/index.mjs` ——
+選手資料與賽事紀錄的資料庫設計。
+
+後端已於 2026-10-12 拆成獨立 repo [plakoro-arena-api](https://github.com/shawnlin0201/plakoro-arena-api) ——
+schema 在那邊的 `db/migrations/`，API 在 `server/index.mjs`。
 **這份文件記錄的是每個欄位為什麼長這樣、以及背後的取捨**，不是 DDL 的副本。
 改了資料表就回來更新這裡。
+
+前端只透過 `VITE_API_URL` 指向後端，兩邊沒有共用程式碼。
 
 當初要搬上資料庫的理由不是「徽章需要資料庫」，而是**紀錄只活在主辦的一台瀏覽器裡**：
 清掉瀏覽資料就全沒了，而且選手看不到自己的成績。
