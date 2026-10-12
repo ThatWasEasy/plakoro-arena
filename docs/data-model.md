@@ -1,17 +1,20 @@
 # 資料模型規劃
 
-把選手資料與賽事紀錄從 localStorage 搬上資料庫的設計。**尚未實作** —— 這份文件是動工前要先定下來的契約。
+選手資料與賽事紀錄的資料庫設計。Schema 在 `db/migrations/`，API 在 `server/index.mjs` ——
+**這份文件記錄的是每個欄位為什麼長這樣、以及背後的取捨**，不是 DDL 的副本。
+改了資料表就回來更新這裡。
 
-目前（2026-10）的實際狀態：
+當初要搬上資料庫的理由不是「徽章需要資料庫」，而是**紀錄只活在主辦的一台瀏覽器裡**：
+清掉瀏覽資料就全沒了，而且選手看不到自己的成績。
+
+目前（2026-10）的落地狀態：
 
 | 資料 | 位置 |
 |---|---|
-| 賽事紀錄 | `localStorage['plakoro_tournaments_v1']` |
-| 選手外觀 | `src/data/nameplates.json`（寫死的假資料） |
-| 本機身份 | `localStorage['plakoro_current_player_v1']` |
-| 戰績數字 | 不存，由 `aggregatePlayers()` 即時算 |
-
-要搬的理由不是「徽章需要資料庫」，而是**紀錄只活在主辦的一台瀏覽器裡**：清掉瀏覽資料就全沒了，而且選手看不到自己的成績。
+| 選手、解鎖、戰績 | ✅ Postgres |
+| 賽事紀錄 | ⬜ 仍以 `localStorage` 為主，可手動上傳／下載資料庫 |
+| 桌次表的名牌 | ✅ 建立賽事時從資料庫抓快照存進賽事（見〈離線快照〉） |
+| 登入 | ✅ 帳號 + PIN |
 
 ## 兩種比賽
 
@@ -243,6 +246,51 @@ CREATE TABLE auth_identities (
 
 同一個 `players` 列可以同時掛多個身份，所以之後加 LINE Login 不影響既有使用者。
 
+### 管理員
+
+沒有獨立的管理員憑證。主辦以一般玩家身分登入，而那個帳號的編號剛好是保留的 `P000000`；
+`requireAdminSession` 只檢查請求帶的 token 屬於誰。
+
+`P000000` 當哨兵值是安全的，因為 `nextPlayerCode()` 是 `MAX(code) + 1` 從 1 起跳，
+註冊流程永遠發不出它 —— 只能手動插入。
+
+前端的開關在玩家選單 → 設定分頁的「管理員模式」checkbox，**只有該帳號看得到**，
+每次重新載入預設關閉。可用 `ADMIN_PLAYER_CODE` 環境變數覆寫。
+
+> 舊版是「三連點版本號 → 輸入 PIN」，PIN 存在 `admin_pin` 表。該表已由
+> `0006_drop_admin_pin.sql` 移除，`AdminPinModal.vue`、`POST /api/admin/login`、
+> `db/seed-admin-pin.mjs` 一併刪除。
+
+另有一組 `ADMIN_SECRET` 環境變數，只用在維運型端點（發認領碼），走 `x-admin-secret` 標頭，
+與登入無關。
+
+### `reward_packages` / `reward_package_items`
+
+上傳賽事時依名次自動發放的內容，**後台可設定**（`0005_reward_packages.sql`）。
+
+```sql
+CREATE TABLE reward_packages (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE reward_package_items (
+  package_id TEXT NOT NULL REFERENCES reward_packages(id) ON DELETE CASCADE,
+  place      TEXT NOT NULL CHECK (place IN ('1', '2', '3', 'participant')),
+  kind       TEXT NOT NULL CHECK (kind IN ('avatar', 'background', 'title')),
+  asset      TEXT NOT NULL,
+  PRIMARY KEY (package_id, place, kind)
+);
+```
+
+取代了原本寫死在程式裡的季別命名規則（`${season}-champion` 那套）。一個獎勵包描述
+冠軍／亞軍／季軍／參與獎各自拿到什麼，三種素材任意搭配 —— 新賽事換獎勵變成點幾下，
+而且**稱號也能自動發**了（以前只能手動）。
+
+成就類稱號（賽到的／九死一生／怎麼結束了？）仍然只能手動發，因為它們依賴的對戰細節
+沒有任何地方記錄。管理介面的「身份切換」提供一格一格點的開關，就是為此存在。
+
 ### `claim_codes`
 
 > **登入與註冊的流程尚未定案，之後要另外討論。** 以下是目前傾向的方向，不是結論。
@@ -447,17 +495,67 @@ INSERT INTO online_matches (...)
 
 ## API
 
+以 `server/index.mjs` 實際實作為準。
+
+**不需登入**
+
 ```
-POST  /api/players/lookup       { codes: [...] }  → 整桌選手的 nameplate + stats
-GET   /api/players/:code                          → 單一選手 + 他的解鎖清單
-PATCH /api/players/:code        { equipped }      → 改外觀，需登入
-POST  /api/players/:code/grants                   → 主辦手動發稱號／旗幟
-POST  /api/tournaments                            → 上傳賽事，需主辦權限
-GET   /api/tournaments                            → 列表
-POST  /api/records/rebuild                        → 手動重建 stats
+POST   /api/auth/register                         → 新人註冊，發新編號
+POST   /api/auth/claim                            → 用認領碼綁定既有編號（兼忘記密碼）
+POST   /api/auth/login                            → 帳號 + PIN
+POST   /api/players/lookup    { codes: [...] }    → 整桌選手的名牌，見下
 ```
 
-### `GET /api/players/:code` 回應
+**需玩家登入**
+
+```
+GET    /api/players/me                            → 自己 + 解鎖清單
+PATCH  /api/players/me        { name, avatar, background, titleId }
+```
+
+**需管理員**（＝登入身份是 `P000000`，見〈管理員〉）
+
+```
+GET    /api/admin/players?q=                      → 依編號或名稱搜尋
+GET    /api/admin/players/:code                   → 單一選手 + 解鎖（含 src）
+POST   /api/admin/players/:code/unlocks           → 發放一項素材
+DELETE /api/admin/players/:code/unlocks?kind=&asset=  → 收回，並連帶卸下
+GET    /api/admin/tournaments                     → 列表
+GET    /api/admin/tournaments/:id                 → 下載回編輯器（v2 格式）
+POST   /api/admin/tournaments                     → 上傳，發獎、重算
+DELETE /api/admin/tournaments/:id                 → 刪除，連帶重算
+POST   /api/admin/records/rebuild                 → 全表重建 stats
+GET/PUT/DELETE /api/admin/reward-packages[/:id]   → 獎勵包設定
+```
+
+**需 `ADMIN_SECRET` 標頭**（維運用，沒有登入流程）
+
+```
+POST   /api/admin/claim-codes  { code }           → 發一組一次性認領碼
+```
+
+### `POST /api/players/lookup`
+
+桌次表用的批次查詢，**不需登入**。它回的東西本來就印在現場牆上的對戰表上（名字、旗幟、勝率），
+而且操作桌次畫面的主辦並不是以被查詢的那些選手身分登入的。
+
+必須明確指定編號，沒有「列出全部」。知道編號是讀取名牌的門檻 —— 跟讀那張貼在牆上的對戰表同一個標準。
+單次上限 256 組。
+
+```jsonc
+// 請求
+{ "codes": ["P000001", "P000004"] }
+
+// 回應：以編號為 key，呼叫端是逐一比對賽事名單，回陣列會讓每一筆都變成掃描
+{ "players": {
+    "P000001": { "code": "P000001", "name": "Ray",
+                 "avatar": "2026-9-champion", "background": "2026-9-champion",
+                 "title_id": "m1-champion",
+                 "events": 1, "gold": 1, "silver": 0, "bronze": 0, "podiums": 1,
+                 "tour_win_rate": 1 } } }
+```
+
+### `GET /api/players/me` 回應
 
 ```jsonc
 {
@@ -480,7 +578,7 @@ POST  /api/records/rebuild                        → 手動重建 stats
 
 不到 500 bytes，因為只有 id。圖檔和稱號文案都已經在前端 bundle 裡。
 
-### `PATCH` 的驗證
+### `PATCH /api/players/me` 的驗證
 
 ```sql
 SELECT 1 FROM player_unlocks
@@ -498,6 +596,17 @@ WHERE code = $1 AND kind = $2 AND asset = $3;
 現行架構是純本機，**斷網也能辦比賽**。改成打 API 之後，場地網路不穩就撈不到選手外觀 —— 而那正是最不能出事的時刻。
 
 解法：**建立賽事時把查到的 nameplate 快照寫進賽事本身**，開打之後整場讀快照，不再連線。
+
+**已實作**（`src/data/nameplateStore.js`）：
+
+- `fetchNameplates(players)` 打 `POST /api/players/lookup`，連不上時回空物件而不是拋錯 —— 場地沒訊號應該讓主辦少看到幾張圖，不是辦不成比賽
+- `ensureNameplates(players)` 只補沒有快照的人。已經有快照的不動，否則就是這個模組存在要防止的「默默竄改歷史」
+- `lookupNameplate(player)` 是同步的（桌次表每一列都會呼叫），讀 `player.nameplate`，沒有就退回 `fallbackNameplate()`
+
+三個呼叫點：建立賽事時（await，確保離開 wifi 前抓齊）、新增遲到選手時（不 await，報到台不該卡在請求上）、
+開啟賽事時（補齊舊賽事與當初離線建立的人）。
+
+原本的 `src/data/nameplates.json` 假資料已刪除。
 
 ```jsonc
 {
@@ -518,12 +627,13 @@ WHERE code = $1 AND kind = $2 AND asset = $3;
 
 ## 前端接點
 
-| 檔案 | 要改什麼 | 呼叫點 |
-|---|---|---|
-| `src/data/nameplateStore.js` | `loadNameplates()` 改打 API、變 async | **2 處**（都在 `TournamentDetail.vue`） |
-| `src/data/tournaments.js` | `loadTournaments` / `saveTournament` 改打 API | **5 處**（都在 `TournamentApp.vue`） |
-| `src/game/playerBadges.js` | **不動** | — |
-| `src/components/PlayerProfileApp.vue` | 依 `unlocks` 把未擁有的項目設為鎖定 | — |
+| 檔案 | 狀態 |
+|---|---|
+| `src/data/nameplateStore.js` | ✅ 已接 API（快照制，見〈離線快照〉） |
+| `src/components/PlayerProfileApp.vue` | ✅ 依 `unlocks` 鎖定未擁有的項目 |
+| `src/components/admin/AdminSwitchApp.vue` | ✅ 全素材開關格，可發放／收回 |
+| `src/game/playerBadges.js` | 不動 |
+| `src/data/tournaments.js` | ⬜ **仍是純 localStorage**。賽事可手動上傳／下載，但不是自動同步 |
 
 `aggregatePlayers()` 吃的是賽事陣列，資料從 localStorage 或 API 來對它沒差別。`nameplateStore.js` 當初就留了交換點：
 
@@ -586,6 +696,14 @@ UPDATE players SET ... FROM player_stats s WHERE s.code = players.code;   -- 見
 
 或呼叫 `POST /api/records/rebuild`。
 
+**名次不在重算範圍內。** `tournament_players.place` 是上傳當下由前端算好寫進去的，不是 view
+推導的。所以你改了某場對局的勝負，`tour_wins` 會跟著修正，但「誰是冠軍」不會 —— 金牌要連
+`place` 那幾列一起改。
+
+**pgweb 沒有行內編輯。** 它只有 Query 分頁可以跑 SQL（容器沒帶 `--readonly`，所以能寫），
+要像試算表那樣點格子改，得用 TablePlus / Postico / DBeaver / pgAdmin 連
+`postgres://plakoro:plakoro@localhost:5432/plakoro`。
+
 不要手改的：`players` 上所有衍生欄位（`tour_wins`、`tour_win_rate`、`online_*`、`gold`、`podiums`…）。改了不會報錯，但下一場線上對戰結束就被整批覆蓋，中間那段時間畫面顯示的是錯的。要調整這些數字，正確做法是去改對局資料然後重算。
 
 ---
@@ -606,6 +724,8 @@ UPDATE players SET ... FROM player_stats s WHERE s.code = players.code;   -- 見
 | **線上與線下勝率分開統計** | 線上隨手打輸幾場不該拉低實體賽事的戰績 |
 | **線上對戰另開一張表** | 沒有輪空、沒有輪數、不屬於任何賽事 —— 形狀本來就不同 |
 | **線上對戰一律要求登入** | 外鍵兩邊都 `NOT NULL`，不會有寫不進去的對局 |
+| **管理員＝登入 `P000000`，不另設憑證** | 一組登入、一個 token，少一樣會出錯的東西。保留編號當哨兵值，註冊永遠發不出來 |
+| **獎勵內容做成可設定的獎勵包** | 原本寫死季別命名規則，新賽事換獎勵要改程式；也讓稱號能自動發 |
 | **Postgres，不用 SQLite** | 要用 GUI 工具從自己電腦連進去改。SQLite 的檔案在容器裡，而且 Vercel 的檔案系統用完即丟、根本寫不了 |
 
 ---
@@ -633,4 +753,6 @@ UPDATE players SET ... FROM player_stats s WHERE s.code = players.code;   -- 見
 - **線上與線下勝率怎麼顯示**：資料已經分開存，顯示方式未定
 - **線上勝率的防刷**：跟朋友對打、快輸就斷線，都能灌水。等決定怎麼顯示時一起想
 - **現場走進來報名的人**：建議由主辦當場建立臨時選手列（有編號、無帳號），之後本人註冊時認領
-- **登入與註冊流程**：`claim_codes` 那段只是傾向，要另外討論。`auth_identities` 的形狀不受影響
+- **登入與註冊流程**：已實作成「帳號 + PIN」（`auth_identities.subject` 是登入帳號，與顯示名、編號三者分開），但流程本身還要再討論。`auth_identities` 的形狀可容納之後加 LINE Login
+- **`player_unlocks` 追溯不到來源**：`src` 目前一律寫 `'auto:upload'`，所以刪賽事無法連帶收回該場發出的獎品。計畫加 `source_tournament_id` 外鍵（`ON DELETE CASCADE`）＋ 主鍵含來源 ＋ `AFTER DELETE` trigger 自動卸下裝備
+- **賽事資料仍在 localStorage**：可手動上傳／下載，但不是自動同步
