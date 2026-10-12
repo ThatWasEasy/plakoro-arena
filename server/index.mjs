@@ -229,6 +229,43 @@ function requireAdminSession(req, res, next) {
   next()
 }
 
+// Copy player_stats onto the players table.
+//
+// The view is the single definition of what a player's record is; these columns are a cache of
+// it, kept because answering "what is Ray's win rate" from the view means reading every match
+// row he has ever played — cheap in CPU, wasteful as a query on every profile view.
+//
+// Always a recompute from the view, never an increment. Adding this event's results to the
+// stored numbers would be faster and would also be wrong the first time a result is corrected,
+// a tournament is deleted, or the same file is uploaded twice: the stored total would carry the
+// mistake forever, with nothing to reconcile it against.
+//
+// `codes` limits it to the players an upload actually touched. Pass null for everyone — the
+// whole table costs about a millisecond at this size, and anything that changed the data
+// without going through an endpoint (a hand-edit in pgweb, a cascade from a deleted tournament)
+// can't say whose numbers moved.
+async function recomputeStats(client, codes = null) {
+  const scoped = Array.isArray(codes)
+  if (scoped && !codes.length) return
+  await client.query(
+    `UPDATE players SET
+       events          = s.events,          ranked        = s.ranked,
+       tour_wins       = s.tour_wins,       tour_losses   = s.tour_losses,
+       tour_draws      = s.tour_draws,      tour_byes     = s.tour_byes,
+       tour_win_rate   = s.tour_win_rate,
+       online_wins     = s.online_wins,     online_losses = s.online_losses,
+       online_draws    = s.online_draws,
+       online_win_rate = s.online_win_rate,
+       gold            = s.gold,            silver        = s.silver,
+       bronze          = s.bronze,          podiums       = s.podiums,
+       best            = s.best,
+       stats_at        = now()
+     FROM player_stats s
+     WHERE s.code = players.code${scoped ? ' AND players.code = ANY($1::text[])' : ''}`,
+    scoped ? [codes] : []
+  )
+}
+
 // Search box behind "切換身份" — by code or by name, since nobody running this at a table has
 // every P###### memorised.
 app.get('/api/admin/players', requireAdminSession, async (req, res) => {
@@ -402,9 +439,43 @@ app.get('/api/admin/tournaments/:id', requireAdminSession, async (req, res) => {
 // are only ever added, never revoked automatically), so this is safe to use on a real event
 // without undoing anyone's earned rewards. Idempotent: deleting an id that was never uploaded,
 // or already removed, just affects zero rows.
+// Deleting takes the matches and the entry list with it (ON DELETE CASCADE), which silently
+// changes what every player in that event has played — so the cache has to be rebuilt or they
+// keep showing results from an event that no longer exists.
+//
+// Unscoped, and in a transaction with the delete: once the rows are gone there is no way left to
+// ask who was in it, and a recompute that lands outside the transaction can be the thing that
+// doesn't run.
 app.delete('/api/admin/tournaments/:id', requireAdminSession, async (req, res) => {
-  await pool.query('DELETE FROM tournaments WHERE id = $1', [req.params.id])
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query('DELETE FROM tournaments WHERE id = $1', [req.params.id])
+    await recomputeStats(client)
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    return res.status(500).json({ error: err.message })
+  } finally {
+    client.release()
+  }
   res.json({ ok: true })
+})
+
+// The way back from drift. Nothing that edits the database outside these endpoints — a result
+// corrected in pgweb, an online_matches row inserted by hand — can update the cache itself, so
+// there has to be one button that rebuilds it from the view.
+app.post('/api/admin/records/rebuild', requireAdminSession, async (req, res) => {
+  const client = await pool.connect()
+  try {
+    await recomputeStats(client)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  } finally {
+    client.release()
+  }
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM players')
+  res.json({ ok: true, players: rows[0].n })
 })
 
 // Admin-configurable tournament rewards (db/migrations/0005_reward_packages.sql). A package
@@ -571,20 +642,9 @@ app.post('/api/admin/tournaments', requireAdminSession, async (req, res) => {
       }
     }
 
-    // 6. Recompute, scoped to the players this upload actually touched (see docs/data-model.md
-    // 「4. 重算」for the unscoped version the real write path uses — scoping it here is just
-    // this one-off endpoint being conservative about what it touches).
-    await client.query(
-      `UPDATE players SET
-         events = s.events, ranked = s.ranked,
-         tour_wins = s.tour_wins, tour_losses = s.tour_losses, tour_draws = s.tour_draws, tour_byes = s.tour_byes,
-         tour_win_rate = s.tour_win_rate,
-         gold = s.gold, silver = s.silver, bronze = s.bronze, podiums = s.podiums, best = s.best,
-         stats_at = now()
-       FROM player_stats s
-       WHERE s.code = players.code AND players.code = ANY($1::text[])`,
-      [touchedCodes]
-    )
+    // 6. Recompute. Scoped here because an upload only ever moves the numbers of the people who
+    //    were in it.
+    await recomputeStats(client, touchedCodes)
 
     await client.query('COMMIT')
     res.json({

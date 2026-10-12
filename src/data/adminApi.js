@@ -66,6 +66,12 @@ export function deleteTournament(token, id) {
   })
 }
 
+// After hand-editing the database (pgweb and friends), the cached stats on `players` are stale
+// until something rebuilds them from the player_stats view. This is that something.
+export function rebuildRecords(token) {
+  return request('/api/admin/records/rebuild', { method: 'POST', headers: authHeader(token) })
+}
+
 export function listRewardPackages(token) {
   return request('/api/admin/reward-packages', { headers: authHeader(token) })
 }
