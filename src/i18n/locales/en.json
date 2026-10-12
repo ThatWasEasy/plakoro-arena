@@ -175,7 +175,10 @@
     "downloadTitle": "Download tournament from database",
     "downloadEmpty": "No tournaments in the database yet",
     "downloadError": "Download failed, please try again",
-    "toggleHint": "Tap to toggle: lit means owned (tap to revoke), dimmed means not owned (tap to grant). Default assets are always available and cannot be toggled."
+    "toggleHint": "Tap to toggle: lit means owned (tap to revoke), dimmed means not owned (tap to grant). Default assets are always available and cannot be toggled.",
+    "claimMint": "Issue claim code",
+    "claimMinting": "Issuing…",
+    "claimHint": "Send it to them; they enter it under \"Claim an existing record\" on the login page. Expires in 14 days."
   },
   "priceLog": {
     "title": {

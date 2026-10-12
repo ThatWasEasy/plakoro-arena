@@ -50,6 +50,10 @@ runSearch()
 
 async function select(code) {
   selectedCode.value = code
+  // Clearing it matters: a code left on screen after switching players reads as belonging to
+  // whoever is shown now, and handing the wrong person's code over gives them that account.
+  claimCode.value = ''
+  claimError.value = ''
   detail.value = null
   detailError.value = ''
   busyDetail.value = true
@@ -106,6 +110,28 @@ const TITLE_IDS = TITLE_GROUPS.map(g => ({ label: g.label, ids: g.titles.map(ti 
 
 const busyKey = ref(null)
 const toggleError = ref('')
+
+// Issued on demand rather than in advance. A player who never wants an account never needs a
+// code, and a code that sits around unused is a credential waiting to be found — it can set
+// the account handle and PIN for the player it names, with nothing else asked for.
+const claimCode = ref('')
+const claimBusy = ref(false)
+const claimError = ref('')
+
+async function mintClaim() {
+  if (!selectedCode.value || claimBusy.value) return
+  claimBusy.value = true
+  claimCode.value = ''
+  claimError.value = ''
+  try {
+    const r = await adminApi.mintClaimCode(adminToken.value, selectedCode.value)
+    claimCode.value = r.claimCode
+  } catch (e) {
+    claimError.value = e.message
+  } finally {
+    claimBusy.value = false
+  }
+}
 
 async function toggle(kind, asset) {
   if (!detail.value || isFree(kind, asset)) return
@@ -169,6 +195,17 @@ async function toggle(kind, asset) {
             <span v-if="detail.player.online_win_rate !== null">
               {{ t('admin.statOnlineWinRate') }} {{ Math.round(detail.player.online_win_rate * 100) }}%
             </span>
+          </div>
+
+          <!-- Only for players who have no account yet. Someone already signed in has nothing
+               to claim, and minting a code for them would be a way to take their account over. -->
+          <div v-if="!detail.hasAccount" class="as-claim">
+            <button class="btn secondary as-claim-btn" :disabled="claimBusy" @click="mintClaim">
+              {{ claimBusy ? t('admin.claimMinting') : t('admin.claimMint') }}
+            </button>
+            <code v-if="claimCode" class="as-claim-code">{{ claimCode }}</code>
+            <span v-if="claimCode" class="as-claim-note">{{ t('admin.claimHint') }}</span>
+            <span v-if="claimError" class="as-error">{{ claimError }}</span>
           </div>
 
           <p class="as-hint">{{ t('admin.toggleHint') }}</p>
@@ -278,6 +315,23 @@ async function toggle(kind, asset) {
 .as-detail { flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.625rem; }
 .as-preview { display: flex; justify-content: center; padding: 0.25rem 0; }
 .as-stats { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.6875rem; font-weight: 700; color: var(--sub); }
+
+.as-claim { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.as-claim-btn { padding: 0.3125rem 0.625rem; font-size: 0.6875rem; }
+/* Monospace and spaced out, because this gets read aloud or retyped from a screenshot and
+   O/0 and I/1 have to be told apart. */
+.as-claim-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.1875rem 0.4375rem;
+  border-radius: var(--radius-sm);
+  background: #2A2A28;
+  color: var(--accent-strong);
+  user-select: all;
+}
+.as-claim-note { font-size: 0.5625rem; color: var(--sub); }
 
 .as-hint { margin: 0; font-size: 0.625rem; font-weight: 600; color: var(--sub); line-height: 1.6; }
 

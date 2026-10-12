@@ -65,9 +65,12 @@ function openNew() {
 
 // Shared by the editor and the read-only preview below — both just want "what's in each
 // place", grouped the same way.
+// Each (place, kind) holds a list, not one asset. A placement can award several things of the
+// same kind — finishing first earns the champion flag and the winner flag, because the tiers
+// are a ladder and the package is where that gets written down.
 function itemsByPlace(items) {
   const out = { '1': {}, '2': {}, '3': {}, participant: {} }
-  items.forEach(it => { out[it.place][it.kind] = it.asset })
+  items.forEach(it => { (out[it.place][it.kind] ||= []).push(it.asset) })
   return out
 }
 
@@ -99,12 +102,18 @@ async function openPreview(id) {
   }
 }
 function placeHasAny(items) {
-  return !!(items.avatar || items.background || items.title)
+  return ['avatar', 'background', 'title'].some(k => (items[k] || []).length)
+}
+
+function picked(place, kind, asset) {
+  return (draft.value.items[place][kind] || []).includes(asset)
 }
 
 function pick(place, kind, asset) {
-  const current = draft.value.items[place][kind]
-  draft.value.items[place][kind] = current === asset ? undefined : asset
+  const list = (draft.value.items[place][kind] ||= [])
+  const i = list.indexOf(asset)
+  if (i === -1) list.push(asset)
+  else list.splice(i, 1)
 }
 
 const confirmDeleteId = ref(null)
@@ -131,8 +140,9 @@ async function save() {
   const items = []
   for (const place of Object.keys(draft.value.items)) {
     for (const kind of Object.keys(draft.value.items[place])) {
-      const asset = draft.value.items[place][kind]
-      if (asset) items.push({ place, kind, asset })
+      for (const asset of draft.value.items[place][kind] || []) {
+        if (asset) items.push({ place, kind, asset })
+      }
     }
   }
   busy.value = true
@@ -196,11 +206,15 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
             <div v-for="place in PLACES" :key="place.key" class="ar-preview-place">
               <div class="ar-place-label">{{ place.label }}</div>
               <div v-if="placeHasAny(previewPkg.items[place.key])" class="ar-preview-row">
-                <img v-if="previewPkg.items[place.key].avatar" class="ar-preview-thumb" :src="avatarUrl(previewPkg.items[place.key].avatar)" alt="">
-                <img v-if="previewPkg.items[place.key].background" class="ar-preview-thumb wide" :src="backgroundUrl(previewPkg.items[place.key].background)" alt="">
-                <span v-if="previewPkg.items[place.key].title" class="ar-title-chip on">
-                  {{ resolveTitle(previewPkg.items[place.key].title)?.text || previewPkg.items[place.key].title }}
-                </span>
+                <img
+                  v-for="id in (previewPkg.items[place.key].avatar || [])" :key="'a' + id"
+                  class="ar-preview-thumb" :src="avatarUrl(id)" :title="id" alt="">
+                <img
+                  v-for="id in (previewPkg.items[place.key].background || [])" :key="'b' + id"
+                  class="ar-preview-thumb wide" :src="backgroundUrl(id)" :title="id" alt="">
+                <span
+                  v-for="id in (previewPkg.items[place.key].title || [])" :key="'t' + id"
+                  class="ar-title-chip on">{{ resolveTitle(id)?.text || id }}</span>
               </div>
               <div v-else class="ar-preview-none">{{ t('admin.rewardsNone') }}</div>
             </div>
@@ -230,7 +244,7 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
             <div class="ar-grid">
               <button
                 v-for="id in AVATAR_IDS" :key="id"
-                :class="['ar-swatch', { on: draft.items[place.key].avatar === id }]"
+                :class="['ar-swatch', { on: picked(place.key, 'avatar', id) }]"
                 :title="id"
                 @click="pick(place.key, 'avatar', id)"
               ><img :src="avatarUrl(id)" alt="" loading="lazy"></button>
@@ -242,7 +256,7 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
             <div class="ar-grid wide">
               <button
                 v-for="id in BACKGROUND_IDS" :key="id"
-                :class="['ar-swatch', 'flag', { on: draft.items[place.key].background === id }]"
+                :class="['ar-swatch', 'flag', { on: picked(place.key, 'background', id) }]"
                 :title="id"
                 @click="pick(place.key, 'background', id)"
               ><img :src="backgroundUrl(id)" alt="" loading="lazy"></button>
@@ -254,7 +268,7 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
             <div class="ar-titles">
               <button
                 v-for="ti in titleOptions" :key="ti.id"
-                :class="['ar-title-chip', { on: draft.items[place.key].title === ti.id }]"
+                :class="['ar-title-chip', { on: picked(place.key, 'title', ti.id) }]"
                 @click="pick(place.key, 'title', ti.id)"
               >{{ ti.text }}</button>
             </div>

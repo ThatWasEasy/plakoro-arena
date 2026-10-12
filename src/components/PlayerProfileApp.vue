@@ -14,7 +14,6 @@ import { sfxSettings, setSfxVolume } from '../data/sfxSettings'
 import { currentIdentity, setCurrentPlayer, signOut } from '../data/currentPlayer'
 import { isAdminAccount, isAdminMode, setAdminMode } from '../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, tierOfAsset } from '../data/nameplateAssets'
-import { TIER_RANK, tierOf } from '../game/playerNameplate'
 import { getToken } from '../data/session'
 import { TITLE_GROUPS, resolveTitle } from '../data/titleCatalogue'
 import PlayerBanner from './tournament/PlayerBanner.vue'
@@ -27,10 +26,8 @@ const { t } = useI18n()
 
 const tab = ref('badge')
 
-// Starts at the lowest tier / empty-owned rather than waiting on the fetch below, so the
-// pickers never flash everything-unlocked before narrowing — the safe default is "nothing
-// earned yet."
-const playerTier = ref('default')
+// Starts empty rather than waiting on the fetch below, so the pickers never flash
+// everything-unlocked before narrowing — the safe default is "nothing earned yet."
 const ownedAvatars = ref(new Set())
 const ownedBackgrounds = ref(new Set())
 const ownedTitles = ref(new Set())
@@ -40,7 +37,6 @@ onMounted(async () => {
   if (!token) return
   try {
     const profile = await authApi.me(token)
-    playerTier.value = tierOf(profile)
     ownedAvatars.value = new Set(profile.unlocks.filter(u => u.kind === 'avatar').map(u => u.asset))
     ownedBackgrounds.value = new Set(profile.unlocks.filter(u => u.kind === 'background').map(u => u.asset))
     ownedTitles.value = new Set(profile.unlocks.filter(u => u.kind === 'title').map(u => u.asset))
@@ -49,14 +45,22 @@ onMounted(async () => {
   }
 })
 
-// Two ways in: a tier-suffixed id (`2026-10-champion`) counts as unlocked at that tier or
-// higher even without its own player_unlocks row (that's how the seasonal ladder works — one
-// grant at placement time covers every lower tier of the same season), or it's explicitly in
-// player_unlocks (covers the three mascots, which have no tier at all, and any asset earned
-// outside the normal ladder).
+// Exactly what the server will accept: a `-default` flag, which every season gives away, or a
+// row in player_unlocks. Nothing is inferred.
+//
+// There used to be a tier ladder here — placing anywhere was taken to unlock every lower tier
+// too. It was wrong twice over. It ignored the season, so one third place opened every event's
+// `-winner`, including events the player never attended; and even within a season it was
+// backwards, because the tiers are not a ladder. A reward package gives 1st `-champion`,
+// 2nd and 3rd `-winner`, and everyone `-participants` — so `-winner` means "came 2nd or 3rd",
+// and a champion is not entitled to it. The one case the ladder was meant to serve, a champion
+// wanting the plainer flag, is already covered: the participant grant goes to the whole entry
+// list, champion included.
+//
+// Deciding what someone gets belongs in the reward package, which is admin-editable. A rule
+// here could only ever drift from it — and did.
 function isUnlocked(id, kind) {
-  const tier = tierOfAsset(id)
-  if (tier !== null && TIER_RANK[tier] <= TIER_RANK[playerTier.value]) return true
+  if (tierOfAsset(id) === 'default') return true
   const owned = kind === 'avatar' ? ownedAvatars.value : ownedBackgrounds.value
   return owned.has(id)
 }

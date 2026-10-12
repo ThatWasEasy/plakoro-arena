@@ -175,7 +175,10 @@
     "downloadTitle": "從資料庫下載賽事",
     "downloadEmpty": "資料庫裡還沒有任何賽事",
     "downloadError": "下載失敗，請稍後再試",
-    "toggleHint": "點一下切換：亮起＝已擁有，點了收回；暗的＝未擁有，點了發給。預設素材人人都有，不能切換。"
+    "toggleHint": "點一下切換：亮起＝已擁有，點了收回；暗的＝未擁有，點了發給。預設素材人人都有，不能切換。",
+    "claimMint": "發認領碼",
+    "claimMinting": "產生中…",
+    "claimHint": "傳給本人，他在登入頁「認領舊帳號」輸入。14 天後失效。"
   },
   "priceLog": {
     "title": {

@@ -68,6 +68,16 @@ export function deleteTournament(token, id) {
 
 // After hand-editing the database (pgweb and friends), the cached stats on `players` are stale
 // until something rebuilds them from the player_stats view. This is that something.
+// One-time code that lets a player attach an account to an existing record, instead of
+// registering fresh and ending up with a second identity holding none of their history.
+export function mintClaimCode(token, code) {
+  return request('/api/admin/claim-codes', {
+    method: 'POST',
+    headers: authHeader(token),
+    body: JSON.stringify({ code })
+  })
+}
+
 export function rebuildRecords(token) {
   return request('/api/admin/records/rebuild', { method: 'POST', headers: authHeader(token) })
 }

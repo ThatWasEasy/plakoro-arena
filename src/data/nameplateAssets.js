@@ -77,6 +77,13 @@ export function tierOfAsset(id) {
   return m ? m[1] : null
 }
 
+// `2026-10-winner` -> `2026-10`. Null for anything without a tier suffix (the mascots), which
+// belong to no season and are free to everyone.
+export function seasonOfAsset(id) {
+  const m = TIER_SUFFIX.exec(id)
+  return m ? id.slice(0, m.index) : null
+}
+
 // Every season that actually has artwork, for anything that needs to ask "which season's
 // rewards" rather than assume it's always the current one — an admin uploading a tournament
 // that happened last season is the reason this exists; defaulting to CURRENT_SEASON there would
