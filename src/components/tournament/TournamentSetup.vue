@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 // Registration is when a player's roster code actually exists — they say it as they sign in.
 // Recovering it later means matching on a name they may not have used last time.
 import { parsePlayerLine } from '../../data/tournaments'
+import { ensureNameplates } from '../../data/nameplateStore'
 
 const emit = defineEmits(['created', 'back'])
 const { t } = useI18n()
@@ -33,14 +34,32 @@ const effectiveRounds = computed(() => roundsTouched.value ? swissRounds.value :
 
 const canSubmit = computed(() => parsedPlayers.value.length >= 2)
 
-function submit() {
+const creating = ref(false)
+
+async function submit() {
   if (!canSubmit.value) { showValidation.value = true; return }
+  if (creating.value) return
+  creating.value = true
+
+  const players = parsedPlayers.value.map(p => ({ id: crypto.randomUUID(), name: p.name, code: p.code }))
+
+  // Taken once, here, and stored on the tournament — see nameplateStore.js. Awaited rather than
+  // left to fill in later so the sheet is complete before anyone walks away from wifi, but not
+  // allowed to block creation: ensureNameplates resolves empty when the server is unreachable,
+  // and a plate-less event still runs.
+  try {
+    await ensureNameplates(players)
+  } catch (e) {
+    // Already swallowed inside ensureNameplates; this is belt and braces.
+  }
+
+  creating.value = false
   emit('created', {
     id: crypto.randomUUID(),
     name: name.value.trim() || t('tournament.setup.namePlaceholder'),
     format: format.value,
     createdAt: Date.now(),
-    players: parsedPlayers.value.map(p => ({ id: crypto.randomUUID(), name: p.name, code: p.code })),
+    players,
     rounds: [],
     swissTotalRounds: format.value === 'swiss' ? effectiveRounds.value : undefined
   })

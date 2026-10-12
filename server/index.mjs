@@ -152,6 +152,36 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ code: rows[0].code, token: signToken(rows[0].code) })
 })
 
+// Nameplates for a list of roster codes, for the tournament tool's pairing sheet.
+//
+// Unauthenticated on purpose. Everything it returns is already printed on a sheet pinned to the
+// wall at the event — a name, a flag, a win rate — and the organiser running the pairing screen
+// is not signed in as any of the players being looked up.
+//
+// Codes have to be named explicitly; there is no "list everyone". Knowing a code is the price of
+// reading its nameplate, which is the same bar as reading the pairing sheet itself.
+const LOOKUP_LIMIT = 256
+
+app.post('/api/players/lookup', async (req, res) => {
+  const codes = Array.isArray(req.body?.codes) ? req.body.codes : []
+  const wanted = [...new Set(
+    codes.map(c => String(c || '').trim().toUpperCase()).filter(Boolean)
+  )].slice(0, LOOKUP_LIMIT)
+  if (!wanted.length) return res.json({ players: {} })
+
+  const { rows } = await pool.query(
+    `SELECT code, name, avatar, background, title_id,
+            events, gold, silver, bronze, podiums, tour_win_rate
+     FROM players WHERE code = ANY($1::text[])`,
+    [wanted]
+  )
+  // Keyed by code rather than returned as a list: the caller is matching each tournament entry
+  // to its row, and a list makes every one of those a scan.
+  const players = {}
+  rows.forEach(r => { players[r.code] = r })
+  res.json({ players })
+})
+
 app.get('/api/players/me', requireAuth, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM players WHERE code = $1', [req.playerCode])
   if (!rows.length) return res.status(404).json({ error: 'player not found' })

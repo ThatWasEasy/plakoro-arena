@@ -16,7 +16,7 @@ import {
   giveByeTo
 } from '../../game/tournamentPairing'
 import { parsePlayerLine } from '../../data/tournaments'
-import { lookupNameplate } from '../../data/nameplateStore'
+import { ensureNameplates, lookupNameplate } from '../../data/nameplateStore'
 import { renderRoundImage, renderStandingsImage, renderPlayerImage, sheetFileName, playerImageFileName } from '../../game/roundImage'
 import * as adminApi from '../../data/adminApi'
 import { adminToken, isAdminMode } from '../../data/adminSession'
@@ -231,6 +231,16 @@ async function checkExistsInDb() {
 }
 onMounted(checkExistsInDb)
 
+// Tournaments created before nameplates were stored on them — and anyone entered while the
+// server was unreachable — have no snapshot. Fill the gaps once on open, then save.
+//
+// Only fills what's missing, so a plate taken at the event is never overwritten by what that
+// player looks like today. Not awaited: the sheet renders with default plates and upgrades in
+// place rather than waiting on a request.
+onMounted(() => {
+  ensureNameplates(local.value.players).then(changed => { if (changed) emitUpdate() })
+})
+
 // The server may have minted fresh codes for players who didn't have one yet (walk-ins) — apply
 // those back onto the local copy so a second upload of the same event reuses them instead of
 // creating a new player each time, then persist like any other edit.
@@ -356,6 +366,11 @@ function addPlayer() {
   }
   newPlayerName.value = ''
   emitUpdate()
+
+  // Not awaited: a late entrant is added at the desk with someone waiting, and their plate
+  // filling in a moment later is better than the button hanging on a request. If it lands, the
+  // row re-renders and the tournament is saved again; if it doesn't, they keep the default.
+  ensureNameplates([player]).then(changed => { if (changed) emitUpdate() })
 }
 
 // Stored trimmed and uppercased: a player code is a case-insensitive identifier, and a stray
