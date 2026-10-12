@@ -12,6 +12,7 @@ import * as authApi from '../data/authApi'
 import { audioSettings, setVolume } from '../data/audioSettings'
 import { sfxSettings, setSfxVolume } from '../data/sfxSettings'
 import { currentIdentity, setCurrentPlayer, signOut } from '../data/currentPlayer'
+import { isAdminAccount, isAdminMode, setAdminMode } from '../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, tierOfAsset } from '../data/nameplateAssets'
 import { TIER_RANK, tierOf } from '../game/playerNameplate'
 import { getToken } from '../data/session'
@@ -262,6 +263,15 @@ function handleSignOut() {
         />
       </div>
 
+      <!-- Only ever rendered for the organiser's own account, so for everyone else admin mode
+           isn't something to be refused — it's something they never learn is there. Off on every
+           page load: being the organiser is permanent, wanting the admin cards in the menu is
+           not. -->
+      <label v-if="isAdminAccount" class="pp-field pp-check">
+        <input type="checkbox" :checked="isAdminMode" @change="setAdminMode($event.target.checked)">
+        <span>{{ t('profile.adminMode') }}</span>
+      </label>
+
       <button class="btn secondary" @click="handleSignOut">{{ t('account.signOut') }}</button>
     </div>
 
@@ -281,6 +291,19 @@ function handleSignOut() {
 
 <style scoped>
 .pp-board { display: flex; flex-direction: column; min-height: 0; }
+
+/* A row, not a stacked field: the label belongs beside its box, and the whole thing is a
+   <label> so the text is part of the hit target. */
+.pp-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.pp-check input { width: 1rem; height: 1rem; accent-color: var(--accent-strong); cursor: pointer; }
 
 .pp-body {
   flex: 1;

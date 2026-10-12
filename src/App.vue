@@ -24,7 +24,6 @@ import { installButtonSfx } from './data/buttonSfx'
 import PlayerChip from './components/PlayerChip.vue'
 import PlayerProfileApp from './components/PlayerProfileApp.vue'
 import LoginApp from './components/auth/LoginApp.vue'
-import AdminPinModal from './components/admin/AdminPinModal.vue'
 import AdminSwitchApp from './components/admin/AdminSwitchApp.vue'
 import AdminRewardsApp from './components/admin/AdminRewardsApp.vue'
 import { isSignedIn } from './data/currentPlayer'
@@ -92,24 +91,6 @@ function exitToHome() {
 const stageRef = ref(null)
 useStageLayout(stageRef)
 
-// The version number doubles as the admin-mode entry point: three taps within a second and a
-// half pop the PIN modal. Not a secret gesture so much as one nobody does by accident — a
-// visible button would invite every curious player to try it.
-const versionTapCount = ref(0)
-let versionTapTimer = null
-const showAdminPin = ref(false)
-
-function onVersionTap() {
-  versionTapCount.value++
-  clearTimeout(versionTapTimer)
-  if (versionTapCount.value >= 3) {
-    versionTapCount.value = 0
-    showAdminPin.value = true
-    return
-  }
-  versionTapTimer = setTimeout(() => { versionTapCount.value = 0 }, 1500)
-}
-
 const inBattleBoard = computed(() => ['moveSelect', 'diceRoll', 'resolve', 'effectPrompt', 'charaThrowTask', 'energyThrowTask', 'turnResultConfirm'].includes(state.phase))
 
 // Each side has their own modal slot (state.modals.A / .B) so opening one never closes the
@@ -147,7 +128,6 @@ onBeforeUnmount(uninstallButtonSfx)
       >←</button>
       <div
         style="position:absolute; right:0.375rem; bottom:0.1875rem; z-index:300; font-size:0.5rem; font-weight:700; color:rgba(58,58,58,.5); cursor:default;"
-        @click="onVersionTap"
       >v{{ appVersion }}</div>
 
       <div v-if="isLoading" style="display:flex; height:100%; align-items:center; justify-content:center; font-weight:800; font-size:1rem; color:var(--sub);">{{ t('app.loading') }}</div>
@@ -227,7 +207,6 @@ onBeforeUnmount(uninstallButtonSfx)
         </div>
       </div>
 
-      <AdminPinModal v-if="showAdminPin" @close="showAdminPin = false" />
     </div>
   </div>
 </template>

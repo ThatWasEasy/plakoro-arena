@@ -139,9 +139,6 @@
     "lineJoin": "Line に参加"
   },
   "admin": {
-    "pinTitle": "管理者パスワード",
-    "pinPlaceholder": "パスワードを入力",
-    "wrongPin": "パスワードが違います",
     "switchTitle": "アカウント切り替え",
     "searchPlaceholder": "選手コードまたは名前で検索",
     "noResults": "該当する選手がいません",
@@ -177,7 +174,8 @@
     "downloadButton": "クラウドからダウンロード",
     "downloadTitle": "データベースから大会をダウンロード",
     "downloadEmpty": "データベースにはまだ大会がありません",
-    "downloadError": "ダウンロードに失敗しました。もう一度お試しください"
+    "downloadError": "ダウンロードに失敗しました。もう一度お試しください",
+    "toggleHint": "タップで切替：点灯＝所持（タップで回収）、暗い＝未所持（タップで付与）。デフォルト素材は全員所持のため切替不可。"
   },
   "priceLog": {
     "title": {
@@ -691,7 +689,8 @@
     "tabBadge": "プレイヤーバッジ",
     "tabSettings": "設定",
     "title": "プレイヤー情報",
-    "titleLabel": "称号"
+    "titleLabel": "称号",
+    "adminMode": "管理者モード"
   },
   "notice": {
     "meetup2": "Meetup#2 の参加受付中 — 詳細は Plakoro Taiwan の Line までお問い合わせください"

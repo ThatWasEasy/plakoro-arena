@@ -139,9 +139,6 @@
     "lineJoin": "Join Line"
   },
   "admin": {
-    "pinTitle": "Admin Password",
-    "pinPlaceholder": "Enter password",
-    "wrongPin": "Wrong password",
     "switchTitle": "Switch Identity",
     "searchPlaceholder": "Search by code or name",
     "noResults": "No matching players",
@@ -177,7 +174,8 @@
     "downloadButton": "Download from cloud",
     "downloadTitle": "Download tournament from database",
     "downloadEmpty": "No tournaments in the database yet",
-    "downloadError": "Download failed, please try again"
+    "downloadError": "Download failed, please try again",
+    "toggleHint": "Tap to toggle: lit means owned (tap to revoke), dimmed means not owned (tap to grant). Default assets are always available and cannot be toggled."
   },
   "priceLog": {
     "title": {
@@ -691,7 +689,8 @@
     "tabBadge": "Player badge",
     "tabSettings": "Settings",
     "title": "Player profile",
-    "titleLabel": "Title"
+    "titleLabel": "Title",
+    "adminMode": "Admin mode"
   },
   "notice": {
     "meetup2": "Meetup#2 sign-ups are open — ask on the Plakoro Taiwan Line for details"

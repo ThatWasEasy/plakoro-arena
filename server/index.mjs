@@ -213,24 +213,19 @@ app.patch('/api/players/me', requireAuth, async (req, res) => {
   res.json(rows[0])
 })
 
-// The in-app admin mode's own login (triple-tap the version number, enter the PIN) — separate
-// from `requireAdmin` above, which gates ops-style endpoints behind the ADMIN_SECRET env var.
-// This PIN lives in the database (see db/migrations/0003_admin_pin.sql) specifically so it can
-// be changed without a redeploy, and issues an ordinary signed token whose `code` is the
-// sentinel 'ADMIN' rather than any real player — never a value `nextPlayerCode` can produce.
-app.post('/api/admin/login', async (req, res) => {
-  const pin = String(req.body?.pin || '')
-  const { rows } = await pool.query('SELECT pin_hash FROM admin_pin WHERE id = 1')
-  const ok = rows[0] && await verifySecret(pin, rows[0].pin_hash)
-  if (!ok) return res.status(401).json({ error: 'wrong pin' })
-  res.json({ token: signToken('ADMIN') })
-})
+// Admin mode is an ordinary player session that happens to belong to the reserved code — no
+// second credential, no PIN. `nextPlayerCode()` numbers from MAX + 1 starting at 1, so P000000
+// is unreachable by registration and has to be inserted on purpose.
+//
+// Distinct from `requireAdmin` above, which gates ops-style endpoints on the ADMIN_SECRET env
+// var and has no login at all.
+const ADMIN_PLAYER_CODE = process.env.ADMIN_PLAYER_CODE || 'P000000'
 
 function requireAdminSession(req, res, next) {
   const header = req.header('authorization') || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   const payload = verifyToken(token)
-  if (!payload || payload.code !== 'ADMIN') return res.status(401).json({ error: 'unauthorized' })
+  if (!payload || payload.code !== ADMIN_PLAYER_CODE) return res.status(401).json({ error: 'unauthorized' })
   next()
 }
 
@@ -250,13 +245,91 @@ app.get('/api/admin/players', requireAdminSession, async (req, res) => {
 // its own signed-in player, read here instead of assumed.
 app.get('/api/admin/players/:code', requireAdminSession, async (req, res) => {
   const code = String(req.params.code).trim().toUpperCase()
-  const { rows } = await pool.query('SELECT * FROM players WHERE code = $1', [code])
+  const { rows } = await pool.query('SELECT 1 FROM players WHERE code = $1', [code])
   if (!rows.length) return res.status(404).json({ error: 'no such player' })
-  const { rows: unlocks } = await pool.query(
-    'SELECT kind, asset FROM player_unlocks WHERE code = $1 ORDER BY kind, asset', [code]
-  )
-  res.json({ player: rows[0], unlocks })
+  // `src` comes along so the toggle grid can show which grants were earned at an event and which
+  // were handed over by someone — the two look identical on a banner but are not the same claim.
+  res.json(await readUnlocks(code))
 })
+
+// Hand-granting and taking back a single asset, from 身份切換's toggle grid.
+//
+// This is how the achievement titles get awarded at all: 賽到的 / 九死一生 / 怎麼結束了？ depend
+// on battle detail nobody records, so unlike placement rewards (which a reward package hands out
+// on upload) there is nothing for the server to derive them from. Someone saw it happen and says
+// so — which is exactly what `src = 'manual:ADMIN'` means.
+//
+// Kept apart from reward packages on purpose: a package grant belongs to its tournament and goes
+// away with it, a manual grant is a standing statement about the player and never does.
+const UNLOCK_KINDS = new Set(['avatar', 'background', 'title'])
+
+app.post('/api/admin/players/:code/unlocks', requireAdminSession, async (req, res) => {
+  const code = String(req.params.code).trim().toUpperCase()
+  const kind = String(req.body?.kind || '')
+  const asset = String(req.body?.asset || '').trim()
+  if (!UNLOCK_KINDS.has(kind) || !asset) return res.status(400).json({ error: 'bad kind or asset' })
+
+  const { rows } = await pool.query('SELECT 1 FROM players WHERE code = $1', [code])
+  if (!rows.length) return res.status(404).json({ error: 'no such player' })
+
+  // Idempotent, and deliberately does NOT overwrite an existing row: if they already earned this
+  // at an event, that grant's own provenance is the true one and re-granting by hand must not
+  // rewrite it into a manual award.
+  await pool.query(
+    `INSERT INTO player_unlocks (code, kind, asset, src) VALUES ($1, $2, $3, 'manual:ADMIN')
+     ON CONFLICT (code, kind, asset) DO NOTHING`,
+    [code, kind, asset]
+  )
+  res.json(await readUnlocks(code))
+})
+
+app.delete('/api/admin/players/:code/unlocks', requireAdminSession, async (req, res) => {
+  const code = String(req.params.code).trim().toUpperCase()
+  const kind = String(req.query.kind || '')
+  const asset = String(req.query.asset || '').trim()
+  if (!UNLOCK_KINDS.has(kind) || !asset) return res.status(400).json({ error: 'bad kind or asset' })
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(
+      'DELETE FROM player_unlocks WHERE code = $1 AND kind = $2 AND asset = $3', [code, kind, asset]
+    )
+
+    // Taking the grant away has to take the equipment off too. `players.avatar/background/
+    // title_id` are plain columns with nothing tying them to player_unlocks, and isAssetAllowed
+    // only runs on PATCH — so without this the player keeps wearing a title the records no longer
+    // back, which is the one thing that would make every earned title meaningless.
+    //
+    // NULL is a valid state: avatarUrl()/backgroundUrl() fall back to the default artwork, and a
+    // null title_id just renders no title.
+    const column = { avatar: 'avatar', background: 'background', title: 'title_id' }[kind]
+    await client.query(
+      `UPDATE players SET ${column} = NULL
+       WHERE code = $1 AND ${column} = $2
+         AND NOT EXISTS (SELECT 1 FROM player_unlocks
+                         WHERE code = $1 AND kind = $3 AND asset = $2)`,
+      [code, asset, kind]
+    )
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    return res.status(500).json({ error: err.message })
+  } finally {
+    client.release()
+  }
+  res.json(await readUnlocks(code))
+})
+
+// Both endpoints answer with the player's state after the change, so the screen re-renders from
+// the server's word rather than from its own guess about what the click did.
+async function readUnlocks(code) {
+  const { rows } = await pool.query('SELECT * FROM players WHERE code = $1', [code])
+  const { rows: unlocks } = await pool.query(
+    'SELECT kind, asset, src FROM player_unlocks WHERE code = $1 ORDER BY kind, asset', [code]
+  )
+  return { player: rows[0], unlocks }
+}
 
 // The reverse direction of the upload below: pick a tournament that's already in the database
 // back into the client-side editor. Lets a device whose localStorage never had the event (or

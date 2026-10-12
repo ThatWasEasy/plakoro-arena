@@ -17,16 +17,30 @@ function authHeader(token) {
   return { Authorization: `Bearer ${token}` }
 }
 
-export function login(pin) {
-  return request('/api/admin/login', { method: 'POST', body: JSON.stringify({ pin }) })
-}
-
 export function searchPlayers(token, q) {
   return request(`/api/admin/players?q=${encodeURIComponent(q || '')}`, { headers: authHeader(token) })
 }
 
 export function getPlayer(token, code) {
   return request(`/api/admin/players/${encodeURIComponent(code)}`, { headers: authHeader(token) })
+}
+
+// Both resolve with the player's state *after* the change ({ player, unlocks }), so the caller
+// replaces what it holds rather than patching its own copy and hoping it matches.
+export function grantUnlock(token, code, kind, asset) {
+  return request(`/api/admin/players/${encodeURIComponent(code)}/unlocks`, {
+    method: 'POST',
+    headers: authHeader(token),
+    body: JSON.stringify({ kind, asset })
+  })
+}
+
+export function revokeUnlock(token, code, kind, asset) {
+  const q = `kind=${encodeURIComponent(kind)}&asset=${encodeURIComponent(asset)}`
+  return request(`/api/admin/players/${encodeURIComponent(code)}/unlocks?${q}`, {
+    method: 'DELETE',
+    headers: authHeader(token)
+  })
 }
 
 export function uploadTournament(token, payload) {

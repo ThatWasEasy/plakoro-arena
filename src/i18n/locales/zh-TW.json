@@ -139,9 +139,6 @@
     "lineJoin": "加入 Line"
   },
   "admin": {
-    "pinTitle": "管理員密碼",
-    "pinPlaceholder": "輸入密碼",
-    "wrongPin": "密碼錯誤",
     "switchTitle": "切換身份",
     "searchPlaceholder": "搜尋玩家代號或名稱",
     "noResults": "沒有符合的玩家",
@@ -177,7 +174,8 @@
     "downloadButton": "從雲端下載",
     "downloadTitle": "從資料庫下載賽事",
     "downloadEmpty": "資料庫裡還沒有任何賽事",
-    "downloadError": "下載失敗，請稍後再試"
+    "downloadError": "下載失敗，請稍後再試",
+    "toggleHint": "點一下切換：亮起＝已擁有，點了收回；暗的＝未擁有，點了發給。預設素材人人都有，不能切換。"
   },
   "priceLog": {
     "title": {
@@ -690,7 +688,8 @@
     "tabBadge": "玩家徽章",
     "tabSettings": "設定",
     "title": "玩家資料",
-    "titleLabel": "稱號"
+    "titleLabel": "稱號",
+    "adminMode": "管理員模式"
   },
   "notice": {
     "meetup2": "Meetup#2 活動報名開跑中，詳情請上 Plakoro Taiwan Line 詢問"
