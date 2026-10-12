@@ -12,7 +12,6 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:migrate": "node --env-file-if-exists=.env db/migrate.mjs",
-    "db:seed-admin-pin": "node --env-file-if-exists=.env db/seed-admin-pin.mjs",
     "db:psql": "docker compose exec db psql -U plakoro -d plakoro",
     "db:dump": "docker compose exec -T db pg_dump -U plakoro -d plakoro --no-owner --no-privileges > db/dump.sql",
     "db:restore": "docker compose exec -T db psql -U plakoro -d plakoro < db/dump.sql",

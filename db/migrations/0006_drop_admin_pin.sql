@@ -1,0 +1,11 @@
+-- Admin mode no longer has a credential of its own. It used to be "triple-tap the version
+-- number, enter a PIN" (0003_admin_pin.sql); it is now "sign in as the reserved player P000000
+-- and tick the checkbox in the profile screen's settings tab", so the session doing the asking
+-- is an ordinary player session and `requireAdminSession` just checks whose it is.
+--
+-- Dropped rather than left sitting there: an unused table holding a password hash is a thing
+-- someone re-wires to later believing it still means something.
+--
+-- 0003 stays in place and is not edited — it has already been applied everywhere, and rewriting
+-- an applied migration is how two databases quietly stop matching.
+DROP TABLE IF EXISTS admin_pin;
