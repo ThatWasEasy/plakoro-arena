@@ -132,6 +132,11 @@ const rows = computed(() => {
 
 <template>
   <div class="board select-board mode-select">
+    <!-- Decoration, so it is out of the accessibility tree and out of the way of every click
+         on the screen. One element, not a field of them: the mascot is a repeating background
+         on a single layer, and the only thing that moves is that layer's transform. -->
+    <div class="mode-bg" aria-hidden="true"></div>
+
     <h1 class="mode-wordmark">PLAKORO ARENA</h1>
 
     <!-- A bounded box with real rows inside it, rather than cards left to wrap. The box itself
@@ -216,6 +221,74 @@ const rows = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* The drifting layer is clipped to the screen, and everything else sits above it. */
+  position: relative;
+  isolation: isolate;
+}
+
+/* The mascot field.
+ *
+ * Why it is built this way rather than the obvious way: animating `background-position` would
+ * repaint the whole area on every frame, on the main thread. A transform on one layer is
+ * handed to the compositor instead — the tile is rasterised once and then just moved, so the
+ * cost is flat no matter how large the field or how many mascots are visible.
+ *
+ * The loop is seamless because the slide is exactly one tile in each axis, measured *inside*
+ * the rotation: rotate first, then translate, so the travel and the tile grid share a
+ * coordinate system. One cell across and one cell down lands on an identical arrangement.
+ */
+.mode-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mode-bg::before {
+  /* The cell, not the mascot. Two things are baked into the image rather than done here —
+     the mascot's own -50° tilt and the transparent gap around it — and both have to be,
+     because CSS cannot space a repeating background (background-size sets the drawn size and
+     the repeat period at once) and a CSS rotation would turn the whole lattice, dragging the
+     drift off its diagonal with it. See scripts/make-emblem-tile.py.
+     Changing this scales mascots and gaps together, keeping their ratio. */
+  --tile: 8rem;
+  content: '';
+  position: absolute;
+  /* A whole cell of overhang on every side, so the half-cell the layer travels can never
+     bring an edge into view — the same idea as the ticker's extra copies, except the layer is
+     simply larger rather than duplicated.
+     Measured in cells, not percent: a percentage resolves against the parent, and 20% of a
+     short stage came out *smaller* than the travel — the top edge crossed into view near the
+     end of every cycle and the reset read as a jump. Tied to --tile, it cannot drift out of
+     step again. */
+  inset: calc(var(--tile) * -1);
+  background-image: url('../assets/gray-plakoro-mascot-emblem-tile.png');
+  background-repeat: repeat;
+  background-size: var(--tile) var(--tile);
+  /* Faint: this is the texture of the board, not a thing to look at. The artwork is already
+     grey, so opacity alone is enough and there is no filter on the paint path. */
+  opacity: 0.25;
+  transform: translate3d(0, 0, 0);
+  /* One cell per 6s. The duration is the speed, and the distance is fixed at exactly one cell
+     in each axis (anything else breaks the seam) — so this has to move with --tile to hold a
+     speed steady. Half of 8rem diagonally over 4.5s is ~35px/s. */
+  animation: mode-bg-drift 4.5s linear infinite;
+  will-change: transform;
+}
+
+/* Straight down-left, in screen space, by *half* a cell — the offset course repeats every half
+   step diagonally, so half a cell lands on the same arrangement again and the loop is seamless
+   at twice the rate a full cell would be. A true 45° toward the bottom-left corner, which reads
+   as drifting in from the top-right. The mascots are tilted inside the image, so their angle
+   and this direction are independent of each other. */
+@keyframes mode-bg-drift {
+  to { transform: translate3d(calc(var(--tile) * -0.5), calc(var(--tile) * 0.5), 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The texture stays, the drift goes. */
+  .mode-bg::before { animation: none; }
 }
 
 /* Set large enough to read as the screen's title rather than a heading over a list. */
