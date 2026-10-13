@@ -37,7 +37,8 @@
     "trainerB": "トレーナーB",
     "notSelected": "未選択",
     "incomingDamageEffect": "効果: 次に受けるダメージ{sign}{value}",
-    "guest": "ゲスト"
+    "guest": "ゲスト",
+    "level": "Lv.{n}"
   },
   "select": {
     "pickPokemon": "ポケモンを<br>選ぶ",

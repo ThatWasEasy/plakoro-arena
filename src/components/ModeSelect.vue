@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isAdminMode } from '../data/adminSession'
 import { giftCount, hasGifts, refreshGifts } from '../data/gifts'
+import { refreshPoints } from '../data/points'
 import Icon from './Icon.vue'
 
 const emit = defineEmits(['pick', 'gifts'])
@@ -110,8 +111,10 @@ onMounted(() => {
   measureTicker()
   window.addEventListener('resize', measureTicker)
   // Asked every time the menu is shown, not once at startup: a prize handed out while the app
-  // sat open should be waiting when they come back to this screen.
+  // sat open should be waiting when they come back to this screen. The balance beside the
+  // avatar moves for the same reasons, so it is re-read on the same trigger.
   refreshGifts()
+  refreshPoints()
 })
 onBeforeUnmount(() => window.removeEventListener('resize', measureTicker))
 

@@ -7,6 +7,7 @@
 // render.
 import { computed, ref } from 'vue'
 import * as authApi from './authApi'
+import { setPtpBalance } from './points'
 import { getToken } from './session'
 
 const gifts = ref([])
@@ -38,8 +39,12 @@ export async function refreshGifts() {
 export async function claimAllGifts() {
   const token = getToken()
   if (!token) return []
-  const { claimed } = await authApi.claimGifts(token)
+  const { claimed, balance } = await authApi.claimGifts(token)
   gifts.value = []
+  // Opening a points card is the moment it becomes spendable, and the corner of the main
+  // screen is already showing the old number. The server just said what the new one is, so
+  // there is nothing to go and ask.
+  setPtpBalance(balance)
   return claimed || []
 }
 

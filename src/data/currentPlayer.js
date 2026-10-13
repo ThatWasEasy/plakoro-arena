@@ -7,6 +7,8 @@
 // The shape deliberately matches a nameplate's identity fields, because that is what a signed-in
 // player will be: a row in the same records the badges are drawn from.
 import { ref, computed } from 'vue'
+import { clearGifts } from './gifts'
+import { clearPoints } from './points'
 
 const STORAGE_KEY = 'plakoro_current_player_v1'
 
@@ -59,4 +61,7 @@ export function setCurrentPlayer(p) {
 
 export function signOut() {
   setCurrentPlayer(null)
+  // Whatever was in the corner belonged to whoever just left.
+  clearGifts()
+  clearPoints()
 }

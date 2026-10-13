@@ -37,7 +37,8 @@
     "trainerB": "訓練家B",
     "notSelected": "未選擇",
     "incomingDamageEffect": "效果：下次受到的傷害{sign}{value}",
-    "guest": "訪客"
+    "guest": "訪客",
+    "level": "Lv.{n}"
   },
   "select": {
     "pickPokemon": "選擇<br>寶可夢",

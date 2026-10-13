@@ -1,14 +1,16 @@
 <script setup>
-// Who you are, in the corner of the home screen — just the face.
+// Who you are, in the corner of the home screen: the face, the name, and the two numbers that
+// change often enough to be worth seeing without opening anything.
 //
-// Nothing signs in yet, so today this is the default artwork. It is here now because the
-// space it occupies is a layout decision, and because the day accounts arrive only
-// `currentPlayer` has to change.
+// Stacked rather than strung along one line — the name is read, the numbers are glanced at, and
+// a long name would push the numbers off the edge if they shared a row.
 //
-// A button now that there is a profile screen behind it.
+// A button: the profile screen is behind it.
 import { useI18n } from 'vue-i18n'
 import { currentIdentity, isSignedIn } from '../data/currentPlayer'
 import { avatarUrl } from '../data/nameplateAssets'
+import { playerLevel } from '../data/playerLevel'
+import { ptpBalance } from '../data/points'
 
 const emit = defineEmits(['open'])
 const { t } = useI18n()
@@ -17,7 +19,15 @@ const { t } = useI18n()
 <template>
   <button class="player-chip" :aria-label="t('profile.title')" @click="emit('open')">
     <img class="pc-avatar" :src="avatarUrl(currentIdentity.avatar)" alt="" aria-hidden="true">
-    <span class="pc-name">{{ isSignedIn ? currentIdentity.name : t('player.guest') }}</span>
+    <span class="pc-lines">
+      <span class="pc-name">{{ isSignedIn ? currentIdentity.name : t('player.guest') }}</span>
+      <!-- Both hidden for a guest: there is no record behind either number, and a Lv.1 that
+           everyone starts at would read as something earned. -->
+      <template v-if="isSignedIn">
+        <span class="pc-stat">{{ t('player.level', { n: playerLevel }) }}</span>
+        <span class="pc-stat">{{ ptpBalance }} PTP</span>
+      </template>
+    </span>
   </button>
 </template>
 
@@ -57,17 +67,43 @@ const { t } = useI18n()
   box-shadow: 0 0 0 0.0625rem rgba(255, 255, 255, .5), 0 0.0625rem 0.25rem rgba(60, 60, 50, .25);
 }
 
-/* Dark on the board, not white on a pill — there is no pill to be white against. */
-.pc-name {
-  /* Nudged down so its cap-height lines up with the top edge of the avatar rather than
+.pc-lines {
+  display: flex;
+  flex-direction: column;
+  /* Three lines have to fit inside the avatar's 3.5rem, so the rhythm is set explicitly rather
+     than left to each font-size's own line box — otherwise the gap under the larger name looks
+     wider than the one between the two numbers. An explicit line-height on all three plus one
+     gap value is what makes them evenly spaced. */
+  gap: 0.125rem;
+  min-width: 0;
+  /* Nudged down so the name's cap-height lines up with the top edge of the avatar rather than
      hanging above it. */
   padding-top: 0.125rem;
+}
+
+/* Dark on the board, not white on a pill — there is no pill to be white against. */
+.pc-name {
   font-size: 0.875rem;
+  line-height: 1.15;
   font-weight: 800;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 9rem;
+}
+
+/* Same size and colour as the name — the three lines are one block about one person, and
+   greying the numbers made them read as a caption on it. Weight alone separates them: the name
+   is what you look for, the numbers are what you check. */
+.pc-stat {
+  /* Smaller than the name so all three clear the avatar's height. Same colour, same rhythm —
+     only the size and the weight separate them. */
+  font-size: 0.6875rem;
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 </style>

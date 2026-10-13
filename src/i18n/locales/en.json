@@ -37,7 +37,8 @@
     "trainerB": "Trainer B",
     "notSelected": "Not selected",
     "incomingDamageEffect": "Effect: next damage taken {sign}{value}",
-    "guest": "Guest"
+    "guest": "Guest",
+    "level": "Lv.{n}"
   },
   "select": {
     "pickPokemon": "Pick a<br>Pokémon",
