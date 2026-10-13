@@ -422,7 +422,11 @@
       "saveImage": "画像を保存",
       "savingImage": "生成中…",
       "savePlayerImage": "この選手の画像を保存",
-      "savePlayerImageShort": "画像"
+      "savePlayerImageShort": "画像",
+      "codeConfirm": "確認",
+      "codeChecking": "照会中",
+      "codeNotFound": "番号 {code} は見つかりません",
+      "codeLookupFailed": "照会に失敗しました"
     },
     "export": {
       "title": "大会を書き出す",

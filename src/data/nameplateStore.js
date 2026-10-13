@@ -67,6 +67,28 @@ export async function fetchNameplates(players = []) {
 }
 
 /**
+ * One code, answered honestly.
+ *
+ * Unlike fetchNameplates above, this one throws when the server could not be reached, and
+ * resolves to null only when the server answered and had no such player. The difference matters
+ * wherever a screen is about to tell somebody their code is wrong: "there is no P000123" and
+ * "the wifi dropped" are not the same sentence, and the first one is worth refusing a code over.
+ */
+export async function lookupPlayerByCode(code) {
+  const wanted = String(code || '').trim().toUpperCase()
+  if (!wanted) return null
+  const res = await fetch(`${API_BASE}/api/players/lookup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codes: [wanted] })
+  })
+  if (!res.ok) throw new Error(`lookup failed (${res.status})`)
+  const data = await res.json()
+  const row = (data.players || {})[wanted]
+  return row ? fromRow(row) : null
+}
+
+/**
  * Attach snapshots to a tournament's players, in place. Returns true if anything changed, so the
  * caller knows whether the tournament is worth saving again.
  *

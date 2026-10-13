@@ -422,7 +422,11 @@
       "saveImage": "Save image",
       "savingImage": "Rendering…",
       "savePlayerImage": "Save this player's image",
-      "savePlayerImageShort": "Image"
+      "savePlayerImageShort": "Image",
+      "codeConfirm": "Check",
+      "codeChecking": "Checking",
+      "codeNotFound": "No player with code {code}",
+      "codeLookupFailed": "Lookup failed — try again"
     },
     "export": {
       "title": "Export tournament",

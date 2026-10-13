@@ -422,7 +422,11 @@
       "saveImage": "匯出圖片",
       "savingImage": "產生中…",
       "savePlayerImage": "匯出這位選手的圖片",
-      "savePlayerImageShort": "圖片"
+      "savePlayerImageShort": "圖片",
+      "codeConfirm": "確認",
+      "codeChecking": "查詢中",
+      "codeNotFound": "查不到編號 {code}",
+      "codeLookupFailed": "查詢失敗，請再試一次"
     },
     "export": {
       "title": "匯出賽事",

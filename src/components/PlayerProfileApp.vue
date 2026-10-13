@@ -394,9 +394,10 @@ function handleSignOut() {
         class="btn secondary pp-foot-btn"
         @click="showAll = !showAll"
       >{{ showAll ? t('profile.showOwned') : t('profile.showAll') }}</button>
-      <!-- Nothing on the details tab waits for a save: the rows are either read-only or commit
-           themselves on confirm. A disabled Save sitting there would only ask to be pressed. -->
-      <button v-if="tab !== 'points'" class="btn pp-foot-btn" :disabled="!dirty || saving" @click="save">{{ t('profile.save') }}</button>
+      <!-- Only the badge tab has anything pending. Details is read-only or commits on confirm,
+           and every control on Settings takes effect the moment it is touched — a Save button
+           beside them only asks to be pressed for nothing. -->
+      <button v-if="tab === 'badge'" class="btn pp-foot-btn" :disabled="!dirty || saving" @click="save">{{ t('profile.save') }}</button>
       <button class="btn secondary pp-foot-btn" @click="emit('back')">{{ t('common.back') }}</button>
     </div>
   </div>

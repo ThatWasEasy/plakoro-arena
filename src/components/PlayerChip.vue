@@ -40,9 +40,9 @@ const { t } = useI18n()
   left: 0.5rem;
   z-index: 300;
   display: flex;
-  /* Top-aligned, not centred: the name reads as a caption the avatar carries, and centring it
-     against a 3.5rem square left it floating in the middle of nothing. */
-  align-items: flex-start;
+  /* Stretch, so the text column is exactly as tall as the avatar and can space its own lines
+     against that height rather than against their own. */
+  align-items: stretch;
   gap: 0.5rem;
   padding: 0;
   border: none;
@@ -70,15 +70,17 @@ const { t } = useI18n()
 .pc-lines {
   display: flex;
   flex-direction: column;
-  /* Three lines have to fit inside the avatar's 3.5rem, so the rhythm is set explicitly rather
-     than left to each font-size's own line box — otherwise the gap under the larger name looks
-     wider than the one between the two numbers. An explicit line-height on all three plus one
-     gap value is what makes them evenly spaced. */
-  gap: 0.125rem;
+  /* The column is the avatar's height, and the three lines are spread across it: the name's
+     cap-height starts at the top edge of the artwork and the last number ends at the bottom,
+     so the block reads as one shape with the square beside it rather than as text that happens
+     to begin near it.
+     An explicit line-height on all three (below) keeps the two resulting gaps equal — left to
+     each font-size's own line box, the one under the larger name comes out wider. */
+  justify-content: space-between;
   min-width: 0;
-  /* Nudged down so the name's cap-height lines up with the top edge of the avatar rather than
-     hanging above it. */
-  padding-top: 0.125rem;
+  /* Trims the half-leading above the first line and below the last, so space-between measures
+     from the glyphs rather than from their line boxes. */
+  padding: 0.0625rem 0;
 }
 
 /* Dark on the board, not white on a pill — there is no pill to be white against. */

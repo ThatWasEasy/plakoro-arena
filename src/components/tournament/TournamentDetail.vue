@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   computeStandings,
@@ -16,7 +16,7 @@ import {
   giveByeTo
 } from '../../game/tournamentPairing'
 import { parsePlayerLine } from '../../data/tournaments'
-import { ensureNameplates, lookupNameplate } from '../../data/nameplateStore'
+import { ensureNameplates, lookupNameplate, lookupPlayerByCode } from '../../data/nameplateStore'
 import { renderRoundImage, renderStandingsImage, renderPlayerImage, sheetFileName, playerImageFileName } from '../../game/roundImage'
 import * as adminApi from '../../data/adminApi'
 import { adminToken, isAdminMode } from '../../data/adminSession'
@@ -373,40 +373,82 @@ function addPlayer() {
   ensureNameplates([player]).then(changed => { if (changed) emitUpdate() })
 }
 
-// A code is typed one character at a time, and only the last version of it is worth asking the
-// server about. One timer per player, so two people being entered at once don't cancel each
-// other.
-const codeLookups = new Map()
-onBeforeUnmount(() => { codeLookups.forEach(clearTimeout); codeLookups.clear() })
-
-// Stored trimmed and uppercased: a player code is a case-insensitive identifier, and a stray
-// space or lowercase letter typed at a busy sign-in desk would otherwise fail to match.
+// A code only counts once it has been checked.
 //
-// Entering a code then goes and finds out who it belongs to, and puts that name on the roster
-// — the organiser wrote down what they heard, the code is what the record actually calls them.
-function setPlayerCode(player, value) {
-  const code = String(value || '').trim().toUpperCase()
-  if (code) player.code = code
-  else delete player.code
-  emitUpdate()
+// Typing goes into a draft and nothing else happens: the box is not the record. Pressing 確認
+// asks the server, and only an answer puts the code on the roster — a typo'd code that nobody
+// owns is refused and the box goes back to what it was. The alternative, which this replaces,
+// was a code that saved itself as you typed: a slip of the finger then became a real code on a
+// real upload, which is exactly how a player ended up with an account nobody meant to create.
+const codeDrafts = ref({})
+const codeBusy = ref('')
+const codeErrors = ref({})
 
-  clearTimeout(codeLookups.get(player.id))
-  if (!code) return
-  codeLookups.set(player.id, setTimeout(async () => {
-    codeLookups.delete(player.id)
-    if (player.code !== code) return
-    // The snapshot belongs to whichever code is in the box now, so the old one goes before the
-    // new one is asked for — otherwise ensureNameplates sees a plate already there and skips.
-    // A code that resolves to nobody therefore leaves no plate, which is the honest answer:
-    // the row falls back to one built from the typed name.
+function codeDraft(player) {
+  const d = codeDrafts.value[player.id]
+  return d === undefined ? (player.code || '') : d
+}
+
+// Uppercased as it is typed: a code is a case-insensitive identifier, and seeing it normalise
+// in the box is also how the organiser knows the field means something specific.
+function editCode(player, value) {
+  codeDrafts.value = { ...codeDrafts.value, [player.id]: String(value || '').trim().toUpperCase() }
+  if (codeErrors.value[player.id]) {
+    const next = { ...codeErrors.value }
+    delete next[player.id]
+    codeErrors.value = next
+  }
+}
+
+const codeDirty = player => codeDraft(player) !== (player.code || '')
+
+function setCodeError(player, message) {
+  codeErrors.value = { ...codeErrors.value, [player.id]: message }
+}
+
+function forgetDraft(player) {
+  const next = { ...codeDrafts.value }
+  delete next[player.id]
+  codeDrafts.value = next
+}
+
+async function confirmCode(player) {
+  const code = codeDraft(player)
+  if (!codeDirty(player) || codeBusy.value) return
+
+  // Clearing is the one change that needs nobody's permission — there is nothing to verify
+  // about "this player has no code".
+  if (!code) {
+    delete player.code
     delete player.nameplate
-    await ensureNameplates([player])
-    // Saved either way: a code that resolved brought a name and a plate, and one that didn't
-    // cleared a plate belonging to the previous code. Both are changes worth keeping.
-    // The box may have moved on while the request was out, though — whatever came back is then
-    // about a code this player no longer has.
-    if (player.code === code) emitUpdate()
-  }, 400))
+    forgetDraft(player)
+    emitUpdate()
+    return
+  }
+
+  codeBusy.value = player.id
+  try {
+    const plate = await lookupPlayerByCode(code)
+    if (!plate) {
+      // Refused, and the box goes back. Leaving the typo in it would look like it had been
+      // accepted and just hadn't found a name yet.
+      setCodeError(player, t('tournament.detail.codeNotFound', { code }))
+      forgetDraft(player)
+      return
+    }
+    player.code = code
+    player.nameplate = plate
+    // The organiser wrote down what they heard across a sign-in desk; the code is what the
+    // record actually calls this person.
+    if (plate.name) player.name = plate.name
+    forgetDraft(player)
+    emitUpdate()
+  } catch (e) {
+    // Unreachable, not unknown. The draft stays so the same keystrokes aren't needed twice.
+    setCodeError(player, t('tournament.detail.codeLookupFailed'))
+  } finally {
+    codeBusy.value = ''
+  }
 }
 
 // Flagged, never deleted: the matches they already played stay on the record, because removing
@@ -701,11 +743,27 @@ function generateNextRound() {
                rather than only at setup, because a player often gives it after sign-in — and
                getting it right is what links this result to the rest of their record. -->
           <input
-            :value="p.code || ''"
+            :value="codeDraft(p)"
             :placeholder="t('tournament.detail.codePlaceholder')"
-            @input="e => setPlayerCode(p, e.target.value)"
-            style="width:5.5rem; flex-shrink:0; font-size:0.625rem; font-weight:800; padding:0.25rem 0.3125rem; border-radius:0.375rem; border:0.125rem solid var(--line); background:#fff; color:var(--ink); text-align:center;"
+            :title="codeErrors[p.id] || ''"
+            @input="e => editCode(p, e.target.value)"
+            @keyup.enter="confirmCode(p)"
+            :style="{
+              width:'5.5rem', flexShrink:0, fontSize:'0.625rem', fontWeight:800,
+              padding:'0.25rem 0.3125rem', borderRadius:'0.375rem',
+              border:'0.125rem solid ' + (codeErrors[p.id] ? '#C0392B' : 'var(--line)'),
+              background:'#fff', color:'var(--ink)', textAlign:'center'
+            }"
           >
+          <!-- Only ever offered when the box differs from what is on the roster: with nothing to
+               confirm, a live button is just something to press and wonder about. -->
+          <button
+            v-if="codeDirty(p)"
+            class="btn"
+            style="padding:0.25rem 0.4375rem; font-size:0.5625rem; flex-shrink:0;"
+            :disabled="codeBusy === p.id"
+            @click="confirmCode(p)"
+          >{{ codeBusy === p.id ? t('tournament.detail.codeChecking') : t('tournament.detail.codeConfirm') }}</button>
           <button
             class="btn secondary"
             style="padding:0.25rem 0.4375rem; font-size:0.5625rem; flex-shrink:0;"
