@@ -497,7 +497,7 @@
     "hint": "Each Pokémon on three pure dice built for them, scored by alternating their {n} best moves",
     "calculating": "working…",
     "fewMoves": "this Pokémon has only {n} moves",
-    "assumptions": "Every Pokémon is assumed to throw three pure dice of whichever type its own moves ask for most. Weakness and the opposing Pokémon are left out. Tap a row to see the moves behind the figure.",
+    "assumptions": "Every Pokémon is assumed to throw three pure dice of whichever type its own moves are worth the most on. Weakness and the opposing Pokémon are left out. Tap a row to see the moves behind the figure.",
     "countIndirect": "Count worth that is not damage (reduction, denial)",
     "metricTopN": "Top {n} average",
     "metricPerTurn": "Per turn",
