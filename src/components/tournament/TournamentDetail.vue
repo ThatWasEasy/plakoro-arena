@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   computeStandings,
@@ -373,13 +373,40 @@ function addPlayer() {
   ensureNameplates([player]).then(changed => { if (changed) emitUpdate() })
 }
 
+// A code is typed one character at a time, and only the last version of it is worth asking the
+// server about. One timer per player, so two people being entered at once don't cancel each
+// other.
+const codeLookups = new Map()
+onBeforeUnmount(() => { codeLookups.forEach(clearTimeout); codeLookups.clear() })
+
 // Stored trimmed and uppercased: a player code is a case-insensitive identifier, and a stray
 // space or lowercase letter typed at a busy sign-in desk would otherwise fail to match.
+//
+// Entering a code then goes and finds out who it belongs to, and puts that name on the roster
+// — the organiser wrote down what they heard, the code is what the record actually calls them.
 function setPlayerCode(player, value) {
   const code = String(value || '').trim().toUpperCase()
   if (code) player.code = code
   else delete player.code
   emitUpdate()
+
+  clearTimeout(codeLookups.get(player.id))
+  if (!code) return
+  codeLookups.set(player.id, setTimeout(async () => {
+    codeLookups.delete(player.id)
+    if (player.code !== code) return
+    // The snapshot belongs to whichever code is in the box now, so the old one goes before the
+    // new one is asked for — otherwise ensureNameplates sees a plate already there and skips.
+    // A code that resolves to nobody therefore leaves no plate, which is the honest answer:
+    // the row falls back to one built from the typed name.
+    delete player.nameplate
+    await ensureNameplates([player])
+    // Saved either way: a code that resolved brought a name and a plate, and one that didn't
+    // cleared a plate belonging to the previous code. Both are changes worth keeping.
+    // The box may have moved on while the request was out, though — whatever came back is then
+    // about a code this player no longer has.
+    if (player.code === code) emitUpdate()
+  }, 400))
 }
 
 // Flagged, never deleted: the matches they already played stay on the record, because removing

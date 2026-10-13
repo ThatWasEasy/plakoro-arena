@@ -720,7 +720,6 @@
   "points": {
     "name": "PTP",
     "empty": "No point activity yet",
-    "unspecified": "No reason recorded",
     "amountHint": "Amount",
     "reasonRequired": "What was redeemed (required)",
     "reasonOptional": "Reason (optional)",
@@ -730,6 +729,10 @@
     "noneForPlace": "None",
     "detail": "History",
     "pending": "{n} unopened",
-    "unopened": "unopened"
+    "unopened": "unopened",
+    "fromPlace": "{name} — placed",
+    "fromParticipant": "{name} — attended",
+    "fromGrant": "Granted by the organiser",
+    "fromEvent": "an event"
   }
 }

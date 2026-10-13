@@ -12,6 +12,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { claimAllGifts } from '../data/gifts'
 import { describeAsset } from '../data/assetCatalogue'
+import { pointReason } from '../data/pointReason'
 import { avatarUrl, backgroundUrl } from '../data/nameplateAssets'
 import { playGetItemSound } from '../data/buttonSfx'
 
@@ -45,10 +46,8 @@ onMounted(async () => {
 // An automatic grant always uses the catalogue — the rule is the reason.
 function reasonFor(g) {
   // Points are not in the asset catalogue and never will be — there is no "how you obtain PTP"
-  // rule, only the event that paid out. The event name is the reason.
-  if (g.kind === 'points') {
-    return g.note || g.tournament_name || t('gift.fromOrganiser')
-  }
+  // rule, only what happened and where.
+  if (g.kind === 'points') return pointReason(g, t)
   const entry = describeAsset(g.kind, g.asset)
   if (g.src && g.src.startsWith('manual:')) return g.note || entry?.obtain || t('gift.fromOrganiser')
   return entry?.obtain || g.tournament_name || t('gift.fromOrganiser')

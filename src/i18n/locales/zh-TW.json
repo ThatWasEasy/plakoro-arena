@@ -719,7 +719,6 @@
   "points": {
     "name": "PTP",
     "empty": "還沒有任何點數紀錄",
-    "unspecified": "未填寫用途",
     "amountHint": "點數",
     "reasonRequired": "扣點用途（必填）",
     "reasonOptional": "用途（選填）",
@@ -729,6 +728,10 @@
     "noneForPlace": "不給點",
     "detail": "明細",
     "pending": "未領取 {n}",
-    "unopened": "未領取"
+    "unopened": "未領取",
+    "fromPlace": "{name} 賽事得名",
+    "fromParticipant": "{name} 賽事參與",
+    "fromGrant": "主辦贈點",
+    "fromEvent": "賽事"
   }
 }

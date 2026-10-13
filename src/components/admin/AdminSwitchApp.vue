@@ -13,6 +13,7 @@ import * as adminApi from '../../data/adminApi'
 import { adminToken } from '../../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl } from '../../data/nameplateAssets'
 import { TITLE_GROUPS, resolveTitle } from '../../data/assetCatalogue'
+import { pointReason } from '../../data/pointReason'
 import PlayerBanner from '../tournament/PlayerBanner.vue'
 
 const emit = defineEmits(['back'])
@@ -313,7 +314,7 @@ async function toggle(kind, asset) {
                 <span :class="['as-ptp-delta', e.delta > 0 ? 'plus' : 'minus']">
                   {{ e.delta > 0 ? '+' : '' }}{{ e.delta }}
                 </span>
-                <span class="as-ptp-why">{{ e.reason || e.tournament_name || t('points.unspecified') }}</span>
+                <span class="as-ptp-why">{{ pointReason(e, t) }}</span>
                 <span v-if="!e.claimed" class="as-ptp-tag">{{ t('points.unopened') }}</span>
               </div>
             </div>

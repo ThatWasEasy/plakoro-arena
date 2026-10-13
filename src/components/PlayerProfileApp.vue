@@ -16,6 +16,7 @@ import { isAdminAccount, isAdminMode, setAdminMode } from '../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, tierOfAsset } from '../data/nameplateAssets'
 import { getToken } from '../data/session'
 import { TITLE_GROUPS, resolveTitle } from '../data/assetCatalogue'
+import { pointReason } from '../data/pointReason'
 import PlayerBanner from './tournament/PlayerBanner.vue'
 import VolumeBar from './VolumeBar.vue'
 
@@ -82,11 +83,8 @@ onMounted(async () => {
   }
 })
 
-// What a ledger line was for. The organiser's own words when there are any — this is the only
-// record of what a redemption actually bought — then the event that paid out, and only then a
-// generic line, which in practice means somebody forgot to write anything.
 function entryReason(e) {
-  return e.reason || e.tournament_name || t('points.unspecified')
+  return pointReason(e, t)
 }
 
 // Local date only: these are all things that happened in a room on an afternoon, and the time

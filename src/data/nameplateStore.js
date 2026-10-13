@@ -72,6 +72,12 @@ export async function fetchNameplates(players = []) {
  *
  * Only fills gaps. A player who already carries a snapshot keeps it — re-fetching would be the
  * silent rewriting of history this module exists to prevent.
+ *
+ * A code that resolves also replaces the name on the roster. The organiser typed what they heard
+ * across a sign-in desk — "阿固" for someone the record calls "Miso" — and the two then disagree
+ * on every pairing sheet and in every upload. A code is the one thing in that exchange that is
+ * unambiguous, so when there is one, it wins. Renaming afterwards still works: the roster's name
+ * beats the snapshot's from then on (see withEventName).
  */
 export async function ensureNameplates(players = []) {
   const missing = players.filter(p => !p.nameplate && String(p?.code || '').trim())
@@ -80,16 +86,20 @@ export async function ensureNameplates(players = []) {
   let changed = false
   missing.forEach(p => {
     const plate = found[String(p.code).trim().toUpperCase()]
-    if (plate) { p.nameplate = plate; changed = true }
+    if (!plate) return
+    p.nameplate = plate
+    if (plate.name && plate.name !== p.name) p.name = plate.name
+    changed = true
   })
   return changed
 }
 
-// The name shown is the one the organiser typed at this event, not the one in the snapshot.
+// The name shown is the one on the roster, not the one in the snapshot.
 //
-// The snapshot's copy was taken when they were entered; the registration sheet is what people in
-// the room are looking for. Renaming someone in the players tab should change the plate
-// immediately, which it would not if the snapshot won.
+// Usually they are the same: a code that resolved copied its name onto the roster when the
+// player was entered. They part ways when the organiser renames someone afterwards — to tell two
+// 小明 apart, say — and that edit should reach the plate immediately, which it would not if the
+// snapshot won.
 //
 // Everything else — the flag, the face, the title, the record — stays the snapshot's to say.
 function withEventName(plate, player) {

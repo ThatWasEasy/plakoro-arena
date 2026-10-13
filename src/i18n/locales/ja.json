@@ -720,7 +720,6 @@
   "points": {
     "name": "PTP",
     "empty": "ポイントの記録はまだありません",
-    "unspecified": "用途の記載なし",
     "amountHint": "ポイント",
     "reasonRequired": "交換内容（必須）",
     "reasonOptional": "用途（任意）",
@@ -730,6 +729,10 @@
     "noneForPlace": "なし",
     "detail": "明細",
     "pending": "未受取 {n}",
-    "unopened": "未受取"
+    "unopened": "未受取",
+    "fromPlace": "{name} 入賞",
+    "fromParticipant": "{name} 参加",
+    "fromGrant": "主催者より付与",
+    "fromEvent": "大会"
   }
 }
