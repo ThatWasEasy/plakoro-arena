@@ -728,6 +728,8 @@
     "deduct": "Deduct",
     "saving": "Saving…",
     "noneForPlace": "None",
-    "detail": "History"
+    "detail": "History",
+    "pending": "{n} unopened",
+    "unopened": "unopened"
   }
 }

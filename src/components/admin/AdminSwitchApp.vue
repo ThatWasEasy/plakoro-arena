@@ -170,6 +170,9 @@ const pointsAmount = computed(() => {
 
 // Mirrors the server's rule rather than trusting it to say no: a deduction is the only line
 // nobody can reconstruct later, so the button stays dead until there is a reason for it.
+//
+// Nothing here checks the balance before deducting — the server owns that, and it holds the
+// only copy that cannot be a few seconds stale.
 const pointsReady = computed(() =>
   pointsAmount.value !== 0 &&
   (pointsAmount.value > 0 || pointsReason.value.trim().length > 0)
@@ -275,6 +278,11 @@ async function toggle(kind, asset) {
             <div class="as-ptp-head">
               <span class="as-ptp-balance">{{ detail.points.balance }}</span>
               <span class="as-ptp-unit">PTP</span>
+              <!-- Granted but not opened yet. Without this the organiser sees an unchanged
+                   balance a second after granting 50 points and concludes it failed. -->
+              <span v-if="detail.points.pending" class="as-ptp-pending">
+                {{ t('points.pending', { n: detail.points.pending }) }}
+              </span>
             </div>
 
             <div class="as-ptp-row">
@@ -301,11 +309,12 @@ async function toggle(kind, asset) {
             <!-- The statement, newest first. An organiser settling an argument at the table needs
                  to see what was taken off and why, not just the number that is left. -->
             <div v-if="detail.points.entries.length" class="as-ptp-list">
-              <div v-for="e in detail.points.entries" :key="e.id" class="as-ptp-entry">
+              <div v-for="e in detail.points.entries" :key="e.id" :class="['as-ptp-entry', { unopened: !e.claimed }]">
                 <span :class="['as-ptp-delta', e.delta > 0 ? 'plus' : 'minus']">
                   {{ e.delta > 0 ? '+' : '' }}{{ e.delta }}
                 </span>
                 <span class="as-ptp-why">{{ e.reason || e.tournament_name || t('points.unspecified') }}</span>
+                <span v-if="!e.claimed" class="as-ptp-tag">{{ t('points.unopened') }}</span>
               </div>
             </div>
           </div>
@@ -487,6 +496,15 @@ async function toggle(kind, asset) {
   font-variant-numeric: tabular-nums;
 }
 .as-ptp-unit { font-size: 0.6875rem; font-weight: 800; color: var(--sub); letter-spacing: 0.08em; }
+.as-ptp-pending {
+  margin-left: auto;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--line);
+  font-size: 0.625rem;
+  font-weight: 800;
+  color: var(--sub);
+}
 
 .as-ptp-row { display: flex; gap: 0.375rem; align-items: stretch; }
 /* Fixed, because the amount is three or four characters and the reason is a sentence. */
@@ -507,6 +525,9 @@ async function toggle(kind, asset) {
 .as-ptp-delta.plus { color: #2E9E6B; }
 .as-ptp-delta.minus { color: #C0392B; }
 .as-ptp-why { color: var(--sub); overflow-wrap: anywhere; }
+/* Dimmed rather than hidden: it is a real line that just hasn't reached the player yet. */
+.as-ptp-entry.unopened { opacity: .6; }
+.as-ptp-tag { margin-left: auto; flex: none; font-size: 0.5625rem; font-weight: 800; color: var(--sub); }
 
 .as-claim { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .as-claim-btn { padding: 0.3125rem 0.625rem; font-size: 0.6875rem; }

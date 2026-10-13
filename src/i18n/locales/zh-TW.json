@@ -727,6 +727,8 @@
     "deduct": "扣除",
     "saving": "處理中…",
     "noneForPlace": "不給點",
-    "detail": "明細"
+    "detail": "明細",
+    "pending": "未領取 {n}",
+    "unopened": "未領取"
   }
 }

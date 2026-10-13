@@ -728,6 +728,8 @@
     "deduct": "減算",
     "saving": "処理中…",
     "noneForPlace": "なし",
-    "detail": "明細"
+    "detail": "明細",
+    "pending": "未受取 {n}",
+    "unopened": "未受取"
   }
 }
