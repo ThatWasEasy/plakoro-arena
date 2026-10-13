@@ -1,14 +1,15 @@
 {
   "name": "plakoro-battle-vue",
   "private": true,
-  "version": "0.8.4",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "fetch-data": "node scripts/fetch-data.mjs",
-    "fetch-product-images": "node scripts/fetch-product-images.mjs"
+    "fetch-product-images": "node scripts/fetch-product-images.mjs",
+    "make-emblem-tile": "python3 scripts/make-emblem-tile.py"
   },
   "dependencies": {
     "cannon-es": "^0.20.0",
