@@ -184,7 +184,7 @@
     "inheritDo": "確認繼承",
     "inheritBusy": "繼承中…",
     "inheritWarn": "來源的參賽紀錄、對局、道具會全部轉到這位選手，來源那一列將被刪除。",
-    "inheritDone": "已繼承：名單 {entries}、對局 {matches}、道具 {unlocks}"
+    "inheritDone": "已繼承：名單 {entries}、對局 {matches}、道具 {unlocks}、PTP {points} 筆"
   },
   "priceLog": {
     "title": {
@@ -698,7 +698,9 @@
     "tabSettings": "設定",
     "title": "玩家資料",
     "titleLabel": "稱號",
-    "adminMode": "管理員模式"
+    "adminMode": "管理員模式",
+    "tabDetails": "詳細資料",
+    "playerCode": "玩家編號"
   },
   "notice": {
     "meetup2": "Meetup#2 活動報名開跑中，詳情請上 Plakoro Taiwan Line 詢問"
@@ -710,5 +712,18 @@
     "done": "完成",
     "opening": "拆禮中…",
     "fromOrganiser": "主辦頒發"
+  },
+  "points": {
+    "name": "PTP",
+    "empty": "還沒有任何點數紀錄",
+    "unspecified": "未填寫用途",
+    "amountHint": "點數",
+    "reasonRequired": "扣點用途（必填）",
+    "reasonOptional": "用途（選填）",
+    "add": "發放",
+    "deduct": "扣除",
+    "saving": "處理中…",
+    "noneForPlace": "不給點",
+    "detail": "明細"
   }
 }

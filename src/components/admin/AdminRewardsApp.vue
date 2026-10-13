@@ -49,8 +49,18 @@ function emptyDraft() {
   return {
     id: '',
     name: '',
-    items: { '1': {}, '2': {}, '3': {}, participant: {} }
+    items: { '1': {}, '2': {}, '3': {}, participant: {} },
+    // Held as strings because these are bound to text inputs — a cleared box is '' rather than
+    // NaN, and the server reads anything that isn't a positive whole number as "no points".
+    points: { '1': '', '2': '', '3': '', participant: '' }
   }
+}
+
+// Server sends only the tiers that pay out; the editor needs a box for every tier.
+function pointsByPlace(points = {}) {
+  const out = { '1': '', '2': '', '3': '', participant: '' }
+  Object.keys(out).forEach(k => { if (points[k]) out[k] = String(points[k]) })
+  return out
 }
 
 const draft = ref(emptyDraft())
@@ -79,7 +89,7 @@ async function openEdit(id) {
   error.value = ''
   try {
     const data = await adminApi.getRewardPackage(adminToken.value, id)
-    draft.value = { id: data.id, name: data.name, items: itemsByPlace(data.items) }
+    draft.value = { id: data.id, name: data.name, items: itemsByPlace(data.items), points: pointsByPlace(data.points) }
     isNew.value = false
     view.value = 'edit'
   } catch (e) {
@@ -96,7 +106,7 @@ async function openPreview(id) {
   error.value = ''
   try {
     const data = await adminApi.getRewardPackage(adminToken.value, id)
-    previewPkg.value = { id: data.id, name: data.name, items: itemsByPlace(data.items) }
+    previewPkg.value = { id: data.id, name: data.name, items: itemsByPlace(data.items), points: data.points || {} }
   } catch (e) {
     error.value = e.message
   }
@@ -145,10 +155,18 @@ async function save() {
       }
     }
   }
+  // Sent for every tier, blanks included: the server replaces a package's points wholesale, and
+  // a tier left out of the payload is how a number that was cleared here would survive there.
+  const points = {}
+  Object.keys(draft.value.points).forEach(place => {
+    const n = Math.trunc(Number(draft.value.points[place]))
+    points[place] = Number.isFinite(n) && n > 0 ? n : 0
+  })
+
   busy.value = true
   error.value = ''
   try {
-    await adminApi.saveRewardPackage(adminToken.value, id, { name, items })
+    await adminApi.saveRewardPackage(adminToken.value, id, { name, items, points })
     await loadList()
     view.value = 'list'
   } catch (e) {
@@ -205,6 +223,9 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
           <div class="ar-preview-body">
             <div v-for="place in PLACES" :key="place.key" class="ar-preview-place">
               <div class="ar-place-label">{{ place.label }}</div>
+              <div v-if="previewPkg.points[place.key]" class="ar-preview-row">
+                <span class="ar-title-chip on">+{{ previewPkg.points[place.key] }} PTP</span>
+              </div>
               <div v-if="placeHasAny(previewPkg.items[place.key])" class="ar-preview-row">
                 <img
                   v-for="id in (previewPkg.items[place.key].avatar || [])" :key="'a' + id"
@@ -216,7 +237,7 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
                   v-for="id in (previewPkg.items[place.key].title || [])" :key="'t' + id"
                   class="ar-title-chip on">{{ resolveTitle(id)?.text || id }}</span>
               </div>
-              <div v-else class="ar-preview-none">{{ t('admin.rewardsNone') }}</div>
+              <div v-else-if="!previewPkg.points[place.key]" class="ar-preview-none">{{ t('admin.rewardsNone') }}</div>
             </div>
           </div>
         </div>
@@ -238,6 +259,20 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
 
         <div v-for="place in PLACES" :key="place.key" class="ar-place">
           <div class="ar-place-label">{{ place.label }}</div>
+
+          <!-- First in the tier, before the artwork: it is one number against three grids of
+               pictures, and it would be lost underneath them. Blank means this tier pays none. -->
+          <label class="ar-kind ar-points">
+            <span class="ar-kind-label">PTP</span>
+            <input
+              v-model="draft.points[place.key]"
+              class="ar-input ar-points-input"
+              type="number"
+              min="0"
+              inputmode="numeric"
+              :placeholder="t('points.noneForPlace')"
+            >
+          </label>
 
           <div class="ar-kind">
             <span class="ar-kind-label">{{ KINDS[0].label }}</span>
@@ -310,6 +345,10 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
 .ar-input:disabled { background: var(--card); color: var(--sub); }
 
 .ar-place { display: flex; flex-direction: column; gap: 0.375rem; padding-top: 0.25rem; border-top: 0.0625rem solid var(--line); }
+/* A row rather than the stacked field the asset grids use — one short number does not need a
+   line of its own above it. */
+.ar-points { flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer; }
+.ar-points-input { width: 5rem; text-align: right; font-variant-numeric: tabular-nums; }
 .ar-place-label { font-size: 0.875rem; font-weight: 800; color: var(--ink); }
 .ar-kind { display: flex; flex-direction: column; gap: 0.25rem; }
 .ar-kind-label { font-size: 0.625rem; font-weight: 800; color: var(--sub); letter-spacing: 0.04em; }

@@ -184,7 +184,7 @@
     "inheritDo": "実行",
     "inheritBusy": "処理中…",
     "inheritWarn": "引き継ぎ元の参加記録・対戦・アイテムがすべてこの選手に移り、元の行は削除されます。",
-    "inheritDone": "移動：参加 {entries}・対戦 {matches}・アイテム {unlocks}"
+    "inheritDone": "移動：参加 {entries}・対戦 {matches}・アイテム {unlocks}・PTP {points} 件"
   },
   "priceLog": {
     "title": {
@@ -699,7 +699,9 @@
     "tabSettings": "設定",
     "title": "プレイヤー情報",
     "titleLabel": "称号",
-    "adminMode": "管理者モード"
+    "adminMode": "管理者モード",
+    "tabDetails": "詳細",
+    "playerCode": "プレイヤー番号"
   },
   "notice": {
     "meetup2": "Meetup#2 の参加受付中 — 詳細は Plakoro Taiwan の Line までお問い合わせください"
@@ -711,5 +713,18 @@
     "done": "完了",
     "opening": "開封中…",
     "fromOrganiser": "主催者より授与"
+  },
+  "points": {
+    "name": "PTP",
+    "empty": "ポイントの記録はまだありません",
+    "unspecified": "用途の記載なし",
+    "amountHint": "ポイント",
+    "reasonRequired": "交換内容（必須）",
+    "reasonOptional": "用途（任意）",
+    "add": "付与",
+    "deduct": "減算",
+    "saving": "処理中…",
+    "noneForPlace": "なし",
+    "detail": "明細"
   }
 }

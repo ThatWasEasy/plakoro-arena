@@ -44,6 +44,11 @@ onMounted(async () => {
 // the catalogue, which is right for anything given under a standing rule ("早期註冊的玩家").
 // An automatic grant always uses the catalogue — the rule is the reason.
 function reasonFor(g) {
+  // Points are not in the asset catalogue and never will be — there is no "how you obtain PTP"
+  // rule, only the event that paid out. The event name is the reason.
+  if (g.kind === 'points') {
+    return g.note || g.tournament_name || t('gift.fromOrganiser')
+  }
   const entry = describeAsset(g.kind, g.asset)
   if (g.src && g.src.startsWith('manual:')) return g.note || entry?.obtain || t('gift.fromOrganiser')
   return entry?.obtain || g.tournament_name || t('gift.fromOrganiser')
@@ -60,7 +65,10 @@ function nameFor(g) {
 // A title's artwork is just words, so without this line it reads as a slogan rather than as
 // something you can put on a nameplate. Reuses the profile screen's own wording — this is the
 // first place a player meets an item, and the second is the profile.
-const KIND_LABELS = { avatar: 'profile.avatar', background: 'profile.flag', title: 'profile.titleLabel' }
+const KIND_LABELS = {
+  avatar: 'profile.avatar', background: 'profile.flag',
+  title: 'profile.titleLabel', points: 'points.name'
+}
 function kindLabel(g) {
   const key = KIND_LABELS[g.kind]
   return key ? t(key) : g.kind
@@ -86,6 +94,11 @@ function next() {
         <div class="gr-art">
           <img v-if="current.kind === 'avatar'" class="gr-avatar" :src="avatarUrl(current.asset)" alt="">
           <img v-else-if="current.kind === 'background'" class="gr-flag" :src="backgroundUrl(current.asset)" alt="">
+          <!-- The amount is the artwork, the same way a title's words are. Nothing to illustrate
+               and nothing gained by inventing a coin. -->
+          <div v-else-if="current.kind === 'points'" class="gr-title-art gr-points-art">
+            +{{ current.points }}<span class="gr-points-unit">PTP</span>
+          </div>
           <div v-else class="gr-title-art">{{ nameFor(current) }}</div>
         </div>
 
@@ -93,7 +106,7 @@ function next() {
 
         <!-- A title's artwork is its own name, so repeating it underneath says nothing. An
              avatar or flag needs the line: the picture alone doesn't tell you which one it is. -->
-        <div v-if="current.kind !== 'title'" class="gr-name">{{ nameFor(current) }}</div>
+        <div v-if="current.kind !== 'title' && current.kind !== 'points'" class="gr-name">{{ nameFor(current) }}</div>
         <div class="gr-reason">{{ reasonFor(current) }}</div>
       </div>
 
@@ -177,6 +190,16 @@ function next() {
   color: var(--sub);
   letter-spacing: 0.14em;
 }
+.gr-points-art {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  font-size: 2.25rem;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.gr-points-unit { font-size: 0.875rem; font-weight: 800; color: var(--sub); letter-spacing: 0.08em; }
+
 .gr-name { font-size: 1rem; font-weight: 900; color: var(--ink); text-align: center; }
 .gr-reason {
   font-size: 0.75rem;

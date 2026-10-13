@@ -184,7 +184,7 @@
     "inheritDo": "Confirm",
     "inheritBusy": "Merging…",
     "inheritWarn": "The source player's entries, matches and items all move to this player, and the source row is deleted.",
-    "inheritDone": "Moved: {entries} entries, {matches} matches, {unlocks} items"
+    "inheritDone": "Moved: {entries} entries, {matches} matches, {unlocks} items, {points} PTP entries"
   },
   "priceLog": {
     "title": {
@@ -699,7 +699,9 @@
     "tabSettings": "Settings",
     "title": "Player profile",
     "titleLabel": "Title",
-    "adminMode": "Admin mode"
+    "adminMode": "Admin mode",
+    "tabDetails": "Details",
+    "playerCode": "Player code"
   },
   "notice": {
     "meetup2": "Meetup#2 sign-ups are open — ask on the Plakoro Taiwan Line for details"
@@ -711,5 +713,18 @@
     "done": "Done",
     "opening": "Opening…",
     "fromOrganiser": "Awarded by the organiser"
+  },
+  "points": {
+    "name": "PTP",
+    "empty": "No point activity yet",
+    "unspecified": "No reason recorded",
+    "amountHint": "Amount",
+    "reasonRequired": "What was redeemed (required)",
+    "reasonOptional": "Reason (optional)",
+    "add": "Grant",
+    "deduct": "Deduct",
+    "saving": "Saving…",
+    "noneForPlace": "None",
+    "detail": "History"
   }
 }

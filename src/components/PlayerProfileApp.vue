@@ -32,6 +32,12 @@ const ownedAvatars = ref(new Set())
 const ownedBackgrounds = ref(new Set())
 const ownedTitles = ref(new Set())
 
+// PTP. Null until the fetch lands, so the tab can say "loading" rather than flash a zero
+// balance at somebody who has points — a wrong number here is worse than no number.
+const pointBalance = ref(null)
+const pointEntries = ref([])
+const ledgerOpen = ref(false)
+
 onMounted(async () => {
   const token = getToken()
   if (!token) return
@@ -43,7 +49,28 @@ onMounted(async () => {
   } catch (e) {
     // Stats/unlocks just didn't load this time — stay locked down rather than guessing.
   }
+  try {
+    const points = await authApi.listPoints(token)
+    pointBalance.value = points.balance
+    pointEntries.value = points.entries
+  } catch (e) {
+    // Same stance: leave the tab saying it couldn't read rather than claiming a balance.
+  }
 })
+
+// What a ledger line was for. The organiser's own words when there are any — this is the only
+// record of what a redemption actually bought — then the event that paid out, and only then a
+// generic line, which in practice means somebody forgot to write anything.
+function entryReason(e) {
+  return e.reason || e.tournament_name || t('points.unspecified')
+}
+
+// Local date only: these are all things that happened in a room on an afternoon, and the time
+// of day is noise next to that.
+function entryDate(e) {
+  const d = new Date(e.at)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString()
+}
 
 // Exactly what the server will accept: a `-default` flag, which every season gives away, or a
 // row in player_unlocks. Nothing is inferred.
@@ -171,6 +198,7 @@ function handleSignOut() {
   <div class="board select-board pp-board">
     <div class="pp-tabs">
       <button :class="['pp-tab', { on: tab === 'badge' }]" @click="tab = 'badge'">{{ t('profile.tabBadge') }}</button>
+      <button :class="['pp-tab', { on: tab === 'points' }]" @click="tab = 'points'">{{ t('profile.tabDetails') }}</button>
       <button :class="['pp-tab', { on: tab === 'settings' }]" @click="tab = 'settings'">{{ t('profile.tabSettings') }}</button>
     </div>
 
@@ -239,6 +267,37 @@ function handleSignOut() {
       </div>
     </template>
 
+    <!-- Facts about the account rather than choices: a label on the left, the value on the
+         right, one row each. Nothing here is editable, which is why it reads as a list and not
+         as the forms on the other two tabs. -->
+    <div v-else-if="tab === 'points'" class="pp-body">
+      <div class="pp-rows">
+        <div class="pp-row">
+          <span class="pp-row-label">{{ t('profile.playerCode') }}</span>
+          <span class="pp-row-value code">{{ currentIdentity.code || '—' }}</span>
+        </div>
+
+        <div class="pp-row">
+          <span class="pp-row-label">PTP</span>
+          <span class="pp-row-value">{{ pointBalance === null ? '—' : pointBalance }}</span>
+          <!-- The balance answers the usual question on its own. The statement is a second
+               question, so it waits behind a button instead of filling the tab. -->
+          <button class="pp-row-btn" @click="ledgerOpen = !ledgerOpen">{{ t('points.detail') }}</button>
+        </div>
+      </div>
+
+      <div v-if="ledgerOpen" class="pp-ptp-list">
+        <div v-for="e in pointEntries" :key="e.id" class="pp-ptp-row">
+          <span :class="['pp-ptp-delta', e.delta > 0 ? 'plus' : 'minus']">
+            {{ e.delta > 0 ? '+' : '' }}{{ e.delta }}
+          </span>
+          <span class="pp-ptp-reason">{{ entryReason(e) }}</span>
+          <span class="pp-ptp-date">{{ entryDate(e) }}</span>
+        </div>
+        <p v-if="!pointEntries.length" class="pp-ptp-empty">{{ t('points.empty') }}</p>
+      </div>
+    </div>
+
     <div v-else class="pp-body">
       <label class="pp-field">
         <span class="pp-label">{{ t('profile.name') }}</span>
@@ -295,6 +354,73 @@ function handleSignOut() {
 
 <style scoped>
 .pp-board { display: flex; flex-direction: column; min-height: 0; }
+
+/* Label left, value right. The label column is sized to the longest label rather than to the
+   content, so the values start on the same line down the list instead of stepping in and out. */
+.pp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  /* Rows are the same width as each other and capped, rather than each one sized to its own
+     contents — otherwise the two cards step in and out and the button never reaches a right
+     edge to sit against. */
+  width: 100%;
+  max-width: 24rem;
+  align-self: center;
+}
+.pp-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--card);
+}
+.pp-row-label { font-size: 0.75rem; font-weight: 800; color: var(--sub); }
+.pp-row-value { font-size: 0.9375rem; font-weight: 900; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.pp-row-value.code { letter-spacing: 0.04em; }
+.pp-row-btn {
+  padding: 0.25rem 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: #1A1A18;
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pp-row-btn:active { transform: scale(.96); }
+
+.pp-ptp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  width: 100%;
+  max-width: 24rem;
+  align-self: center;
+}
+.pp-ptp-row {
+  display: grid;
+  /* Amount column fixed so the signs and digits line up down the page — a statement you have to
+     read sideways is not one anybody checks. */
+  grid-template-columns: 3.25rem 1fr auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4375rem 0.625rem;
+  border-radius: 0.5rem;
+  background: var(--card);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.pp-ptp-delta { font-weight: 900; text-align: right; font-variant-numeric: tabular-nums; }
+.pp-ptp-delta.plus { color: #2E9E6B; }
+.pp-ptp-delta.minus { color: #C0392B; }
+.pp-ptp-reason { color: var(--ink); overflow-wrap: anywhere; }
+.pp-ptp-date { color: var(--sub); font-size: 0.625rem; font-variant-numeric: tabular-nums; }
+.pp-ptp-empty { margin: 1rem 0 0; text-align: center; font-size: 0.75rem; font-weight: 700; color: var(--sub); }
 
 /* A row, not a stacked field: the label belongs beside its box, and the whole thing is a
    <label> so the text is part of the hit target. */

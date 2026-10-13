@@ -46,6 +46,12 @@ export function updateMe(token, patch) {
   })
 }
 
+// This player's PTP: the balance and every line behind it. One call rather than two — the
+// profile screen shows the number and the statement together.
+export function listPoints(token) {
+  return request('/api/players/me/points', { headers: { Authorization: `Bearer ${token}` } })
+}
+
 // Rewards this player has been given but not yet opened. Asked on every main-screen load, so
 // the gift badge reflects a grant made while they were away rather than only after a reload.
 export function listGifts(token) {

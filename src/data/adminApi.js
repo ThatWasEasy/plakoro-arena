@@ -43,6 +43,18 @@ export function revokeUnlock(token, code, kind, asset) {
   })
 }
 
+// Hand-adjusting PTP. Resolves with the same { player, unlocks, points } shape as getPlayer,
+// so the screen re-renders from the server's balance rather than adding the delta to its own.
+//
+// `reason` is required by the server on a deduction and ignored-if-blank on a grant.
+export function adjustPoints(token, code, delta, reason) {
+  return request(`/api/admin/players/${encodeURIComponent(code)}/points`, {
+    method: 'POST',
+    headers: authHeader(token),
+    body: JSON.stringify({ delta, reason })
+  })
+}
+
 export function uploadTournament(token, payload) {
   return request('/api/admin/tournaments', {
     method: 'POST',
