@@ -38,6 +38,30 @@ const pointBalance = ref(null)
 const pointEntries = ref([])
 const ledgerOpen = ref(false)
 
+// Renaming happens in its own little window rather than as a field sitting open on the page.
+// A name is what everyone at an event calls this person, and the two keystrokes it takes to
+// wreck it should not be available by accident — so it is: open, type, confirm.
+const nameOpen = ref(false)
+const nameDraft = ref('')
+
+function openRename() {
+  nameDraft.value = draft.value.name
+  nameOpen.value = true
+}
+
+// Confirming writes into the same draft every other picker writes into and saves immediately,
+// rather than leaving the new name pending behind the footer's Save — the window asked for a
+// decision and then has to honour it.
+async function confirmRename() {
+  const next = nameDraft.value.trim()
+  if (!next || next === draft.value.name.trim()) { nameOpen.value = false; return }
+  draft.value.name = next
+  nameOpen.value = false
+  // Failure leaves the old name on screen and the error under it — the row reads from
+  // currentIdentity, which only changes once the server has agreed.
+  await persist()
+}
+
 onMounted(async () => {
   const token = getToken()
   if (!token) return
@@ -159,8 +183,11 @@ const dirty = computed(() =>
 const saving = ref(false)
 const saveError = ref('')
 
-async function save() {
-  if (saving.value) return
+// Writes the draft and returns whether it landed. Leaving the screen is the caller's decision,
+// not this function's: the footer's Save means "done here", while confirming a rename means
+// "that one thing, now" and has no business closing the profile.
+async function persist() {
+  if (saving.value) return false
   saveError.value = ''
   saving.value = true
   try {
@@ -178,12 +205,17 @@ async function save() {
       background: profile.background,
       titleId: profile.title_id
     })
-    emit('back')
+    return true
   } catch (e) {
     saveError.value = e.message || t('profile.saveError')
+    return false
   } finally {
     saving.value = false
   }
+}
+
+async function save() {
+  if (await persist()) emit('back')
 }
 
 // Nothing left to edit once signed out, so this leaves the screen rather than reverting it to a
@@ -273,6 +305,12 @@ function handleSignOut() {
     <div v-else-if="tab === 'points'" class="pp-body">
       <div class="pp-rows">
         <div class="pp-row">
+          <span class="pp-row-label">{{ t('profile.name') }}</span>
+          <span class="pp-row-value">{{ currentIdentity.name || '—' }}</span>
+          <button class="pp-row-btn" @click="openRename">{{ t('profile.rename') }}</button>
+        </div>
+
+        <div class="pp-row">
           <span class="pp-row-label">{{ t('profile.playerCode') }}</span>
           <span class="pp-row-value code">{{ currentIdentity.code || '—' }}</span>
         </div>
@@ -299,16 +337,6 @@ function handleSignOut() {
     </div>
 
     <div v-else class="pp-body">
-      <label class="pp-field">
-        <span class="pp-label">{{ t('profile.name') }}</span>
-        <input
-          v-model="draft.name"
-          class="pp-input"
-          maxlength="20"
-          :placeholder="t('profile.namePlaceholder')"
-        >
-      </label>
-
       <div class="pp-field">
         <span class="pp-label">{{ t('profile.musicVolume') }}</span>
         <VolumeBar
@@ -338,6 +366,28 @@ function handleSignOut() {
       <button class="btn secondary" @click="handleSignOut">{{ t('account.signOut') }}</button>
     </div>
 
+    <div v-if="nameOpen" class="modal-overlay" style="align-items:center;" @click.self="nameOpen = false">
+      <div class="modal-sheet pp-rename">
+        <div class="modal-title">{{ t('profile.rename') }}</div>
+        <input
+          v-model="nameDraft"
+          class="pp-input"
+          maxlength="20"
+          :placeholder="t('profile.namePlaceholder')"
+          @keyup.enter="confirmRename"
+        >
+        <!-- Says the name back before it is committed. The whole reason this is a window and
+             not an input on the page is that somebody should read it once more first. -->
+        <p class="pp-rename-confirm">{{ t('profile.renameConfirm', { name: nameDraft.trim() || '—' }) }}</p>
+        <div class="pp-rename-actions">
+          <button class="btn secondary" @click="nameOpen = false">{{ t('common.cancel') }}</button>
+          <button class="btn" :disabled="!nameDraft.trim() || saving" @click="confirmRename">
+            {{ saving ? t('points.saving') : t('profile.renameDo') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <p v-if="saveError" class="pp-save-error">{{ saveError }}</p>
 
     <div class="pp-foot">
@@ -346,7 +396,9 @@ function handleSignOut() {
         class="btn secondary pp-foot-btn"
         @click="showAll = !showAll"
       >{{ showAll ? t('profile.showOwned') : t('profile.showAll') }}</button>
-      <button class="btn pp-foot-btn" :disabled="!dirty || saving" @click="save">{{ t('profile.save') }}</button>
+      <!-- Nothing on the details tab waits for a save: the rows are either read-only or commit
+           themselves on confirm. A disabled Save sitting there would only ask to be pressed. -->
+      <button v-if="tab !== 'points'" class="btn pp-foot-btn" :disabled="!dirty || saving" @click="save">{{ t('profile.save') }}</button>
       <button class="btn secondary pp-foot-btn" @click="emit('back')">{{ t('common.back') }}</button>
     </div>
   </div>
@@ -392,6 +444,18 @@ function handleSignOut() {
   cursor: pointer;
 }
 .pp-row-btn:active { transform: scale(.96); }
+
+.pp-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  width: 100%;
+  max-width: 20rem;
+  border-radius: 1rem;
+  padding: 1rem;
+}
+.pp-rename-confirm { margin: 0; text-align: center; font-size: 0.75rem; font-weight: 700; color: var(--sub); }
+.pp-rename-actions { display: flex; gap: 0.5rem; justify-content: center; }
 
 .pp-ptp-list {
   display: flex;

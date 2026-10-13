@@ -701,7 +701,10 @@
     "titleLabel": "称号",
     "adminMode": "管理者モード",
     "tabDetails": "詳細",
-    "playerCode": "プレイヤー番号"
+    "playerCode": "プレイヤー番号",
+    "rename": "名前を変更",
+    "renameDo": "変更する",
+    "renameConfirm": "「{name}」として表示されます"
   },
   "notice": {
     "meetup2": "Meetup#2 の参加受付中 — 詳細は Plakoro Taiwan の Line までお問い合わせください"

@@ -701,7 +701,10 @@
     "titleLabel": "Title",
     "adminMode": "Admin mode",
     "tabDetails": "Details",
-    "playerCode": "Player code"
+    "playerCode": "Player code",
+    "rename": "Rename",
+    "renameDo": "Confirm",
+    "renameConfirm": "You will appear as “{name}”"
   },
   "notice": {
     "meetup2": "Meetup#2 sign-ups are open — ask on the Plakoro Taiwan Line for details"

@@ -700,7 +700,10 @@
     "titleLabel": "稱號",
     "adminMode": "管理員模式",
     "tabDetails": "詳細資料",
-    "playerCode": "玩家編號"
+    "playerCode": "玩家編號",
+    "rename": "更改名稱",
+    "renameDo": "確認變更",
+    "renameConfirm": "將顯示為「{name}」"
   },
   "notice": {
     "meetup2": "Meetup#2 活動報名開跑中，詳情請上 Plakoro Taiwan Line 詢問"
