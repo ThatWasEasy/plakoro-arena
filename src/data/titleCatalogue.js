@@ -47,6 +47,16 @@ export const TITLE_GROUPS = [
     ]
   },
   {
+    // Not earned by playing — given for being here at a particular time. Deliberately its own
+    // group rather than folded into 通用: everything in `general` is unlocked for everyone
+    // (see isTitleUnlocked), which is the opposite of what a limited title means.
+    key: 'limited',
+    label: '限定',
+    titles: [
+      { id: 'early-player', text: '早鳥玩家', rank: 'epic' }
+    ]
+  },
+  {
     key: 'achievement',
     label: '特殊成就',
     titles: [
