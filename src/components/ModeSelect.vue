@@ -3,8 +3,10 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isAdminMode } from '../data/adminSession'
+import { giftCount, hasGifts, refreshGifts } from '../data/gifts'
+import Icon from './Icon.vue'
 
-const emit = defineEmits(['pick'])
+const emit = defineEmits(['pick', 'gifts'])
 const { t } = useI18n()
 
 // Two things on this screen open the group — the menu card and the mark in the corner. Held in
@@ -107,6 +109,9 @@ function measureTicker() {
 onMounted(() => {
   measureTicker()
   window.addEventListener('resize', measureTicker)
+  // Asked every time the menu is shown, not once at startup: a prize handed out while the app
+  // sat open should be waiting when they come back to this screen.
+  refreshGifts()
 })
 onBeforeUnmount(() => window.removeEventListener('resize', measureTicker))
 
@@ -154,6 +159,13 @@ const rows = computed(() => {
     <!-- The group's own mark, in the corner. Same destination as the Line card above, offered
          as the thing people actually recognise rather than as a second labelled button. -->
     <div class="mode-mark-row">
+      <!-- Bottom left, opposite the Line mark, and only when something is waiting. An unopened
+           prize should be the hardest thing on this screen to miss — tucked into a dot on the
+           avatar it would go unnoticed for weeks. -->
+      <button v-if="hasGifts" class="mode-gift" @click="emit('gifts')">
+        <Icon class="mode-gift-icon" name="gift" />
+        <span class="mode-gift-label">{{ t('gift.waiting', { n: giftCount }) }}</span>
+      </button>
       <a
         class="mode-mark"
         :href="LINE_URL"
@@ -296,7 +308,42 @@ const rows = computed(() => {
   width: 100%;
   display: flex;
   align-items: center;
+  /* The gift grows leftward via its own auto margin rather than `space-between`, which would
+     shove the Line mark across whenever no gift is waiting. */
   justify-content: flex-end;
+}
+
+/* Loud on purpose, and animated until it is opened — the reason grants moved out of the
+   profile screen is that nobody noticed them there. */
+.mode-gift {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  /* Black on a pale board. Everything else down here is light — the Line mark, the cards, the
+     ground — so the one thing asking to be tapped is the one thing that inverts. */
+  background: #1A1A18;
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 0.125rem 0.5rem rgba(26, 26, 24, .3);
+  animation: mode-gift-pulse 1.8s ease-in-out infinite;
+}
+.mode-gift:active { transform: scale(.96); }
+.mode-gift-icon { font-size: 1rem; flex-shrink: 0; }
+.mode-gift-label { white-space: nowrap; }
+
+@keyframes mode-gift-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mode-gift { animation: none; }
 }
 
 /* Mark and bubble are one target: the whole thing is the invitation, so either half opens it. */

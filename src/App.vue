@@ -23,6 +23,7 @@ import { showMusicPlayer } from './data/musicPlayerUi'
 import { installButtonSfx } from './data/buttonSfx'
 import PlayerChip from './components/PlayerChip.vue'
 import PlayerProfileApp from './components/PlayerProfileApp.vue'
+import GiftRevealApp from './components/GiftRevealApp.vue'
 import LoginApp from './components/auth/LoginApp.vue'
 import AdminSwitchApp from './components/admin/AdminSwitchApp.vue'
 import AdminRewardsApp from './components/admin/AdminRewardsApp.vue'
@@ -138,7 +139,7 @@ onBeforeUnmount(uninstallButtonSfx)
         <button class="btn" @click="characterData.loadData()">{{ t('app.retry') }}</button>
       </div>
 
-      <ModeSelect v-else-if="mode === null" @pick="openMode($event)" />
+      <ModeSelect v-else-if="mode === null" @pick="openMode($event)" @gifts="openMode('gifts')" />
 
       <template v-else-if="mode === 'duel'">
         <OnlineRoomPanel :online="online" />
@@ -181,8 +182,12 @@ onBeforeUnmount(uninstallButtonSfx)
       <TraitChartApp v-else-if="mode === 'traitChart'" @back="leaveMode()" />
 
       <PlayerProfileApp v-else-if="mode === 'profile'" @back="leaveMode()" />
+      <GiftRevealApp v-else-if="mode === 'gifts'" @back="leaveMode()" />
 
-      <LoginApp v-else-if="mode === 'login'" @back="leaveMode()" @done="openMode('profile')" />
+      <!-- Signing in lands on the main screen, not the profile. Signing in is how you reach
+           everything, not a visit to one screen — and the gift badge only exists out there, so
+           dropping someone into their profile hides the one thing that just became true. -->
+      <LoginApp v-else-if="mode === 'login'" @back="leaveMode()" @done="leaveMode()" />
 
       <AdminSwitchApp v-else-if="mode === 'adminSwitch'" @back="leaveMode()" />
 

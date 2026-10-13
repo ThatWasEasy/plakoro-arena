@@ -703,5 +703,13 @@
   },
   "notice": {
     "meetup2": "Meetup#2 sign-ups are open — ask on the Plakoro Taiwan Line for details"
+  },
+  "gift": {
+    "waiting": "{n} gift(s)",
+    "nth": "{n} / {total}",
+    "next": "Next",
+    "done": "Done",
+    "opening": "Opening…",
+    "fromOrganiser": "Awarded by the organiser"
   }
 }

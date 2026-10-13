@@ -702,5 +702,13 @@
   },
   "notice": {
     "meetup2": "Meetup#2 活動報名開跑中，詳情請上 Plakoro Taiwan Line 詢問"
+  },
+  "gift": {
+    "waiting": "{n} 份禮物",
+    "nth": "{n} / {total}",
+    "next": "下一個",
+    "done": "完成",
+    "opening": "拆禮中…",
+    "fromOrganiser": "主辦頒發"
   }
 }

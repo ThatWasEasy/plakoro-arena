@@ -4,6 +4,7 @@
 import clickUrl from '../assets/sound/button-click.mp3'
 import confirmUrl from '../assets/sound/button-confirm.mp3'
 import cancelUrl from '../assets/sound/button-cancel.mp3'
+import getItemUrl from '../assets/sound/get-item.mp3'
 import { sfxSettings } from './sfxSettings'
 import { i18n } from '../i18n'
 
@@ -14,6 +15,7 @@ import { i18n } from '../i18n'
 const clickAudio = new Audio(clickUrl)
 const confirmAudio = new Audio(confirmUrl)
 const cancelAudio = new Audio(cancelUrl)
+const getItemAudio = new Audio(getItemUrl)
 
 function play(audio) {
   // Its own setting (sfxSettings.js), independent of the background-music volume/mute — the two
@@ -32,6 +34,9 @@ function play(audio) {
 export function playClickSound() { play(clickAudio) }
 export function playConfirmSound() { play(confirmAudio) }
 export function playCancelSound() { play(cancelAudio) }
+// Not a button sound — played when something is actually handed to the player (the gift reveal).
+// It lives here so every sound in the app shares the one mute/volume setting.
+export function playGetItemSound() { play(getItemAudio) }
 
 // `.btn` alone (not `.secondary`) is this app's own existing convention for the affirmative/
 // primary action in a given screen — Save, Confirm, Upload, Login, the red destructive-confirm
@@ -60,6 +65,9 @@ export function installButtonSfx() {
   function onClick(e) {
     const el = e.target.closest('button, a')
     if (!el || el.disabled) return
+    // A screen that makes its own sound for the same gesture opts out here, so the tap and the
+    // thing it triggers don't talk over each other.
+    if (el.closest('[data-sfx="off"]')) return
     if (isConfirmButton(el)) playConfirmSound()
     else if (isCancelButton(el)) playCancelSound()
     else playClickSound()

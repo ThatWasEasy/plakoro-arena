@@ -703,5 +703,13 @@
   },
   "notice": {
     "meetup2": "Meetup#2 の参加受付中 — 詳細は Plakoro Taiwan の Line までお問い合わせください"
+  },
+  "gift": {
+    "waiting": "プレゼント {n} 件",
+    "nth": "{n} / {total}",
+    "next": "次へ",
+    "done": "完了",
+    "opening": "開封中…",
+    "fromOrganiser": "主催者より授与"
   }
 }
