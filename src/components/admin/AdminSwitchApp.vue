@@ -12,7 +12,7 @@ import { useI18n } from 'vue-i18n'
 import * as adminApi from '../../data/adminApi'
 import { adminToken } from '../../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl } from '../../data/nameplateAssets'
-import { TITLE_GROUPS, resolveTitle } from '../../data/titleCatalogue'
+import { TITLE_GROUPS, resolveTitle } from '../../data/assetCatalogue'
 import PlayerBanner from '../tournament/PlayerBanner.vue'
 
 const emit = defineEmits(['back'])
@@ -54,6 +54,10 @@ async function select(code) {
   // whoever is shown now, and handing the wrong person's code over gives them that account.
   claimCode.value = ''
   claimError.value = ''
+  inheritOpen.value = false
+  inheritFrom.value = ''
+  inheritError.value = ''
+  inheritDone.value = null
   detail.value = null
   detailError.value = ''
   busyDetail.value = true
@@ -117,6 +121,36 @@ const toggleError = ref('')
 const claimCode = ref('')
 const claimBusy = ref(false)
 const claimError = ref('')
+
+// Merging two codes that turned out to be the same person. Destructive and not reversible
+// from here, so it asks for the source twice over: typing the code is the confirmation.
+const inheritOpen = ref(false)
+const inheritFrom = ref('')
+const inheritBusy = ref(false)
+const inheritError = ref('')
+const inheritDone = ref(null)
+
+async function doInherit() {
+  const from = inheritFrom.value.trim().toUpperCase()
+  if (!from || inheritBusy.value) return
+  inheritBusy.value = true
+  inheritError.value = ''
+  inheritDone.value = null
+  try {
+    const r = await adminApi.inheritRecords(adminToken.value, selectedCode.value, from)
+    inheritDone.value = r.moved
+    inheritFrom.value = ''
+    inheritOpen.value = false
+    // Re-read rather than patch: the merge recomputed stats and moved unlocks, and guessing at
+    // the result here is how a screen starts disagreeing with the database.
+    detail.value = await adminApi.getPlayer(adminToken.value, selectedCode.value)
+    await runSearch()
+  } catch (e) {
+    inheritError.value = e.message
+  } finally {
+    inheritBusy.value = false
+  }
+}
 
 async function mintClaim() {
   if (!selectedCode.value || claimBusy.value) return
@@ -206,6 +240,32 @@ async function toggle(kind, asset) {
             <code v-if="claimCode" class="as-claim-code">{{ claimCode }}</code>
             <span v-if="claimCode" class="as-claim-note">{{ t('admin.claimHint') }}</span>
             <span v-if="claimError" class="as-error">{{ claimError }}</span>
+          </div>
+
+          <div class="as-claim">
+            <button class="btn secondary as-claim-btn" @click="inheritOpen = !inheritOpen">
+              {{ t('admin.inherit') }}
+            </button>
+            <span v-if="inheritDone" class="as-claim-note">
+              {{ t('admin.inheritDone', inheritDone) }}
+            </span>
+          </div>
+
+          <div v-if="inheritOpen" class="as-inherit">
+            <p class="as-inherit-warn">{{ t('admin.inheritWarn') }}</p>
+            <div class="as-inherit-row">
+              <input
+                v-model="inheritFrom"
+                class="as-input as-inherit-input"
+                :placeholder="t('admin.inheritFrom')"
+                maxlength="12"
+                @keyup.enter="doInherit"
+              >
+              <button class="btn as-claim-btn" :disabled="!inheritFrom.trim() || inheritBusy" @click="doInherit">
+                {{ inheritBusy ? t('admin.inheritBusy') : t('admin.inheritDo') }}
+              </button>
+            </div>
+            <span v-if="inheritError" class="as-error">{{ inheritError }}</span>
           </div>
 
           <p class="as-hint">{{ t('admin.toggleHint') }}</p>
@@ -315,6 +375,19 @@ async function toggle(kind, asset) {
 .as-detail { flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.625rem; }
 .as-preview { display: flex; justify-content: center; padding: 0.25rem 0; }
 .as-stats { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.6875rem; font-weight: 700; color: var(--sub); }
+
+.as-inherit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  border: 0.0625rem solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.as-inherit-warn { margin: 0; font-size: 0.5625rem; color: #C0392B; font-weight: 700; line-height: 1.6; }
+.as-inherit-row { display: flex; gap: 0.375rem; align-items: center; }
+.as-inherit-input { width: 8rem; font-size: 0.75rem; padding: 0.3125rem 0.4375rem; text-transform: uppercase; }
 
 .as-claim { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .as-claim-btn { padding: 0.3125rem 0.625rem; font-size: 0.6875rem; }

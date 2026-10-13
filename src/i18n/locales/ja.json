@@ -130,7 +130,7 @@
     "typeChart": "タイプ相性表",
     "tierMaker": "Tierメーカー",
     "traitChart": "キャラ特性図",
-    "adminSwitch": "アカウント切り替え",
+    "adminSwitch": "アカウント管理",
     "adminRewards": "大会報酬の管理",
     "group": {
       "tools": "その他のツール"
@@ -139,7 +139,7 @@
     "lineJoin": "Line に参加"
   },
   "admin": {
-    "switchTitle": "アカウント切り替え",
+    "switchTitle": "アカウント管理",
     "searchPlaceholder": "選手コードまたは名前で検索",
     "noResults": "該当する選手がいません",
     "statEvents": "参加回数",
@@ -178,7 +178,13 @@
     "toggleHint": "タップで切替：点灯＝所持（タップで回収）、暗い＝未所持（タップで付与）。デフォルト素材は全員所持のため切替不可。",
     "claimMint": "クレームコード発行",
     "claimMinting": "発行中…",
-    "claimHint": "本人に渡し、ログイン画面の「既存記録の引き継ぎ」で入力。14日で失効。"
+    "claimHint": "本人に渡し、ログイン画面の「既存記録の引き継ぎ」で入力。14日で失効。",
+    "inherit": "記録を引き継ぐ",
+    "inheritFrom": "引き継ぎ元コード",
+    "inheritDo": "実行",
+    "inheritBusy": "処理中…",
+    "inheritWarn": "引き継ぎ元の参加記録・対戦・アイテムがすべてこの選手に移り、元の行は削除されます。",
+    "inheritDone": "移動：参加 {entries}・対戦 {matches}・アイテム {unlocks}"
   },
   "priceLog": {
     "title": {

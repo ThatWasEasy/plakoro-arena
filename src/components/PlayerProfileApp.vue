@@ -15,7 +15,7 @@ import { currentIdentity, setCurrentPlayer, signOut } from '../data/currentPlaye
 import { isAdminAccount, isAdminMode, setAdminMode } from '../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, tierOfAsset } from '../data/nameplateAssets'
 import { getToken } from '../data/session'
-import { TITLE_GROUPS, resolveTitle } from '../data/titleCatalogue'
+import { TITLE_GROUPS, resolveTitle } from '../data/assetCatalogue'
 import PlayerBanner from './tournament/PlayerBanner.vue'
 import VolumeBar from './VolumeBar.vue'
 
@@ -229,9 +229,9 @@ function handleSignOut() {
                 v-for="ti in g.titles"
                 :key="ti.id"
                 :class="['pp-title-chip', ti.rank, { on: draft.titleId === ti.id, locked: !isTitleUnlocked(ti.id, g.key) }]"
-                :title="isTitleUnlocked(ti.id, g.key) ? ti.condition || undefined : (ti.condition || t('profile.locked'))"
+                :title="isTitleUnlocked(ti.id, g.key) ? ti.obtain || undefined : (ti.obtain || t('profile.locked'))"
                 @click="pickTitle(ti.id, g.key)"
-              >{{ ti.text }}</button>
+              >{{ ti.name }}</button>
             </div>
           </div>
         </div>

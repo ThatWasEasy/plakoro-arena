@@ -130,7 +130,7 @@
     "typeChart": "Type matchups",
     "tierMaker": "Tier Maker",
     "traitChart": "Trait chart",
-    "adminSwitch": "Switch Identity",
+    "adminSwitch": "Account Admin",
     "adminRewards": "Manage Tournament Rewards",
     "group": {
       "tools": "More tools"
@@ -139,7 +139,7 @@
     "lineJoin": "Join Line"
   },
   "admin": {
-    "switchTitle": "Switch Identity",
+    "switchTitle": "Account Admin",
     "searchPlaceholder": "Search by code or name",
     "noResults": "No matching players",
     "statEvents": "Events",
@@ -178,7 +178,13 @@
     "toggleHint": "Tap to toggle: lit means owned (tap to revoke), dimmed means not owned (tap to grant). Default assets are always available and cannot be toggled.",
     "claimMint": "Issue claim code",
     "claimMinting": "Issuing…",
-    "claimHint": "Send it to them; they enter it under \"Claim an existing record\" on the login page. Expires in 14 days."
+    "claimHint": "Send it to them; they enter it under \"Claim an existing record\" on the login page. Expires in 14 days.",
+    "inherit": "Inherit records",
+    "inheritFrom": "Source code",
+    "inheritDo": "Confirm",
+    "inheritBusy": "Merging…",
+    "inheritWarn": "The source player's entries, matches and items all move to this player, and the source row is deleted.",
+    "inheritDone": "Moved: {entries} entries, {matches} matches, {unlocks} items"
   },
   "priceLog": {
     "title": {

@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 import * as adminApi from '../../data/adminApi'
 import { adminToken } from '../../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl } from '../../data/nameplateAssets'
-import { TITLE_GROUPS, resolveTitle } from '../../data/titleCatalogue'
+import { TITLE_GROUPS, resolveTitle } from '../../data/assetCatalogue'
 
 const emit = defineEmits(['back'])
 const { t } = useI18n()
@@ -270,7 +270,7 @@ const titleOptions = computed(() => TITLE_GROUPS.flatMap(g => g.titles.map(ti =>
                 v-for="ti in titleOptions" :key="ti.id"
                 :class="['ar-title-chip', { on: picked(place.key, 'title', ti.id) }]"
                 @click="pick(place.key, 'title', ti.id)"
-              >{{ ti.text }}</button>
+              >{{ ti.name }}</button>
             </div>
           </div>
         </div>

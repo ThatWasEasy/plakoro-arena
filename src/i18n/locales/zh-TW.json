@@ -130,7 +130,7 @@
     "typeChart": "屬性克制表",
     "tierMaker": "Tier 製作器",
     "traitChart": "角色特性分佈",
-    "adminSwitch": "切換身份",
+    "adminSwitch": "帳號管理",
     "adminRewards": "賽事獎品管理",
     "group": {
       "tools": "其他工具"
@@ -139,7 +139,7 @@
     "lineJoin": "加入 Line"
   },
   "admin": {
-    "switchTitle": "切換身份",
+    "switchTitle": "帳號管理",
     "searchPlaceholder": "搜尋玩家代號或名稱",
     "noResults": "沒有符合的玩家",
     "statEvents": "參賽場次",
@@ -178,7 +178,13 @@
     "toggleHint": "點一下切換：亮起＝已擁有，點了收回；暗的＝未擁有，點了發給。預設素材人人都有，不能切換。",
     "claimMint": "發認領碼",
     "claimMinting": "產生中…",
-    "claimHint": "傳給本人，他在登入頁「認領舊帳號」輸入。14 天後失效。"
+    "claimHint": "傳給本人，他在登入頁「認領舊帳號」輸入。14 天後失效。",
+    "inherit": "繼承成績",
+    "inheritFrom": "來源編號",
+    "inheritDo": "確認繼承",
+    "inheritBusy": "繼承中…",
+    "inheritWarn": "來源的參賽紀錄、對局、道具會全部轉到這位選手，來源那一列將被刪除。",
+    "inheritDone": "已繼承：名單 {entries}、對局 {matches}、道具 {unlocks}"
   },
   "priceLog": {
     "title": {

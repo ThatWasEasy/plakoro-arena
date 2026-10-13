@@ -14,7 +14,7 @@
 //   - A nameplate is a statement about a moment. Meetup#1's sheet should show the flag Ray was
 //     wearing that afternoon, not the one he earned two events later — otherwise every old
 //     pairing sheet silently rewrites itself.
-import { resolveTitle } from './titleCatalogue'
+import { resolveTitle } from './assetCatalogue'
 import { fallbackNameplate, keyFor, NAMEPLATE_VERSION } from '../game/playerNameplate'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8787'

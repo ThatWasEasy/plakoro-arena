@@ -78,6 +78,16 @@ export function mintClaimCode(token, code) {
   })
 }
 
+// Move one player's whole record onto another and delete the source — for when the same
+// person ended up with two codes. Resolves with a summary of what actually moved.
+export function inheritRecords(token, code, from) {
+  return request(`/api/admin/players/${encodeURIComponent(code)}/inherit`, {
+    method: 'POST',
+    headers: authHeader(token),
+    body: JSON.stringify({ from })
+  })
+}
+
 export function rebuildRecords(token) {
   return request('/api/admin/records/rebuild', { method: 'POST', headers: authHeader(token) })
 }
