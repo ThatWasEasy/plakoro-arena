@@ -137,7 +137,9 @@
       "tools": "その他のツール"
     },
     "line": "公式 Line",
-    "lineJoin": "Line に参加"
+    "lineJoin": "Line に参加",
+    "online": "オンライン対戦",
+    "comingSoon": "近日公開"
   },
   "admin": {
     "switchTitle": "アカウント管理",
@@ -739,5 +741,8 @@
     "fromParticipant": "{name} 参加",
     "fromGrant": "主催者より付与",
     "fromEvent": "大会"
+  },
+  "online": {
+    "underConstruction": "製作中です。この画面は主催者にのみ表示されます。"
   }
 }

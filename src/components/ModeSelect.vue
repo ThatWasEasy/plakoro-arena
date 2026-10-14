@@ -2,7 +2,7 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { isAdminMode } from '../data/adminSession'
+import { isAdminAccount, isAdminMode } from '../data/adminSession'
 import { giftCount, hasGifts, refreshGifts } from '../data/gifts'
 import { refreshPoints } from '../data/points'
 import Icon from './Icon.vue'
@@ -21,6 +21,14 @@ const LINE_URL = 'https://line.me/ti/g2/nX4Wb5UHJR9vy573jqGe_Q_q2Rd6JsruabTKVw'
 // code. Deleting the entry instead would leave its component, i18n strings and data loader with
 // no visible caller, which is how features quietly rot — this way re-enabling is one word.
 const MODES = [
+  // First, because that is where it belongs once it ships — and putting it anywhere else now
+  // would mean moving every card on launch day.
+  //
+  // Shown to everyone, openable by nobody but the organiser. `comingSoon` is deliberately not
+  // `adminOnly`: a card nobody else can see is a surprise when it launches, and a card that
+  // says 即將上線 is the announcement. Gated on the account rather than on admin *mode*, so
+  // checking on progress doesn't mean turning the admin cards on first.
+  { key: 'online', comingSoon: true },
   { key: 'duel' },
   { key: 'solo' },
   { key: 'diceBuilder' },
@@ -54,6 +62,11 @@ function visible(m) {
   return m.enabled !== false && (!m.adminOnly || isAdminMode.value)
 }
 
+// Visible but inert until it is finished — and never inert for the person building it.
+function locked(m) {
+  return !!m.comingSoon && !isAdminAccount.value
+}
+
 const topLevel = computed(() => [
   ...MODES.filter(m => visible(m) && !m.group),
   ...GROUPS.map(g => ({ ...g, isGroup: true }))
@@ -65,6 +78,7 @@ const groupModes = computed(() =>
 const cards = computed(() => (openGroup.value ? groupModes.value : topLevel.value))
 
 function pick(card) {
+  if (locked(card)) return
   if (card.isGroup) openGroup.value = card.key
   else emit('pick', card.key)
 }
@@ -149,13 +163,17 @@ const rows = computed(() => {
           :is="c.url ? 'a' : 'button'"
           v-for="c in row"
           :key="c.key"
-          class="select-card mode-card"
+          :class="['select-card', 'mode-card', { locked: locked(c) }]"
           :href="c.url"
           :target="c.url ? '_blank' : undefined"
           :rel="c.url ? 'noopener noreferrer' : undefined"
           @click="c.url ? undefined : pick(c)"
         >
           <span class="select-card-title mode-card-title">{{ label(c) }}</span>
+          <!-- Only for the people who are waiting. To the one person who can open it, it is
+               not coming soon — it is the screen they are working on, and the label would be
+               telling them something they already know. -->
+          <span v-if="locked(c)" class="mode-card-soon">{{ t('mode.comingSoon') }}</span>
         </component>
       </div>
     </div>
@@ -293,15 +311,29 @@ const rows = computed(() => {
 
 /* Set large enough to read as the screen's title rather than a heading over a list. */
 .mode-wordmark {
-  flex: 2 1 0%;
-  min-height: 0;
+  /* Fixed, not a share of what's left. A title is one line of a known size — letting it grow
+     with the stage only moved it around relative to the chip above it, and that relationship
+     is the whole reason the space above exists.
+     4.5rem of it is reserved for the player chip (a 3.5rem avatar at a 0.5rem offset, plus
+     room to breathe): the chip grew when it took the player's code, and a centred title on a
+     16:9 stage reaches far enough left to run into it. The title sits in the 3.5rem below. */
+  flex: none;
+  /* 4.25rem reserved above for the chip, 2.25rem of title, 0.75rem below it. The height is the
+     sum rather than a round number, so changing the title's size or the room underneath pushes
+     the box instead of squeezing what sits inside it. */
+  height: 7.25rem;
+  padding: 4.25rem 0 0.75rem;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0;
   /* rem, not vw: the app already scales its root font with the stage, so a viewport unit
      here would drift out of step with everything around it. */
-  font-size: 1.75rem;
+  font-size: 2.25rem;
+  /* Exactly the font size, so the box arithmetic above is the arithmetic the browser uses —
+     a default line box is taller than the type and would make the reserved space a guess. */
+  line-height: 1;
   font-weight: 900;
   letter-spacing: 0.1em;
   /* The tracking adds a trailing gap after the last letter; pulling it back keeps the mark
@@ -365,7 +397,44 @@ const rows = computed(() => {
   border: none;
   font-family: inherit;
 }
-/* The link cards are anchors, which bring their own underline and colour. */
+/* Never shrinks. .select-card lays its children out in a column, so the moment a second one
+   appeared the title gave up its height to make room — it measured zero and the card looked
+   like it had lost its name. */
+.mode-card-title { flex: none; }
+
+/* Two lines in a card built for one. The inherited 0.625rem gap and the card's own padding
+   together left less room than the two lines need, so both are pulled in here rather than
+   changing the cards that are still single-line. */
+.mode-card.locked {
+  flex-direction: column;
+  gap: 0.0625rem;
+  padding-top: 0.0625rem;
+  padding-bottom: 0.0625rem;
+  /* Not pressable, and not dimmed either: fading the card is what makes a player squint at
+     the one thing on this screen that is trying to tell them something. It stays as legible
+     as every card beside it; the chip below says what the state is. */
+  cursor: default;
+}
+.mode-card.locked .mode-card-title { line-height: 1.05; }
+.mode-card.locked:active { transform: none; }
+.mode-card.locked:hover { box-shadow: 0 0.125rem 0.375rem rgba(60, 60, 50, 0.16); }
+
+/* A status chip, not a caption. Dark text on the board's own rule colour — readable from the
+   same distance as the title, while clearly being a label about the card rather than part of
+   its name. */
+.mode-card-soon {
+  flex: none;
+  padding: 0.0625rem 0.3125rem;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--ink);
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
 .mode-card { text-decoration: none; color: inherit; }
 .mode-card:hover { box-shadow: 0 0.1875rem 0.5rem rgba(60, 60, 50, 0.22); }
 .mode-card:active { transform: scale(.97); box-shadow: 0 0.0625rem 0.1875rem rgba(60, 60, 50, 0.2); }

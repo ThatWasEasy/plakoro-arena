@@ -137,7 +137,9 @@
       "tools": "其他工具"
     },
     "line": "官方 Line",
-    "lineJoin": "加入 Line"
+    "lineJoin": "加入 Line",
+    "online": "線上對戰",
+    "comingSoon": "即將上線"
   },
   "admin": {
     "switchTitle": "帳號管理",
@@ -738,5 +740,8 @@
     "fromParticipant": "{name} 賽事參與",
     "fromGrant": "主辦贈點",
     "fromEvent": "賽事"
+  },
+  "online": {
+    "underConstruction": "還在做。這個畫面只有主辦看得到。"
   }
 }

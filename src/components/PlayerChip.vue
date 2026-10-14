@@ -20,7 +20,13 @@ const { t } = useI18n()
   <button class="player-chip" :aria-label="t('profile.title')" @click="emit('open')">
     <img class="pc-avatar" :src="avatarUrl(currentIdentity.avatar)" alt="" aria-hidden="true">
     <span class="pc-lines">
-      <span class="pc-name">{{ isSignedIn ? currentIdentity.name : t('player.guest') }}</span>
+      <span class="pc-name">
+        <span class="pc-name-text">{{ isSignedIn ? currentIdentity.name : t('player.guest') }}</span>
+        <!-- The code is what an organiser asks for at a sign-in desk, so it belongs where the
+             player can read it off without opening anything. Its own element, not part of the
+             name string: a long nickname truncates and the code must not go with it. -->
+        <span v-if="isSignedIn && currentIdentity.code" class="pc-code">({{ currentIdentity.code }})</span>
+      </span>
       <!-- Both hidden for a guest: there is no record behind either number, and a Lv.1 that
            everyone starts at would read as something earned. -->
       <template v-if="isSignedIn">
@@ -85,14 +91,31 @@ const { t } = useI18n()
 
 /* Dark on the board, not white on a pill — there is no pill to be white against. */
 .pc-name {
-  font-size: 0.875rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
   line-height: 1.15;
+  /* Wide enough for a normal nickname plus the code. Past that the nickname gives way and the
+     code stays — the code is the half that identifies you to an organiser. */
+  max-width: 13rem;
+}
+.pc-name-text {
+  min-width: 0;
+  font-size: 0.875rem;
   font-weight: 800;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 9rem;
+}
+/* Same size and colour as the name, lighter — it is an identifier attached to the name, not a
+   second name. Matches the weight of the two lines below it. */
+.pc-code {
+  flex: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Same size and colour as the name — the three lines are one block about one person, and

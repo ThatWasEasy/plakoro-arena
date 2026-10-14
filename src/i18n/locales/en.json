@@ -137,7 +137,9 @@
       "tools": "More tools"
     },
     "line": "Official Line",
-    "lineJoin": "Join Line"
+    "lineJoin": "Join Line",
+    "online": "Online Battle",
+    "comingSoon": "Coming soon"
   },
   "admin": {
     "switchTitle": "Account Admin",
@@ -739,5 +741,8 @@
     "fromParticipant": "{name} — attended",
     "fromGrant": "Granted by the organiser",
     "fromEvent": "an event"
+  },
+  "online": {
+    "underConstruction": "Still being built. Only the organiser can see this screen."
   }
 }
