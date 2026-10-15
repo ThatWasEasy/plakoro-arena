@@ -253,10 +253,25 @@ function weaknessBonus(mv, env) {
   return printed > 0 ? env.enemyWeakness : 0
 }
 
+// "このワザは失敗する" has no effect type of its own: the data writes it as a DAMAGE_EXTRA
+// that cancels the printed damage exactly (-30 on a 30-damage そらをとぶ, -80 on もえつきる).
+// Read literally that only zeroes the printed figure, and the weakness bonus — which rides on
+// the printed figure — would still land on a move that failed. So an entry that cancels the
+// printed damage is taken for what the card says it is: the whole move fails, and nothing it
+// does, weakness included, reaches the opponent.
+function failsMove(mv, ce) {
+  return !!ce && ce.type === 'DAMAGE_EXTRA' && mv.baseDamage > 0 && ce.value === -mv.baseDamage
+}
+
 // One outcome of the character die: the move's own effect plus whichever character-die entry
 // (if any) that face belongs to, resolved in the order resolveTurn queues them.
 function resolveBranch(mv, ce, env) {
-  const state = { damage: mv.baseDamage, self: 0, defensive: 0, tempo: 0, repeats: false, notes: new Map() }
+  const state = { damage: mv.baseDamage, self: 0, defensive: 0, tempo: 0, repeats: false, failed: false, notes: new Map() }
+  if (failsMove(mv, ce)) {
+    state.damage = 0
+    state.failed = true
+    return state
+  }
   if (mv.effectType) applyEffect({ type: mv.effectType, value: mv.effectValue }, state, env)
   if (ce && ce.type) applyEffect({ type: ce.type, value: ce.value }, state, env)
   return state
@@ -408,9 +423,9 @@ export function moveExpectedValue(mv, options) {
     const state = resolveBranch(mv, branch.ce, { ...env, charaHits: branch.hits })
     // Mirrors proceedToAnimateWithCtx: a move can't heal the opponent, so damage floors at 0 —
     // after the opponent's reduction and weakness have been applied, which is what makes the
-    // floor bite.
+    // floor bite. A failed move deals nothing for either to act on.
     const unmodified = Math.max(state.damage, 0)
-    const damage = Math.max(state.damage + opponentMod, 0)
+    const damage = state.failed ? 0 : Math.max(state.damage + opponentMod, 0)
     damageOnHit += branch.weight * damage
     unmodifiedOnHit += branch.weight * unmodified
     selfOnHit += branch.weight * state.self
