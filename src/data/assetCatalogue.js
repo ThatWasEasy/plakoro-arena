@@ -24,7 +24,8 @@ export const GROUP_LABELS = {
   limited: '限定',
   meetup1: 'Meetup#1',
   meetup2: 'Meetup#2',
-  achievement: '特殊成就'
+  achievement: '特殊成就',
+  secret: '秘密'
 }
 
 export const ASSETS = [
@@ -41,6 +42,10 @@ export const ASSETS = [
   { kind: 'avatar', id: 'lucky-mascot',         name: 'LUCKY 吉祥物頭像',   obtain: '實體賽事：一擊打出 100 滴以上傷害' },
   { kind: 'avatar', id: 'perfect-mascot',       name: 'PERFECT 吉祥物頭像', obtain: '實體賽事：擊敗對手時，還保留 120 滴血量' },
   { kind: 'avatar', id: 'safe-mascot',          name: 'SAFE 吉祥物頭像',    obtain: '實體賽事：擊敗對手時，僅剩下 10 滴血量' },
+  // `secret-` 開頭的素材在玩家沒拿到之前不會出現在選擇器裡（見 nameplateAssets 的
+  // isSecretAsset），所以這行獲取條件只有拿到的人看得到 —— 寫「秘密禮物」是刻意的：
+  // 能看到它的時候東西已經在手上了，再解釋一次條件反而少了點什麼。
+  { kind: 'avatar', id: 'secret-mame',          name: '秘密頭像',           obtain: '秘密禮物' },
 
   // ── 旗幟 ──
   { kind: 'background', id: '2026-9-default',       name: 'Meetup#1 基本旗幟', obtain: 'Meetup#1：基本旗幟' },
@@ -51,6 +56,8 @@ export const ASSETS = [
   { kind: 'background', id: '2026-10-participants', name: 'Meetup#2 參加旗幟', obtain: 'Meetup#2：參與實體賽事' },
   { kind: 'background', id: '2026-10-winner',       name: 'Meetup#2 入賞旗幟', obtain: 'Meetup#2：於賽季獲得前三名' },
   { kind: 'background', id: '2026-10-champion',     name: 'Meetup#2 冠軍旗幟', obtain: 'Meetup#2：於賽季奪冠' },
+
+  { kind: 'background', id: 'secret-tama',          name: '秘密旗幟',          obtain: '秘密禮物' },
 
   // ── 稱號 ──
   { kind: 'title', id: 'gen-rookie',     name: '骰子新鮮人',    group: 'general',     rank: 'plain',  obtain: '我入坑骰子啦！' },
@@ -74,7 +81,12 @@ export const ASSETS = [
   // avatar earned the same way.
   { kind: 'title', id: 'ach-big-hit',    name: '賽到的',        group: 'achievement', rank: 'plain',  obtain: '實體賽事：一擊打出 100 滴以上傷害' },
   { kind: 'title', id: 'ach-last-stand', name: '九死一生',      group: 'achievement', rank: 'epic',   obtain: '實體賽事：擊敗對手時，僅剩下 10 滴血量' },
-  { kind: 'title', id: 'ach-untouched',  name: '怎麼結束了？',  group: 'achievement', rank: 'legend', obtain: '實體賽事：擊敗對手時，還保留 120 滴血量' }
+  { kind: 'title', id: 'ach-untouched',  name: '怎麼結束了？',  group: 'achievement', rank: 'legend', obtain: '實體賽事：擊敗對手時，還保留 120 滴血量' },
+
+  // Its own group, which is how it stays hidden: the picker drops any group with nothing left
+  // to show, and a secret nobody owns leaves this one empty. Lumping it in with 限定 would put
+  // an empty-looking slot where a player can count what they are missing.
+  { kind: 'title', id: 'secret-poop',    name: '便便～',        group: 'secret',      rank: 'epic',   obtain: '秘密禮物' }
 ]
 
 const BY_KEY = new Map(ASSETS.map(a => [`${a.kind}:${a.id}`, a]))

@@ -72,6 +72,21 @@ export function avatarBorderUrl(id) {
 // "not a seasonal tier," not "free for everyone" — see PlayerProfileApp.vue's isUnlocked().
 const TIER_SUFFIX = /-(default|participants|winner|champion)$/
 
+// Items nobody is told exist until they have one.
+//
+// "Show all" is otherwise a catalogue of everything there is to aim for, which is the point of
+// it — but a secret stops being one the moment it is listed as locked. These are filtered out
+// of the player's own pickers until they own one; the admin grids deliberately still show them,
+// because somebody has to be able to hand them out.
+//
+// A filename prefix rather than a flag in the catalogue: the asset exists the moment the file
+// does, and a rule that lives anywhere else can be forgotten when the next one is dropped in.
+const SECRET_PREFIX = /^secret-/
+
+export function isSecretAsset(id) {
+  return SECRET_PREFIX.test(String(id || ''))
+}
+
 export function tierOfAsset(id) {
   const m = TIER_SUFFIX.exec(id)
   return m ? m[1] : null

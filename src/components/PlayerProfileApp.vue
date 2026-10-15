@@ -13,7 +13,7 @@ import { audioSettings, setVolume } from '../data/audioSettings'
 import { sfxSettings, setSfxVolume } from '../data/sfxSettings'
 import { currentIdentity, setCurrentPlayer, signOut } from '../data/currentPlayer'
 import { isAdminAccount, isAdminMode, setAdminMode } from '../data/adminSession'
-import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, tierOfAsset } from '../data/nameplateAssets'
+import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, isSecretAsset, tierOfAsset } from '../data/nameplateAssets'
 import { getToken } from '../data/session'
 import { TITLE_GROUPS, resolveTitle } from '../data/assetCatalogue'
 import { pointReason } from '../data/pointReason'
@@ -141,11 +141,16 @@ function pickTitle(id, groupKey) {
 // screen the first time. "Show all" is there for whoever wants to see what's out there to aim
 // for; it doesn't change what's pickable, only what's shown.
 const showAll = ref(false)
-const visibleAvatarIds = computed(() => AVATAR_IDS.filter(id => showAll.value || isUnlocked(id, 'avatar')))
-const visibleBackgroundIds = computed(() => BACKGROUND_IDS.filter(id => showAll.value || isUnlocked(id, 'background')))
+
+// Owned always shows. "Show all" adds everything else *except* the secrets — listing one as
+// locked is how a secret stops being one (see isSecretAsset).
+const shown = (id, owned) => owned || (showAll.value && !isSecretAsset(id))
+
+const visibleAvatarIds = computed(() => AVATAR_IDS.filter(id => shown(id, isUnlocked(id, 'avatar'))))
+const visibleBackgroundIds = computed(() => BACKGROUND_IDS.filter(id => shown(id, isUnlocked(id, 'background'))))
 const visibleTitleGroups = computed(() =>
   TITLE_GROUPS
-    .map(g => ({ ...g, titles: g.titles.filter(ti => showAll.value || isTitleUnlocked(ti.id, g.key)) }))
+    .map(g => ({ ...g, titles: g.titles.filter(ti => shown(ti.id, isTitleUnlocked(ti.id, g.key))) }))
     .filter(g => g.titles.length > 0))
 
 // A draft, so backing out leaves the saved profile alone.
