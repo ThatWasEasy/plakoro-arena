@@ -722,7 +722,8 @@
     "next": "次へ",
     "done": "完了",
     "opening": "開封中…",
-    "fromOrganiser": "主催者より授与"
+    "fromOrganiser": "主催者より授与",
+    "artworkMissing": "このバージョンにはまだ画像がありません。再読み込みで表示されます"
   },
   "points": {
     "name": "PTP",

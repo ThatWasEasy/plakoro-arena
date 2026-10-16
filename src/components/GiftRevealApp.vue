@@ -13,7 +13,7 @@ import { useI18n } from 'vue-i18n'
 import { claimAllGifts } from '../data/gifts'
 import { describeAsset } from '../data/assetCatalogue'
 import { pointReason } from '../data/pointReason'
-import { avatarUrl, backgroundUrl } from '../data/nameplateAssets'
+import { avatarUrl, backgroundUrl, hasArtwork } from '../data/nameplateAssets'
 import { playGetItemSound } from '../data/buttonSfx'
 
 const emit = defineEmits(['back'])
@@ -78,6 +78,15 @@ function kindLabel(g) {
 // gesture here, and they should make one sound, not two.
 watch(current, g => { if (g) playGetItemSound() })
 
+// A gift whose artwork this build has never heard of.
+//
+// Happens when a reward ships before the build that draws it, or when a player is still on a
+// cached older one. Without this the card quietly shows the season default and the player is
+// looking at the thing everyone already owns, told it is their prize.
+function missingArt(g) {
+  return !hasArtwork(g.kind, g.asset)
+}
+
 function next() {
   if (index.value < items.value.length - 1) index.value++
   else emit('back')
@@ -91,7 +100,9 @@ function next() {
 
       <div :key="current.id" class="gr-card">
         <div class="gr-art">
-          <img v-if="current.kind === 'avatar'" class="gr-avatar" :src="avatarUrl(current.asset)" alt="">
+          <!-- Says so, rather than drawing the default in its place. -->
+          <div v-if="missingArt(current)" class="gr-title-art gr-unknown">？</div>
+          <img v-else-if="current.kind === 'avatar'" class="gr-avatar" :src="avatarUrl(current.asset)" alt="">
           <img v-else-if="current.kind === 'background'" class="gr-flag" :src="backgroundUrl(current.asset)" alt="">
           <!-- The amount is the artwork, the same way a title's words are. Nothing to illustrate
                and nothing gained by inventing a coin. -->
@@ -106,7 +117,7 @@ function next() {
         <!-- A title's artwork is its own name, so repeating it underneath says nothing. An
              avatar or flag needs the line: the picture alone doesn't tell you which one it is. -->
         <div v-if="current.kind !== 'title' && current.kind !== 'points'" class="gr-name">{{ nameFor(current) }}</div>
-        <div class="gr-reason">{{ reasonFor(current) }}</div>
+        <div class="gr-reason">{{ missingArt(current) ? t('gift.artworkMissing') : reasonFor(current) }}</div>
       </div>
 
       <!-- The board stays tappable — a thumb on a phone shouldn't have to find a target — but
@@ -189,6 +200,16 @@ function next() {
   color: var(--sub);
   letter-spacing: 0.14em;
 }
+.gr-unknown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 7rem;
+  height: 7rem;
+  font-size: 3rem;
+  color: var(--sub);
+}
+
 .gr-points-art {
   display: flex;
   align-items: baseline;

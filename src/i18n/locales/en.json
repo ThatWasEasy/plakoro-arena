@@ -722,7 +722,8 @@
     "next": "Next",
     "done": "Done",
     "opening": "Opening…",
-    "fromOrganiser": "Awarded by the organiser"
+    "fromOrganiser": "Awarded by the organiser",
+    "artworkMissing": "This build has no artwork for it yet — reload and it will appear"
   },
   "points": {
     "name": "PTP",

@@ -54,6 +54,19 @@ export const FALLBACK_AVATAR = AVATAR_URLS[`${CURRENT_SEASON}-default`]
   ? `${CURRENT_SEASON}-default`
   : (AVATAR_IDS.find(id => id.endsWith('-default')) || AVATAR_IDS[0])
 
+// Whether this build actually ships artwork for an id.
+//
+// avatarUrl/backgroundUrl below answer "what should I draw", and for a nameplate the right
+// answer to an unknown id is the season default — a pairing sheet at a venue with no signal
+// still has to render. But the gift screen is the one place where that lie costs something:
+// it tells a player they received an item and then shows them the picture everyone already
+// has. Asking first is how that screen tells the two apart.
+export function hasArtwork(kind, id) {
+  if (kind === 'avatar') return !!AVATAR_URLS[id]
+  if (kind === 'background') return !!BACKGROUND_URLS[id]
+  return true
+}
+
 export function backgroundUrl(id) {
   return BACKGROUND_URLS[id] || BACKGROUND_URLS[FALLBACK_BACKGROUND]
 }
