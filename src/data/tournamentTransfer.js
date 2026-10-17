@@ -250,11 +250,15 @@ export function buildUploadPayload(tournament, rewardPackageId) {
       name: p.name,
       place: placeOf.get(p.id) ?? null
     })),
+    // `table` rides along so the numbers survive a round-trip. They were already in the
+    // exported file; leaving them out of the upload is what made a downloaded tournament come
+    // back with no seats — see migration 0011.
     matches: (tournament.rounds || []).flatMap(r => r.matches.map(m => ({
       round: r.roundNumber,
       p1Id: m.player1Id,
       p2Id: m.player2Id,
-      result: m.result
+      result: m.result,
+      table: m.table ?? null
     })))
   }
 }

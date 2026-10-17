@@ -12,6 +12,7 @@ import {
   BACKGROUND_URLS, AVATAR_URLS, AVATAR_BORDER_URLS,
   FALLBACK_BACKGROUND, FALLBACK_AVATAR
 } from '../data/nameplateAssets'
+import { tableNumberOf } from './tournamentPairing'
 
 // Drawn at 2x and scaled down by the viewer, so the text is crisp in print and when someone
 // pinches into it on a phone.
@@ -322,8 +323,11 @@ export async function renderRoundImage({ tournament, round, plateFor, t }) {
     ctx.fillStyle = '#3A3A3A'
     ctx.font = `700 20px ${FONT}`
     ctx.textBaseline = 'middle'
-    const label = m.table !== null && m.table !== undefined
-      ? t('tournament.detail.tableLabel', { n: m.table })
+    // Via the helper, so a round with no stored numbers prints seats rather than printing
+    // every real match as a bye — which is what a missing `table` used to produce here.
+    const tableNo = tableNumberOf(round, m)
+    const label = tableNo !== null
+      ? t('tournament.detail.tableLabel', { n: tableNo })
       : t('tournament.detail.bye')
     ctx.fillText(label, PAD, y + PLATE_H / 2)
 

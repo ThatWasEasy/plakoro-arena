@@ -9,6 +9,7 @@ import {
   isRoundComplete,
   championOf,
   assignTableNumbers,
+  tableNumberOf,
   addPlayerToRound,
   rewindToRound,
   roundsAfter,
@@ -572,7 +573,9 @@ function generateNextRound() {
           <tbody>
             <tr v-for="m in currentRound.matches" :key="m.id" style="border-bottom:1px solid var(--line);">
               <td style="padding:0.5rem 0.375rem; color:var(--sub); white-space:nowrap;">
-                {{ m.table !== null ? t('tournament.detail.tableLabel', { n: m.table }) : t('tournament.detail.bye') }}
+                {{ tableNumberOf(currentRound, m) !== null
+                   ? t('tournament.detail.tableLabel', { n: tableNumberOf(currentRound, m) })
+                   : t('tournament.detail.bye') }}
               </td>
               <!-- While editing, each name is its own tap target — a plain pill, because
                    swapping is two taps and the nameplate's emblem would be one more thing

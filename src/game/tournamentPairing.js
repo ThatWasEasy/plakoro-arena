@@ -333,6 +333,26 @@ export function giveByeTo(tournament, round, playerId) {
 // tables); for elimination, natural bracket order is kept since it already carries structural
 // meaning. Either way, byes move to the end since they don't need a table at all. Mutates and
 // returns `round`.
+/**
+ * The table a match was played on, for display.
+ *
+ * Normally just `m.table`, stamped once when the round was generated. Falls back to the match's
+ * position among the round's real matches when that is missing — which is every round uploaded
+ * before the server had anywhere to store it (migration 0011). Position is the right fallback
+ * and not a guess: assignTableNumbers reorders `round.matches` into table order before anything
+ * is saved, and both the file format and the API return them in that order, so counting them
+ * off reproduces the numbers that were on the tables.
+ *
+ * Returns null only for a bye, which never had a table.
+ */
+export function tableNumberOf(round, match) {
+  if (match.player2Id === null) return null
+  if (Number.isInteger(match.table)) return match.table
+  const real = (round?.matches || []).filter(m => m.player2Id !== null)
+  const i = real.indexOf(match)
+  return i >= 0 ? i + 1 : null
+}
+
 export function assignTableNumbers(tournament, round) {
   const real = round.matches.filter(m => m.player2Id !== null)
   const byes = round.matches.filter(m => m.player2Id === null)
