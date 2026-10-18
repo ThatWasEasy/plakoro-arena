@@ -46,7 +46,9 @@ const MODES = [
   // up front pushed the front page past the point where every card still fit.
   { key: 'tournament', group: 'tools' },
   { key: 'tierMaker', group: 'tools' },
-  { key: 'traitChart', group: 'tools' },
+  // Admin-only: the trait numbers are hand-maintained and incomplete, so publishing them as
+  // a player-facing chart would present guesses as data.
+  { key: 'traitChart', group: 'tools', adminOnly: true },
   // Only ever shown once admin mode is on (see App.vue's triple-tap-the-version-number entry
   // point) — hidden rather than just inert, so its existence isn't a hint to someone poking
   // around the menu who hasn't passed the PIN check.
@@ -214,7 +216,7 @@ const rows = computed(() => {
           :key="i"
           class="mt-text"
           :aria-hidden="i > 1 ? 'true' : undefined"
-        >{{ t('notice.meetup2') }}</span>
+        >{{ t('notice.current') }}</span>
       </div>
     </div>
 

@@ -136,10 +136,14 @@ const claimError = ref('')
 // from here, so it asks for the source twice over: typing the code is the confirmation.
 // Who the typed code actually belongs to.
 //
-// This action deletes that player, and a code is six digits with no redundancy — one wrong
-// keystroke names somebody else entirely. Looking it up and showing the name turns "I typed
-// what I meant to" into "I can see who this is", which is the only check that catches a typo
-// that happens to be a real code.
+// The direction reads the way the job is actually done: find the orphaned record, then say
+// where it goes. The player on screen is the one being given up; the code typed in is the
+// account that keeps everything. (The API takes it the other way round — target in the path,
+// source in the body — so doInherit swaps them.)
+//
+// A code is six digits with no redundancy, so one wrong keystroke names somebody else who
+// really exists. Looking it up and showing the name turns "I typed what I meant to" into
+// "I can see who this is", which is the only check that catches that.
 const inheritLookup = ref(null)   // { name, hasAccount } | 'missing' | null
 let inheritTimer = null
 
@@ -166,24 +170,34 @@ const inheritBusy = ref(false)
 const inheritError = ref('')
 const inheritDone = ref(null)
 
-// Nothing to press until the code resolves to a real player who can actually be merged away.
+// Nothing to press until the typed code resolves to a real player to hand the record to.
+// Unlike before, that player's own account is fine — they are the one keeping it.
 const inheritReady = computed(() =>
-  !!inheritLookup.value && inheritLookup.value !== 'missing' && !inheritLookup.value.hasAccount)
+  !!inheritLookup.value && inheritLookup.value !== 'missing' && !sourceHasAccount.value)
+
+// The player on screen is the one being deleted, so they must not have a login — the server
+// refuses it anyway (409), and saying so before the press is better than after.
+const sourceHasAccount = computed(() => !!detail.value?.hasAccount)
 
 async function doInherit() {
-  const from = inheritFrom.value.trim().toUpperCase()
-  if (!from || inheritBusy.value) return
+  const keeper = inheritFrom.value.trim().toUpperCase()
+  const givenUp = selectedCode.value
+  if (!keeper || !inheritReady.value || inheritBusy.value) return
   inheritBusy.value = true
   inheritError.value = ''
   inheritDone.value = null
   try {
-    const r = await adminApi.inheritRecords(adminToken.value, selectedCode.value, from)
+    // Swapped on the way out: the endpoint keeps the player in the path and deletes the one in
+    // the body, which is the reverse of how the screen reads.
+    const r = await adminApi.inheritRecords(adminToken.value, keeper, givenUp)
     inheritDone.value = r.moved
     inheritFrom.value = ''
+    inheritLookup.value = null
     inheritOpen.value = false
-    // Re-read rather than patch: the merge recomputed stats and moved unlocks, and guessing at
-    // the result here is how a screen starts disagreeing with the database.
-    detail.value = await adminApi.getPlayer(adminToken.value, selectedCode.value)
+    // The player who was on screen no longer exists, so the screen follows the record to where
+    // it went rather than sitting on a 404.
+    selectedCode.value = keeper
+    detail.value = await adminApi.getPlayer(adminToken.value, keeper)
     await runSearch()
   } catch (e) {
     inheritError.value = e.message
@@ -378,14 +392,15 @@ async function toggle(kind, asset) {
           </div>
 
           <div v-if="inheritOpen" class="as-inherit">
-            <p class="as-inherit-warn">
-              {{ t('admin.inheritWarn', { keep: detail.player.name, keepCode: selectedCode }) }}
-            </p>
+            <!-- Reads left to right the way the job is done: this record → that account. -->
             <div class="as-inherit-row">
+              <span class="as-inherit-from">
+                {{ t('admin.inheritFromLabel', { name: detail.player.name, code: selectedCode }) }}
+              </span>
               <input
                 v-model="inheritFrom"
                 class="as-input as-inherit-input"
-                :placeholder="t('admin.inheritFrom')"
+                :placeholder="t('admin.inheritTo')"
                 maxlength="12"
                 @input="onInheritInput"
                 @keyup.enter="doInherit"
@@ -396,17 +411,20 @@ async function toggle(kind, asset) {
                 @click="doInherit"
               >{{ inheritBusy ? t('admin.inheritBusy') : t('admin.inheritDo') }}</button>
             </div>
-            <!-- Says the name out loud before anything happens. A code that resolves to the
-                 wrong person is the failure this is here to catch. -->
-            <p v-if="inheritLookup === 'missing'" class="as-error">
+            <p v-if="sourceHasAccount" class="as-error">
+              {{ t('admin.inheritSourceHasAccount', { name: detail.player.name }) }}
+            </p>
+            <p v-else-if="inheritLookup === 'missing'" class="as-error">
               {{ t('admin.inheritNotFound', { code: inheritFrom.trim().toUpperCase() }) }}
             </p>
-            <p v-else-if="inheritLookup && inheritLookup.hasAccount" class="as-error">
-              {{ t('admin.inheritHasAccount', { name: inheritLookup.name }) }}
-            </p>
+            <!-- Both names, out loud, before anything happens. A code that resolves to the
+                 wrong person is the failure this is here to catch. -->
             <p v-else-if="inheritLookup" class="as-inherit-warn">
-              {{ t('admin.inheritWillDelete', { name: inheritLookup.name, code: inheritFrom.trim().toUpperCase() }) }}
+              {{ t('admin.inheritConfirm', {
+                   from: detail.player.name, fromCode: selectedCode,
+                   to: inheritLookup.name, toCode: inheritFrom.trim().toUpperCase() }) }}
             </p>
+            <p v-else class="as-inherit-warn">{{ t('admin.inheritWarn') }}</p>
             <span v-if="inheritError" class="as-error">{{ inheritError }}</span>
           </div>
 

@@ -1,5 +1,4 @@
 {
-  "appTitle": "Plakoro Battle",
   "common": {
     "selected": "Selected",
     "confirm": "Confirm",
@@ -184,15 +183,16 @@
     "claimMinting": "Issuing…",
     "claimHint": "Send it to them; they enter it under \"Claim an existing record\" on the login page. Expires in 14 days.",
     "inherit": "Inherit records",
-    "inheritFrom": "Old code to delete",
     "inheritDo": "Confirm",
     "inheritBusy": "Merging…",
-    "inheritWarn": "Enter the OLD code being given up. Its entries, matches, items and PTP all move to {keep} ({keepCode}), and that code is then deleted.",
+    "inheritWarn": "Enter the code of the account that should receive this record. The code on screen is deleted afterwards.",
     "inheritDone": "Moved: {entries} entries, {matches} matches, {unlocks} items, {points} PTP entries",
     "searchTruncated": "Showing the first {n} — type a code or name to narrow it down",
-    "inheritWillDelete": "⚠ Will delete: {name} ({code}) — the code disappears once its record moves",
     "inheritNotFound": "No player with code {code}",
-    "inheritHasAccount": "{name} has their own account and cannot be deleted — merge the other way round"
+    "inheritFromLabel": "{name} ({code}) hands everything over to →",
+    "inheritTo": "Receiving code",
+    "inheritConfirm": "⚠ {from} ({fromCode}) — entries, matches, items and PTP all move to {to} ({toCode}), then {fromCode} is deleted.",
+    "inheritSourceHasAccount": "{name} has their own account and cannot be merged away — select the code being given up instead."
   },
   "priceLog": {
     "title": {
@@ -726,7 +726,7 @@
     "renameConfirm": "You will appear as “{name}”"
   },
   "notice": {
-    "meetup2": "Meetup#2 sign-ups are open — ask on the Plakoro Taiwan Line for details"
+    "current": "The PLAKORO strategy guide is coming soon — ask on the Plakoro Taiwan Line for details"
   },
   "gift": {
     "waiting": "{n} gift(s)",

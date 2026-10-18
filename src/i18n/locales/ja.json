@@ -1,5 +1,4 @@
 {
-  "appTitle": "プラコロバトル",
   "common": {
     "selected": "選択済み",
     "confirm": "確定",
@@ -184,15 +183,16 @@
     "claimMinting": "発行中…",
     "claimHint": "本人に渡し、ログイン画面の「既存記録の引き継ぎ」で入力。14日で失効。",
     "inherit": "記録を引き継ぐ",
-    "inheritFrom": "削除する古い番号",
     "inheritDo": "実行",
     "inheritBusy": "処理中…",
-    "inheritWarn": "「手放す方」の古い番号を入力してください。参加記録・対戦・アイテム・PTP はすべて {keep}（{keepCode}）に移り、その番号は削除されます。",
+    "inheritWarn": "この記録を受け取るアカウントの番号を入力してください。移行後、表示中の番号は削除されます。",
     "inheritDone": "移動：参加 {entries}・対戦 {matches}・アイテム {unlocks}・PTP {points} 件",
     "searchTruncated": "先頭 {n} 件のみ表示。番号か名前で絞り込んでください",
-    "inheritWillDelete": "⚠ 削除されます：{name}（{code}）— 記録の移動後に番号は消えます",
     "inheritNotFound": "番号 {code} は見つかりません",
-    "inheritHasAccount": "{name} は自分のアカウントを持っているため削除できません — 逆方向で統合してください"
+    "inheritFromLabel": "{name}（{code}）の記録を引き継ぐ →",
+    "inheritTo": "受け取る番号",
+    "inheritConfirm": "⚠ {from}（{fromCode}）の参加記録・対戦・アイテム・PTP はすべて {to}（{toCode}）へ移り、{fromCode} は削除されます。",
+    "inheritSourceHasAccount": "{name} は自分のアカウントを持っているため統合できません — 手放す側の番号を選んでください。"
   },
   "priceLog": {
     "title": {
@@ -726,7 +726,7 @@
     "renameConfirm": "「{name}」として表示されます"
   },
   "notice": {
-    "meetup2": "Meetup#2 の参加受付中 — 詳細は Plakoro Taiwan の Line までお問い合わせください"
+    "current": "PLAKORO 攻略ハンドブックが近日公開 — 詳細は Plakoro Taiwan の Line までお問い合わせください"
   },
   "gift": {
     "waiting": "プレゼント {n} 件",

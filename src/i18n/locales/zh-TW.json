@@ -1,5 +1,4 @@
 {
-  "appTitle": "普拉可羅對戰",
   "common": {
     "selected": "已選擇",
     "confirm": "確定",
@@ -184,15 +183,16 @@
     "claimMinting": "產生中…",
     "claimHint": "傳給本人，他在登入頁「認領舊帳號」輸入。14 天後失效。",
     "inherit": "繼承成績",
-    "inheritFrom": "要刪掉的舊編號",
     "inheritDo": "確認繼承",
     "inheritBusy": "繼承中…",
-    "inheritWarn": "填入「要丟掉」的那個舊編號。它的參賽紀錄、對局、道具、PTP 會全部轉給 {keep}（{keepCode}），然後那個編號會被刪除。",
+    "inheritWarn": "輸入要接收這份紀錄的帳號編號。轉移後，目前這個編號會被刪除。",
     "inheritDone": "已繼承：名單 {entries}、對局 {matches}、道具 {unlocks}、PTP {points} 筆",
     "searchTruncated": "只顯示前 {n} 筆，請輸入編號或名字縮小範圍",
-    "inheritWillDelete": "⚠ 將刪除：{name}（{code}），紀錄轉移後此編號消失",
     "inheritNotFound": "查不到編號 {code}",
-    "inheritHasAccount": "{name} 已經有自己的帳號，不能被刪除 —— 請反過來做（選中他，來源填另一個編號）"
+    "inheritFromLabel": "{name}（{code}）即將繼承給 →",
+    "inheritTo": "接收的編號",
+    "inheritConfirm": "⚠ {from}（{fromCode}）的參賽紀錄、對局、道具、PTP 將全部轉給 {to}（{toCode}），然後 {fromCode} 會被刪除。",
+    "inheritSourceHasAccount": "{name} 已經有自己的帳號，不能被繼承掉 —— 請改成選中「要丟掉的那個編號」再操作。"
   },
   "priceLog": {
     "title": {
@@ -725,7 +725,7 @@
     "renameConfirm": "將顯示為「{name}」"
   },
   "notice": {
-    "meetup2": "Meetup#2 活動報名開跑中，詳情請上 Plakoro Taiwan Line 詢問"
+    "current": "PLAKORO 攻略手冊即將上線，詳情請上 Plakoro Taiwan Line 詢問"
   },
   "gift": {
     "waiting": "{n} 份禮物",

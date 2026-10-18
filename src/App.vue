@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, provide, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCharacterData } from './composables/useCharacterData'
 import { useBattleState } from './composables/useBattleState'
@@ -104,9 +104,9 @@ const activeModalKey = computed(() => {
   return state.modals.A ? 'A' : (state.modals.B ? 'B' : null)
 })
 
-watch(() => t('appTitle'), (title) => {
-  document.title = title
-}, { immediate: true })
+// The page title is set once in index.html and left alone. It used to follow the locale, but
+// PLAKORO ARENA is a name, not a phrase — translating it only meant the browser tab disagreed
+// with the wordmark on the screen below it.
 
 onMounted(() => {
   characterData.loadData()
