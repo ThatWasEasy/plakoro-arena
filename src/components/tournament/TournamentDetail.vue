@@ -477,6 +477,16 @@ function toggleDropped(player) {
 
 const activeCount = computed(() => local.value.players.filter(p => !p.dropped).length)
 
+// The planned round count, changeable after the event. Lowering it to the number actually
+// played is how an event that ended early gets marked finished — placements are only computed
+// once rounds.length reaches this, and nothing is granted until placements exist.
+function setTotalRounds(value) {
+  const n = Math.trunc(Number(value))
+  if (!Number.isFinite(n) || n < 1 || n > 20) return
+  local.value.swissTotalRounds = n
+  emitUpdate()
+}
+
 let generating = false
 function generateNextRound() {
   if (generating || !canGenerateNext.value) return
@@ -735,6 +745,28 @@ function generateNextRound() {
       <!-- Player roster — rename anyone who registered under the wrong name/nickname. Renaming
            is safe at any point: matches/results are keyed by player id, never by name. -->
       <div v-else-if="subview === 'players'" style="display:flex; flex-direction:column; gap:0.375rem;">
+        <!-- Editable after the fact, not just at setup. An event that was planned for four
+             rounds and finished in three stays "unfinished" forever otherwise: no placements
+             are computed, so no placement prizes are ever granted — which is exactly what
+             happened to Meetup#2 雙打賽. -->
+        <label
+          v-if="local.format === 'swiss'"
+          style="display:flex; align-items:center; gap:0.5rem; padding:0.375rem 0.5rem; background:var(--card); border-radius:0.5rem; box-shadow:var(--shadow);"
+        >
+          <span style="font-size:0.6875rem; font-weight:800; color:var(--sub);">{{ t('tournament.setup.roundsLabel') }}</span>
+          <input
+            :value="local.swissTotalRounds"
+            type="number"
+            min="1"
+            max="20"
+            style="width:3.5rem; text-align:center; font-size:0.8125rem; font-weight:800; color:var(--ink); padding:0.25rem; border:0.125rem solid var(--line); border-radius:0.375rem; background:#fff; font-variant-numeric:tabular-nums;"
+            @input="setTotalRounds($event.target.value)"
+          >
+          <span style="font-size:0.625rem; font-weight:700; color:var(--sub);">
+            {{ t('tournament.detail.roundsPlayed', { n: local.rounds.length }) }}
+          </span>
+        </label>
+
         <div
           v-for="p in local.players"
           :key="p.id"

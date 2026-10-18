@@ -14,12 +14,28 @@ export function defaultTiers() {
   ]
 }
 
+// An instance used to carry one `type`; it now carries `types`, up to two, because a Pokémon
+// here can be single- or dual-typed. Migrated on read rather than by bumping the storage key:
+// the key holds somebody's whole tier list, and throwing that away to change the shape of one
+// field would be a poor trade.
+function withTypesArray(entries) {
+  const out = {}
+  for (const [tierId, list] of Object.entries(entries)) {
+    out[tierId] = (Array.isArray(list) ? list : []).map(e => {
+      if (Array.isArray(e.types)) return e
+      const { type, ...rest } = e
+      return { ...rest, types: type ? [type] : [] }
+    })
+  }
+  return out
+}
+
 export function loadTierMaker() {
   try {
     const raw = localStorage.getItem(TIER_MAKER_STORAGE_KEY)
     const parsed = raw ? JSON.parse(raw) : null
     if (!parsed || !Array.isArray(parsed.tiers) || typeof parsed.entries !== "object") return null
-    return parsed
+    return { ...parsed, entries: withTypesArray(parsed.entries) }
   } catch (e) {
     return null
   }

@@ -9,7 +9,8 @@
     "weaknessColon": "Weakness:",
     "and": "and",
     "cancel": "Cancel",
-    "methodology": "Methodology & assumptions"
+    "methodology": "Methodology & assumptions",
+    "close": "Close"
   },
   "app": {
     "loading": "NOW LOADING...",
@@ -430,7 +431,8 @@
       "codeChecking": "Checking",
       "codeNotFound": "No player with code {code}",
       "codeLookupFailed": "Lookup failed — try again",
-      "generateExtraRound": "Extra round"
+      "generateExtraRound": "Extra round",
+      "roundsPlayed": "{n} played"
     },
     "export": {
       "title": "Export tournament",
@@ -510,7 +512,8 @@
     "resetButton": "Clear all",
     "resetConfirm": "Tap again to confirm",
     "exportButton": "Export image",
-    "exporting": "Exporting…"
+    "exporting": "Exporting…",
+    "typeHint": "Pick up to {n} types — tap again to remove"
   },
   "solo": {
     "you": "You",

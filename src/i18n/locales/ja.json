@@ -9,7 +9,8 @@
     "weaknessColon": "弱点:",
     "and": "と",
     "cancel": "キャンセル",
-    "methodology": "計算方法と前提"
+    "methodology": "計算方法と前提",
+    "close": "閉じる"
   },
   "app": {
     "loading": "NOW LOADING...",
@@ -430,7 +431,8 @@
       "codeChecking": "照会中",
       "codeNotFound": "番号 {code} は見つかりません",
       "codeLookupFailed": "照会に失敗しました",
-      "generateExtraRound": "延長ラウンド"
+      "generateExtraRound": "延長ラウンド",
+      "roundsPlayed": "{n} ラウンド実施"
     },
     "export": {
       "title": "大会を書き出す",
@@ -510,7 +512,8 @@
     "resetButton": "配置をリセット",
     "resetConfirm": "もう一度タップで確定",
     "exportButton": "画像として書き出す",
-    "exporting": "書き出し中…"
+    "exporting": "書き出し中…",
+    "typeHint": "最大 {n} タイプ。もう一度タップで解除"
   },
   "solo": {
     "you": "あなた",

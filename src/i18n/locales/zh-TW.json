@@ -9,7 +9,8 @@
     "weaknessColon": "弱點：",
     "and": "和",
     "cancel": "取消",
-    "methodology": "計算方式與前提"
+    "methodology": "計算方式與前提",
+    "close": "關閉"
   },
   "app": {
     "loading": "載入中...",
@@ -430,7 +431,8 @@
       "codeChecking": "查詢中",
       "codeNotFound": "查不到編號 {code}",
       "codeLookupFailed": "查詢失敗，請再試一次",
-      "generateExtraRound": "加賽一輪"
+      "generateExtraRound": "加賽一輪",
+      "roundsPlayed": "已打 {n} 輪"
     },
     "export": {
       "title": "匯出賽事",
@@ -510,7 +512,8 @@
     "resetButton": "清空排列",
     "resetConfirm": "再按一次確定清空",
     "exportButton": "匯出圖片",
-    "exporting": "匯出中…"
+    "exporting": "匯出中…",
+    "typeHint": "最多選 {n} 種屬性，再點一次取消"
   },
   "solo": {
     "you": "你",

@@ -1,5 +1,5 @@
 <script setup>
-import { inject, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { asset } from '../data/assetPath'
 import { typeBgColor } from '../data/constants'
@@ -95,7 +95,7 @@ function placeInTier(tierId) {
     if (!character) return
     // Left unset rather than defaulting to the first option — a badge nobody chose isn't
     // information, and this way every visible badge actually means something.
-    const entry = { id: newInstanceId(), characterId: sel.characterId, type: null }
+    const entry = { id: newInstanceId(), characterId: sel.characterId, types: [] }
     entries.value = { ...entries.value, [tierId]: [...listFor(tierId), entry] }
     return
   }
@@ -129,18 +129,54 @@ function nudgeInstance(tierId, instanceId, delta) {
   entries.value = { ...entries.value, [tierId]: arr }
 }
 
-// Cycles unset -> first option -> ... -> last option -> unset, so "no badge" is always
-// reachable again rather than being a one-way trip off of a short list.
-function cycleBadge(tierId, instanceId) {
+const MAX_TYPES = 2
+
+// Always an array, including for instances saved before there was one.
+function typesOf(entry) {
+  return Array.isArray(entry.types) ? entry.types : (entry.type ? [entry.type] : [])
+}
+
+// Tapping the badge opens a picker rather than cycling to the next type.
+//
+// Cycling worked while a Pokémon had exactly one: tap until the right one shows. With two it
+// stops working — the combinations multiply and there is no way to see what you are cycling
+// past. The picker lays out every type this character could be built around and you tap the
+// ones you want.
+const picking = ref(null)   // { tierId, instanceId }
+
+function openPicker(tierId, instanceId) {
+  picking.value = { tierId, instanceId }
+}
+
+const pickingEntry = computed(() => {
+  if (!picking.value) return null
+  return listFor(picking.value.tierId).find(e => e.id === picking.value.instanceId) || null
+})
+
+const pickingCharacter = computed(() =>
+  pickingEntry.value ? characterById(pickingEntry.value.characterId) : null)
+
+const pickingOptions = computed(() =>
+  pickingCharacter.value ? typeOptionsFor(pickingCharacter.value) : [])
+
+// On when chosen, off when tapped again. Past two, the new one takes the second slot — the
+// first stays put, so changing your mind about the secondary never disturbs the main and no
+// tap is ever a dead one.
+function toggleType(type) {
+  const entry = pickingEntry.value
+  if (!entry) return
+  const { tierId } = picking.value
+  const current = typesOf(entry)
+  let next
+  if (current.includes(type)) next = current.filter(x => x !== type)
+  else if (current.length < MAX_TYPES) next = [...current, type]
+  else next = [current[0], type]
+
   const list = listFor(tierId)
-  const idx = list.findIndex(e => e.id === instanceId)
+  const idx = list.findIndex(e => e.id === entry.id)
   if (idx === -1) return
-  const entry = list[idx]
-  const options = typeOptionsFor(characterById(entry.characterId))
-  const at = entry.type === null ? -1 : options.indexOf(entry.type)
-  const nextType = at + 1 >= options.length ? null : options[at + 1]
   const arr = [...list]
-  arr[idx] = { ...entry, type: nextType }
+  arr[idx] = { ...entry, types: next }
   entries.value = { ...entries.value, [tierId]: arr }
 }
 
@@ -236,7 +272,7 @@ async function exportImage() {
     const neededTypes = new Set()
     tiers.value.forEach(tier => listFor(tier.id).forEach(e => {
       neededCharIds.add(e.characterId)
-      if (e.type) neededTypes.add(e.type)
+      typesOf(e).forEach(ty => neededTypes.add(ty))
     }))
     const charImageMap = {}
     const typeImageMap = {}
@@ -312,17 +348,19 @@ async function exportImage() {
         else { ctx.fillStyle = '#ddd'; ctx.fillRect(ax, ay, AVATAR, AVATAR) }
         ctx.restore()
 
-        if (e.type) {
+        // Bottom upward, matching the on-screen stack — sideways would reach over the avatar
+        // beside it.
+        typesOf(e).forEach((ty, i) => {
           const bx = ax + AVATAR - BADGE_R * 0.6
-          const by = ay + AVATAR - BADGE_R * 0.6
+          const by = ay + AVATAR - BADGE_R * 0.6 - i * (BADGE_R * 2 + 1)
           ctx.beginPath()
-          ctx.fillStyle = typeBgColor(e.type)
+          ctx.fillStyle = typeBgColor(ty)
           ctx.arc(bx, by, BADGE_R, 0, Math.PI * 2)
           ctx.fill()
           ctx.lineWidth = 1.5
           ctx.strokeStyle = '#fff'
           ctx.stroke()
-          const typeImg = typeImageMap[e.type]
+          const typeImg = typeImageMap[ty]
           if (typeImg) {
             ctx.save()
             ctx.beginPath()
@@ -332,7 +370,7 @@ async function exportImage() {
             ctx.drawImage(typeImg, bx - (BADGE_R - 2), by - (BADGE_R - 2), (BADGE_R - 2) * 2, (BADGE_R - 2) * 2)
             ctx.restore()
           }
-        }
+        })
         ax += AVATAR + GAP
       })
       y += height + GAP
@@ -393,13 +431,18 @@ async function exportImage() {
             >
               <img :src="characterById(e.characterId).imageUrl || asset(`image/CHARA/${characterById(e.characterId).name}.png`)" class="img-icon" :alt="characterById(e.characterId).name">
               <span v-if="isSelectedInstance(e.id)" class="tm-delete-badge" @click.stop="deleteInstance(tier.id, e.id)">✕</span>
-              <span
-                class="tm-badge"
-                :class="{ 'tm-badge-empty': !e.type }"
-                :style="e.type ? { background: typeBgColor(e.type) } : {}"
-                @click.stop="cycleBadge(tier.id, e.id)"
-              >
-                <img v-if="e.type" :src="asset(`image/ICON/${e.type}.png`)" class="img-icon" :alt="e.type">
+              <!-- One dot per type, up to two. The whole strip is the tap target, including
+                   when it is empty — an instance with no type still has to be reachable. -->
+              <span class="tm-badges" @click.stop="openPicker(tier.id, e.id)">
+                <span
+                  v-for="ty in typesOf(e)"
+                  :key="ty"
+                  class="tm-badge"
+                  :style="{ background: typeBgColor(ty) }"
+                >
+                  <img :src="asset(`image/ICON/${ty}.png`)" class="img-icon" :alt="ty">
+                </span>
+                <span v-if="!typesOf(e).length" class="tm-badge tm-badge-empty"></span>
               </span>
             </button>
             <button v-if="isSelectedInstance(e.id)" class="tm-nudge-btn" @click.stop="nudgeInstance(tier.id, e.id, 1)">▶</button>
@@ -441,6 +484,29 @@ async function exportImage() {
       <button class="btn secondary" @click="emit('back')">{{ t('common.back') }}</button>
     </div>
   </div>
+
+    <!-- Type picker. A sheet rather than a popover anchored to the dot: the dot is a quarter of
+         a thumb wide and sits inside a horizontally scrolling row, so anything hanging off it
+         would be both hard to hit and liable to be clipped. -->
+    <div v-if="picking" class="modal-overlay" style="align-items:center;" @click.self="picking = null">
+      <div class="modal-sheet tm-pick">
+        <div class="modal-title">{{ pickingCharacter?.name }}</div>
+        <p class="tm-pick-hint">{{ t('tierMaker.typeHint', { n: MAX_TYPES }) }}</p>
+        <div class="tm-pick-grid">
+          <button
+            v-for="ty in pickingOptions"
+            :key="ty"
+            :class="['tm-pick-chip', { on: typesOf(pickingEntry).includes(ty) }]"
+            :style="typesOf(pickingEntry).includes(ty) ? { background: typeBgColor(ty) } : {}"
+            @click="toggleType(ty)"
+          >
+            <img :src="asset(`image/ICON/${ty}.png`)" class="tm-pick-icon" :alt="ty">
+            <span>{{ ty }}</span>
+          </button>
+        </div>
+        <button class="btn secondary" @click="picking = null">{{ t('common.close') }}</button>
+      </div>
+    </div>
 </template>
 
 <style scoped>
@@ -473,7 +539,12 @@ async function exportImage() {
 
 .tm-tier-label {
   flex-shrink: 0;
-  width: 3rem;
+  /* Grows with the label instead of wrapping "全場最強" down four lines inside 3rem. Capped at
+     a third of the row so a long name can never squeeze the avatars out — past that it wraps,
+     which is the right failure for a name nobody should be writing an essay in. */
+  width: auto;
+  min-width: 3rem;
+  max-width: 33%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -488,7 +559,11 @@ async function exportImage() {
 }
 
 .tm-label-input {
+  /* field-sizing lets the box follow the text where it is supported; the ch floor keeps it
+     usable everywhere else. */
   width: 100%;
+  min-width: 2.5rem;
+  field-sizing: content;
   text-align: center;
   font-size: 0.8125rem;
   font-weight: 900;
@@ -533,18 +608,57 @@ async function exportImage() {
 .tm-avatar .img-icon { border-radius: 50%; overflow: hidden; }
 .tm-avatar-selected { border-color: var(--ink); transform: scale(1.08); }
 
-.tm-badge {
+/* Stacked down the right edge rather than along the bottom: a second dot placed sideways
+   reaches across the avatar next to it, and in a packed tier row that covers a face. Going
+   down only uses the space the avatar already occupies. */
+.tm-badges {
   position: absolute;
   right: -0.1875rem;
   bottom: -0.1875rem;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 0.0625rem;
+  z-index: 1;
+  cursor: pointer;
+}
+.tm-badge {
   width: 1rem;
   height: 1rem;
+  flex: none;
   border-radius: 50%;
   border: 0.09375rem solid #fff;
   overflow: hidden;
   display: block;
-  z-index: 1;
 }
+
+.tm-pick { width: 100%; max-width: 22rem; border-radius: 1rem; padding: 1rem; }
+.tm-pick-hint { margin: 0 0 0.75rem; text-align: center; font-size: 0.6875rem; font-weight: 700; color: var(--sub); }
+.tm-pick-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  justify-content: center;
+  margin-bottom: 0.875rem;
+}
+.tm-pick-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  /* Sized for a thumb — this is the part the request was about. */
+  padding: 0.4375rem 0.75rem;
+  border: 0.125rem solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+}
+.tm-pick-chip.on { border-color: var(--ink); }
+.tm-pick-chip:active { transform: scale(.96); }
+.tm-pick-icon { width: 1.125rem; height: 1.125rem; object-fit: contain; }
 /* No type picked yet — stay fully invisible rather than drawing an empty outline, so an unset
    badge doesn't read as its own bit of UI; the click target is still there, just unseen. */
 .tm-badge-empty {
