@@ -438,7 +438,8 @@
       "refreshPlates": "Refresh nameplates",
       "refreshingPlates": "Refreshing…",
       "refreshedPlates": "{n} updated",
-      "refreshPlatesWarn": "This event is over — pressing again rewrites how it looked that day"
+      "refreshPlatesWarn": "This event is over — pressing again rewrites how it looked that day",
+      "eventDate": "Event date"
     },
     "export": {
       "title": "Export tournament",

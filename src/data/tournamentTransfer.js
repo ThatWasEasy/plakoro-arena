@@ -22,6 +22,15 @@ function pad(n) {
   return String(n).padStart(2, '0')
 }
 
+// The day the event happened, which is not the day its file was created. They are usually the
+// same and were silently treated as the same for a long time — but a tournament built the night
+// before is dated a day early, and that date is what the leaderboard's weekly and monthly
+// windows slice on. `eventDate` is the organiser's answer when they have one; createdAt is the
+// guess to fall back on.
+export function eventDateOf(tournament) {
+  return isoDate(tournament?.eventDate || tournament?.createdAt)
+}
+
 export function isoDate(value) {
   const d = new Date(value || Date.now())
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -51,7 +60,7 @@ export function serialize(tournament) {
     exportedAt: new Date().toISOString(),
 
     name: tournament.name || '',
-    date: isoDate(tournament.createdAt),
+    date: eventDateOf(tournament),
     // Carried through rather than dropped. The tool never asks for a venue — it isn't needed to
     // run an event — but a file is also the record of one, and where it happened is the kind of
     // thing nobody can reconstruct a year later.
@@ -180,6 +189,9 @@ export function fromObject(data, { id } = {}) {
       id: id || crypto.randomUUID(),
       name: String(data.name || '').trim() || '(未命名)',
       createdAt: data.date ? new Date(`${data.date}T00:00:00`).toISOString() : new Date().toISOString(),
+      // Carried explicitly on the way in, so re-exporting cannot quietly round-trip it back
+      // into "whenever this copy was made".
+      ...(data.date ? { eventDate: data.date } : {}),
       ...(data.venue ? { venue: String(data.venue).trim() } : {}),
       format: system,
       ...(system === 'swiss' ? { swissTotalRounds: totalRounds } : {}),
@@ -191,7 +203,7 @@ export function fromObject(data, { id } = {}) {
 
 // A filename someone can recognise in a downloads folder a week later.
 export function fileName(tournament) {
-  const date = isoDate(tournament.createdAt).replace(/-/g, '')
+  const date = eventDateOf(tournament).replace(/-/g, '')
   const safe = String(tournament.name || 'tournament')
     .replace(/[\\/:*?"<>|]/g, '')
     .trim()
@@ -237,7 +249,7 @@ export function buildUploadPayload(tournament, rewardPackageId) {
   return {
     id: tournament.id,
     name: tournament.name || '',
-    date: isoDate(tournament.createdAt),
+    date: eventDateOf(tournament),
     venue: tournament.venue || null,
     format: tournament.format === 'elimination' ? 'elimination' : 'swiss',
     totalRounds: tournament.format === 'swiss' ? tournament.swissTotalRounds : (tournament.rounds || []).length,

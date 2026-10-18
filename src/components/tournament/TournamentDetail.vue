@@ -17,6 +17,7 @@ import {
   giveByeTo
 } from '../../game/tournamentPairing'
 import { parsePlayerLine } from '../../data/tournaments'
+import { eventDateOf } from '../../data/tournamentTransfer'
 import { ensureNameplates, lookupNameplate, lookupPlayerByCode, refreshNameplates } from '../../data/nameplateStore'
 import { renderRoundImage, renderStandingsImage, renderPlayerImage, sheetFileName, playerImageFileName } from '../../game/roundImage'
 import * as adminApi from '../../data/adminApi'
@@ -509,6 +510,18 @@ async function doRefreshPlates() {
   }
 }
 
+// The day the event happened. Defaults to the day the tournament was created here, which is
+// right when both are the same afternoon and wrong the moment a schedule is built the night
+// before — and this date is what the leaderboard's weekly and monthly windows slice on.
+const eventDate = computed(() => eventDateOf(local.value))
+
+function setEventDate(value) {
+  const v = String(value || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return
+  local.value.eventDate = v
+  emitUpdate()
+}
+
 // The planned round count, changeable after the event. Lowering it to the number actually
 // played is how an event that ended early gets marked finished — placements are only computed
 // once rounds.length reaches this, and nothing is granted until placements exist.
@@ -781,6 +794,16 @@ function generateNextRound() {
              rounds and finished in three stays "unfinished" forever otherwise: no placements
              are computed, so no placement prizes are ever granted — which is exactly what
              happened to Meetup#2 雙打賽. -->
+        <label style="display:flex; align-items:center; gap:0.5rem; padding:0.375rem 0.5rem; background:var(--card); border-radius:0.5rem; box-shadow:var(--shadow);">
+          <span style="font-size:0.6875rem; font-weight:800; color:var(--sub);">{{ t('tournament.detail.eventDate') }}</span>
+          <input
+            :value="eventDate"
+            type="date"
+            style="font-size:0.75rem; font-weight:700; color:var(--ink); padding:0.25rem 0.375rem; border:0.125rem solid var(--line); border-radius:0.375rem; background:#fff;"
+            @change="setEventDate($event.target.value)"
+          >
+        </label>
+
         <!-- Before the event: pull in whatever people are wearing now. -->
         <div style="display:flex; align-items:center; gap:0.5rem; padding:0.375rem 0.5rem; background:var(--card); border-radius:0.5rem; box-shadow:var(--shadow);">
           <button

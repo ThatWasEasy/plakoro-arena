@@ -438,7 +438,8 @@
       "refreshPlates": "更新所有名牌",
       "refreshingPlates": "更新中…",
       "refreshedPlates": "已更新 {n} 位",
-      "refreshPlatesWarn": "這場已結束，再按一次會改寫當天的樣子"
+      "refreshPlatesWarn": "這場已結束，再按一次會改寫當天的樣子",
+      "eventDate": "賽事日期"
     },
     "export": {
       "title": "匯出賽事",

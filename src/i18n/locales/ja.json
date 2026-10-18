@@ -438,7 +438,8 @@
       "refreshPlates": "名札を更新",
       "refreshingPlates": "更新中…",
       "refreshedPlates": "{n} 件更新",
-      "refreshPlatesWarn": "終了した大会です。もう一度押すと当日の表示が書き換わります"
+      "refreshPlatesWarn": "終了した大会です。もう一度押すと当日の表示が書き換わります",
+      "eventDate": "開催日"
     },
     "export": {
       "title": "大会を書き出す",
