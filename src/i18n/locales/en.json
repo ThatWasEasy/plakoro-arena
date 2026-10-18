@@ -432,7 +432,11 @@
       "codeNotFound": "No player with code {code}",
       "codeLookupFailed": "Lookup failed — try again",
       "generateExtraRound": "Extra round",
-      "roundsPlayed": "{n} played"
+      "roundsPlayed": "{n} played",
+      "refreshPlates": "Refresh nameplates",
+      "refreshingPlates": "Refreshing…",
+      "refreshedPlates": "{n} updated",
+      "refreshPlatesWarn": "This event is over — pressing again rewrites how it looked that day"
     },
     "export": {
       "title": "Export tournament",

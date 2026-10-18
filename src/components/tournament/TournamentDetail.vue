@@ -17,7 +17,7 @@ import {
   giveByeTo
 } from '../../game/tournamentPairing'
 import { parsePlayerLine } from '../../data/tournaments'
-import { ensureNameplates, lookupNameplate, lookupPlayerByCode } from '../../data/nameplateStore'
+import { ensureNameplates, lookupNameplate, lookupPlayerByCode, refreshNameplates } from '../../data/nameplateStore'
 import { renderRoundImage, renderStandingsImage, renderPlayerImage, sheetFileName, playerImageFileName } from '../../game/roundImage'
 import * as adminApi from '../../data/adminApi'
 import { adminToken, isAdminMode } from '../../data/adminSession'
@@ -477,6 +477,38 @@ function toggleDropped(player) {
 
 const activeCount = computed(() => local.value.players.filter(p => !p.dropped).length)
 
+// Re-take every player's nameplate from the server.
+//
+// Snapshots are taken once when a player is entered and then left alone — a finished event's
+// pairing sheet has to keep showing what people were wearing that afternoon. Before the event
+// that rule is backwards: someone who changed their flag this morning should appear in today's
+// pairings wearing it. This is that case, made explicit.
+//
+// Confirms first when the tournament is already finished, because then it really is rewriting
+// a record of a day that has passed.
+const refreshingPlates = ref(false)
+const refreshPlatesConfirm = ref(false)
+const refreshedCount = ref(null)
+
+function askRefreshPlates() {
+  if (complete.value && !refreshPlatesConfirm.value) { refreshPlatesConfirm.value = true; return }
+  doRefreshPlates()
+}
+
+async function doRefreshPlates() {
+  if (refreshingPlates.value) return
+  refreshingPlates.value = true
+  refreshPlatesConfirm.value = false
+  refreshedCount.value = null
+  try {
+    const n = await refreshNameplates(local.value.players)
+    refreshedCount.value = n
+    if (n > 0) emitUpdate()
+  } finally {
+    refreshingPlates.value = false
+  }
+}
+
 // The planned round count, changeable after the event. Lowering it to the number actually
 // played is how an event that ended early gets marked finished — placements are only computed
 // once rounds.length reaches this, and nothing is granted until placements exist.
@@ -749,6 +781,22 @@ function generateNextRound() {
              rounds and finished in three stays "unfinished" forever otherwise: no placements
              are computed, so no placement prizes are ever granted — which is exactly what
              happened to Meetup#2 雙打賽. -->
+        <!-- Before the event: pull in whatever people are wearing now. -->
+        <div style="display:flex; align-items:center; gap:0.5rem; padding:0.375rem 0.5rem; background:var(--card); border-radius:0.5rem; box-shadow:var(--shadow);">
+          <button
+            class="btn secondary"
+            style="padding:0.25rem 0.5rem; font-size:0.625rem; flex-shrink:0;"
+            :disabled="refreshingPlates"
+            @click="askRefreshPlates"
+          >{{ refreshingPlates ? t('tournament.detail.refreshingPlates') : t('tournament.detail.refreshPlates') }}</button>
+          <span v-if="refreshPlatesConfirm" style="font-size:0.625rem; font-weight:800; color:#C8203C;">
+            {{ t('tournament.detail.refreshPlatesWarn') }}
+          </span>
+          <span v-else-if="refreshedCount !== null" style="font-size:0.625rem; font-weight:700; color:var(--sub);">
+            {{ t('tournament.detail.refreshedPlates', { n: refreshedCount }) }}
+          </span>
+        </div>
+
         <label
           v-if="local.format === 'swiss'"
           style="display:flex; align-items:center; gap:0.5rem; padding:0.375rem 0.5rem; background:var(--card); border-radius:0.5rem; box-shadow:var(--shadow);"

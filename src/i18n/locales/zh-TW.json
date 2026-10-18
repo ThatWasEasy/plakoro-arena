@@ -432,7 +432,11 @@
       "codeNotFound": "查不到編號 {code}",
       "codeLookupFailed": "查詢失敗，請再試一次",
       "generateExtraRound": "加賽一輪",
-      "roundsPlayed": "已打 {n} 輪"
+      "roundsPlayed": "已打 {n} 輪",
+      "refreshPlates": "更新所有名牌",
+      "refreshingPlates": "更新中…",
+      "refreshedPlates": "已更新 {n} 位",
+      "refreshPlatesWarn": "這場已結束，再按一次會改寫當天的樣子"
     },
     "export": {
       "title": "匯出賽事",

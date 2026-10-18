@@ -89,6 +89,39 @@ export async function lookupPlayerByCode(code) {
 }
 
 /**
+ * Re-take every snapshot, overwriting what is already there. Returns how many changed.
+ *
+ * The opposite of ensureNameplates below, and deliberately a separate function with a louder
+ * name — "silently rewriting history" is the thing that one exists to prevent, and this is the
+ * button that does it on purpose.
+ *
+ * It is for before the event, not after. A player who changed their flag this morning should
+ * appear in today's pairings wearing it; last month's pairing sheet should not quietly change
+ * because of it. Nothing stops an organiser pressing this on a finished tournament, so the
+ * screen asks first.
+ *
+ * Players with no code are left alone: there is nothing on file to re-take.
+ */
+export async function refreshNameplates(players = []) {
+  const coded = players.filter(p => String(p?.code || '').trim())
+  if (!coded.length) return 0
+  const found = await fetchNameplates(coded)
+  let changed = 0
+  coded.forEach(p => {
+    const plate = found[String(p.code).trim().toUpperCase()]
+    if (!plate) return
+    // Compared before assigning, so the count means "actually different" rather than
+    // "we asked" — the screen reports it to a person who wants to know if anything moved.
+    const before = JSON.stringify(p.nameplate || null)
+    if (before === JSON.stringify(plate) && p.name === plate.name) return
+    p.nameplate = plate
+    if (plate.name) p.name = plate.name
+    changed++
+  })
+  return changed
+}
+
+/**
  * Attach snapshots to a tournament's players, in place. Returns true if anything changed, so the
  * caller knows whether the tournament is worth saving again.
  *

@@ -432,7 +432,11 @@
       "codeNotFound": "番号 {code} は見つかりません",
       "codeLookupFailed": "照会に失敗しました",
       "generateExtraRound": "延長ラウンド",
-      "roundsPlayed": "{n} ラウンド実施"
+      "roundsPlayed": "{n} ラウンド実施",
+      "refreshPlates": "名札を更新",
+      "refreshingPlates": "更新中…",
+      "refreshedPlates": "{n} 件更新",
+      "refreshPlatesWarn": "終了した大会です。もう一度押すと当日の表示が書き換わります"
     },
     "export": {
       "title": "大会を書き出す",
