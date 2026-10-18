@@ -17,6 +17,13 @@
 export function pointReason(e, t) {
   const src = e?.src || ''
 
+  // Written beats derived, whatever kind of row this is. The derived wording names the
+  // tournament, which is right when the two tournaments at one meetup awarded different
+  // things — and wrong for an award that belongs to the meetup rather than to either of them.
+  // Writing the reason down is how that gets said; this is the line that lets it be heard.
+  const written = (e?.note || e?.reason || '').trim()
+  if (written) return written
+
   if (src.startsWith('auto:')) {
     const name = e.tournament_name || t('points.fromEvent')
     // Everything automatic is one of the two placement tiers. Participation is the one that
@@ -26,7 +33,6 @@ export function pointReason(e, t) {
       : t('points.fromPlace', { name })
   }
 
-  // Hand-adjusted. The organiser's own words if there are any — a deduction always has them,
-  // since what was redeemed is recorded here or nowhere.
-  return (e?.note || e?.reason || '').trim() || t('points.fromGrant')
+  // Hand-adjusted with nothing written down.
+  return t('points.fromGrant')
 }
