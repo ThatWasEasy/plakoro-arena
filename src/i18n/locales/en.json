@@ -184,12 +184,15 @@
     "claimMinting": "Issuing…",
     "claimHint": "Send it to them; they enter it under \"Claim an existing record\" on the login page. Expires in 14 days.",
     "inherit": "Inherit records",
-    "inheritFrom": "Source code",
+    "inheritFrom": "Old code to delete",
     "inheritDo": "Confirm",
     "inheritBusy": "Merging…",
-    "inheritWarn": "The source player's entries, matches and items all move to this player, and the source row is deleted.",
+    "inheritWarn": "Enter the OLD code being given up. Its entries, matches, items and PTP all move to {keep} ({keepCode}), and that code is then deleted.",
     "inheritDone": "Moved: {entries} entries, {matches} matches, {unlocks} items, {points} PTP entries",
-    "searchTruncated": "Showing the first {n} — type a code or name to narrow it down"
+    "searchTruncated": "Showing the first {n} — type a code or name to narrow it down",
+    "inheritWillDelete": "⚠ Will delete: {name} ({code}) — the code disappears once its record moves",
+    "inheritNotFound": "No player with code {code}",
+    "inheritHasAccount": "{name} has their own account and cannot be deleted — merge the other way round"
   },
   "priceLog": {
     "title": {

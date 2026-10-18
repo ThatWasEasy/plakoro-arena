@@ -64,6 +64,7 @@ async function select(code) {
   inheritFrom.value = ''
   inheritError.value = ''
   inheritDone.value = null
+  inheritLookup.value = null
   detail.value = null
   pointsDelta.value = ''
   pointsReason.value = ''
@@ -133,11 +134,41 @@ const claimError = ref('')
 
 // Merging two codes that turned out to be the same person. Destructive and not reversible
 // from here, so it asks for the source twice over: typing the code is the confirmation.
+// Who the typed code actually belongs to.
+//
+// This action deletes that player, and a code is six digits with no redundancy — one wrong
+// keystroke names somebody else entirely. Looking it up and showing the name turns "I typed
+// what I meant to" into "I can see who this is", which is the only check that catches a typo
+// that happens to be a real code.
+const inheritLookup = ref(null)   // { name, hasAccount } | 'missing' | null
+let inheritTimer = null
+
+function onInheritInput() {
+  inheritLookup.value = null
+  inheritError.value = ''
+  clearTimeout(inheritTimer)
+  const code = inheritFrom.value.trim().toUpperCase()
+  if (!code) return
+  inheritTimer = setTimeout(async () => {
+    try {
+      const d = await adminApi.getPlayer(adminToken.value, code)
+      if (inheritFrom.value.trim().toUpperCase() !== code) return
+      inheritLookup.value = { name: d.player.name, hasAccount: d.hasAccount }
+    } catch (e) {
+      if (inheritFrom.value.trim().toUpperCase() === code) inheritLookup.value = 'missing'
+    }
+  }, 350)
+}
+
 const inheritOpen = ref(false)
 const inheritFrom = ref('')
 const inheritBusy = ref(false)
 const inheritError = ref('')
 const inheritDone = ref(null)
+
+// Nothing to press until the code resolves to a real player who can actually be merged away.
+const inheritReady = computed(() =>
+  !!inheritLookup.value && inheritLookup.value !== 'missing' && !inheritLookup.value.hasAccount)
 
 async function doInherit() {
   const from = inheritFrom.value.trim().toUpperCase()
@@ -347,19 +378,35 @@ async function toggle(kind, asset) {
           </div>
 
           <div v-if="inheritOpen" class="as-inherit">
-            <p class="as-inherit-warn">{{ t('admin.inheritWarn') }}</p>
+            <p class="as-inherit-warn">
+              {{ t('admin.inheritWarn', { keep: detail.player.name, keepCode: selectedCode }) }}
+            </p>
             <div class="as-inherit-row">
               <input
                 v-model="inheritFrom"
                 class="as-input as-inherit-input"
                 :placeholder="t('admin.inheritFrom')"
                 maxlength="12"
+                @input="onInheritInput"
                 @keyup.enter="doInherit"
               >
-              <button class="btn as-claim-btn" :disabled="!inheritFrom.trim() || inheritBusy" @click="doInherit">
-                {{ inheritBusy ? t('admin.inheritBusy') : t('admin.inheritDo') }}
-              </button>
+              <button
+                class="btn fail as-claim-btn"
+                :disabled="!inheritReady || inheritBusy"
+                @click="doInherit"
+              >{{ inheritBusy ? t('admin.inheritBusy') : t('admin.inheritDo') }}</button>
             </div>
+            <!-- Says the name out loud before anything happens. A code that resolves to the
+                 wrong person is the failure this is here to catch. -->
+            <p v-if="inheritLookup === 'missing'" class="as-error">
+              {{ t('admin.inheritNotFound', { code: inheritFrom.trim().toUpperCase() }) }}
+            </p>
+            <p v-else-if="inheritLookup && inheritLookup.hasAccount" class="as-error">
+              {{ t('admin.inheritHasAccount', { name: inheritLookup.name }) }}
+            </p>
+            <p v-else-if="inheritLookup" class="as-inherit-warn">
+              {{ t('admin.inheritWillDelete', { name: inheritLookup.name, code: inheritFrom.trim().toUpperCase() }) }}
+            </p>
             <span v-if="inheritError" class="as-error">{{ inheritError }}</span>
           </div>
 
