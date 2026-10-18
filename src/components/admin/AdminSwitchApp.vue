@@ -23,6 +23,9 @@ const query = ref('')
 const results = ref([])
 const busySearch = ref(false)
 
+// Whether the server had more to give. Without saying so, a cut-off list reads as the whole
+// roster — which is how a player who is definitely on file looks deleted.
+const resultsTruncated = ref(false)
 const selectedCode = ref(null)
 const detail = ref(null)
 const busyDetail = ref(false)
@@ -31,10 +34,12 @@ const detailError = ref('')
 async function runSearch() {
   busySearch.value = true
   try {
-    const { players } = await adminApi.searchPlayers(adminToken.value, query.value.trim())
+    const { players, truncated } = await adminApi.searchPlayers(adminToken.value, query.value.trim())
     results.value = players
+    resultsTruncated.value = !!truncated
   } catch (e) {
     results.value = []
+    resultsTruncated.value = false
   } finally {
     busySearch.value = false
   }
@@ -257,6 +262,7 @@ async function toggle(kind, asset) {
           <span class="as-result-code">{{ p.code }}</span>
         </button>
         <p v-if="!busySearch && !results.length" class="as-empty">{{ t('admin.noResults') }}</p>
+        <p v-else-if="resultsTruncated" class="as-empty">{{ t('admin.searchTruncated', { n: results.length }) }}</p>
       </div>
 
       <div v-if="selectedCode" class="as-detail">
