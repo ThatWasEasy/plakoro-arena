@@ -141,9 +141,9 @@ const claimError = ref('')
 // account that keeps everything. (The API takes it the other way round — target in the path,
 // source in the body — so doInherit swaps them.)
 //
-// A code is six digits with no redundancy, so one wrong keystroke names somebody else who
-// really exists. Looking it up and showing the name turns "I typed what I meant to" into
-// "I can see who this is", which is the only check that catches that.
+// A code is six digits with no redundancy, so one wrong keystroke sends the record to somebody
+// else who really exists. Looking it up and showing the name turns "I typed what I meant to"
+// into "I can see who this is", which is the only check that catches that.
 const inheritLookup = ref(null)   // { name, hasAccount } | 'missing' | null
 let inheritTimer = null
 
@@ -171,13 +171,9 @@ const inheritError = ref('')
 const inheritDone = ref(null)
 
 // Nothing to press until the typed code resolves to a real player to hand the record to.
-// Unlike before, that player's own account is fine — they are the one keeping it.
+// Either side having its own login is fine now: nothing is deleted, so no login breaks.
 const inheritReady = computed(() =>
-  !!inheritLookup.value && inheritLookup.value !== 'missing' && !sourceHasAccount.value)
-
-// The player on screen is the one being deleted, so they must not have a login — the server
-// refuses it anyway (409), and saying so before the press is better than after.
-const sourceHasAccount = computed(() => !!detail.value?.hasAccount)
+  !!inheritLookup.value && inheritLookup.value !== 'missing')
 
 async function doInherit() {
   const keeper = inheritFrom.value.trim().toUpperCase()
@@ -194,8 +190,8 @@ async function doInherit() {
     inheritFrom.value = ''
     inheritLookup.value = null
     inheritOpen.value = false
-    // The player who was on screen no longer exists, so the screen follows the record to where
-    // it went rather than sitting on a 404.
+    // The record moved, so the screen follows it. The old code still exists — now empty — and
+    // staying on it would just show a blank profile.
     selectedCode.value = keeper
     detail.value = await adminApi.getPlayer(adminToken.value, keeper)
     await runSearch()
@@ -411,10 +407,7 @@ async function toggle(kind, asset) {
                 @click="doInherit"
               >{{ inheritBusy ? t('admin.inheritBusy') : t('admin.inheritDo') }}</button>
             </div>
-            <p v-if="sourceHasAccount" class="as-error">
-              {{ t('admin.inheritSourceHasAccount', { name: detail.player.name }) }}
-            </p>
-            <p v-else-if="inheritLookup === 'missing'" class="as-error">
+            <p v-if="inheritLookup === 'missing'" class="as-error">
               {{ t('admin.inheritNotFound', { code: inheritFrom.trim().toUpperCase() }) }}
             </p>
             <!-- Both names, out loud, before anything happens. A code that resolves to the
@@ -546,8 +539,18 @@ async function toggle(kind, asset) {
   background: var(--card);
 }
 .as-inherit-warn { margin: 0; font-size: 0.5625rem; color: #C0392B; font-weight: 700; line-height: 1.6; }
-.as-inherit-row { display: flex; gap: 0.375rem; align-items: center; }
-.as-inherit-input { width: 8rem; font-size: 0.75rem; padding: 0.3125rem 0.4375rem; text-transform: uppercase; }
+.as-inherit-row { display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; }
+/* The whole row is set at one size. The label had no rule at all and so came out at the board's
+   default — nearly half as large again as the field beside it, which read as emphasis nobody
+   asked for. */
+.as-inherit-from { font-size: 0.6875rem; font-weight: 800; color: var(--ink); white-space: nowrap; }
+.as-inherit-input {
+  width: 6.5rem;
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.375rem;
+  text-transform: uppercase;
+}
+.as-inherit-row .as-claim-btn { padding: 0.25rem 0.5rem; font-size: 0.625rem; }
 
 /* PTP sits directly under the stats line: it is another fact about this player, and the two
    get read together when somebody asks what they are owed. */

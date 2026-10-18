@@ -185,14 +185,13 @@
     "inherit": "記録を引き継ぐ",
     "inheritDo": "実行",
     "inheritBusy": "処理中…",
-    "inheritWarn": "この記録を受け取るアカウントの番号を入力してください。移行後、表示中の番号は削除されます。",
+    "inheritWarn": "この記録を受け取るアカウントの番号を入力してください。表示中の番号は削除されず、空の記録になります。",
     "inheritDone": "移動：参加 {entries}・対戦 {matches}・アイテム {unlocks}・PTP {points} 件",
     "searchTruncated": "先頭 {n} 件のみ表示。番号か名前で絞り込んでください",
     "inheritNotFound": "番号 {code} は見つかりません",
     "inheritFromLabel": "{name}（{code}）の記録を引き継ぐ →",
     "inheritTo": "受け取る番号",
-    "inheritConfirm": "⚠ {from}（{fromCode}）の参加記録・対戦・アイテム・PTP はすべて {to}（{toCode}）へ移り、{fromCode} は削除されます。",
-    "inheritSourceHasAccount": "{name} は自分のアカウントを持っているため統合できません — 手放す側の番号を選んでください。"
+    "inheritConfirm": "⚠ {from}（{fromCode}）の参加記録・対戦・アイテム・PTP はすべて {to}（{toCode}）へ移ります。{fromCode} は残りますが空になります。"
   },
   "priceLog": {
     "title": {

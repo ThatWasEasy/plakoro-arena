@@ -185,14 +185,13 @@
     "inherit": "Inherit records",
     "inheritDo": "Confirm",
     "inheritBusy": "Merging…",
-    "inheritWarn": "Enter the code of the account that should receive this record. The code on screen is deleted afterwards.",
+    "inheritWarn": "Enter the code of the account that should receive this record. The code on screen is kept, just emptied.",
     "inheritDone": "Moved: {entries} entries, {matches} matches, {unlocks} items, {points} PTP entries",
     "searchTruncated": "Showing the first {n} — type a code or name to narrow it down",
     "inheritNotFound": "No player with code {code}",
     "inheritFromLabel": "{name} ({code}) hands everything over to →",
     "inheritTo": "Receiving code",
-    "inheritConfirm": "⚠ {from} ({fromCode}) — entries, matches, items and PTP all move to {to} ({toCode}), then {fromCode} is deleted.",
-    "inheritSourceHasAccount": "{name} has their own account and cannot be merged away — select the code being given up instead."
+    "inheritConfirm": "⚠ {from} ({fromCode}) — entries, matches, items and PTP all move to {to} ({toCode}). {fromCode} stays, but empty."
   },
   "priceLog": {
     "title": {
