@@ -756,5 +756,26 @@
   },
   "online": {
     "underConstruction": "還在做。這個畫面只有主辦看得到。"
+  },
+  "leaderboard": {
+    "title": "排行榜",
+    "loading": "載入中…",
+    "empty": "還沒有任何比賽紀錄",
+    "scoring": "勝 3 分、和 1 分、輪空 3 分 · 僅計線下賽事",
+    "record": "{w}勝 {l}敗 {d}和",
+    "myRank": "第 {n} 名",
+    "points": "{n} 分",
+    "notRanked": "你還沒有線下比賽紀錄",
+    "window": {
+      "month": "本月",
+      "year": "今年",
+      "all": "總排行"
+    },
+    "scope": {
+      "offline": "線下賽事",
+      "online": "線上賽事"
+    },
+    "comingSoon": "線上對戰即將上線",
+    "notRankedOnline": "你還沒有線上對戰紀錄"
   }
 }

@@ -757,5 +757,26 @@
   },
   "online": {
     "underConstruction": "Still being built. Only the organiser can see this screen."
+  },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "loading": "Loading…",
+    "empty": "No matches recorded yet",
+    "scoring": "Win 3 · Draw 1 · Bye 3 — offline events only",
+    "record": "{w}W {l}L {d}D",
+    "myRank": "#{n}",
+    "points": "{n} pts",
+    "notRanked": "You have no offline matches yet",
+    "window": {
+      "month": "This month",
+      "year": "This year",
+      "all": "All time"
+    },
+    "scope": {
+      "offline": "Offline events",
+      "online": "Online battles"
+    },
+    "comingSoon": "Online battle is coming soon",
+    "notRankedOnline": "You have no online battles yet"
   }
 }

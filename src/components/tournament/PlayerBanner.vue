@@ -99,6 +99,9 @@ const top3 = computed(() => {
   border: var(--border) solid rgba(255, 255, 255, 0.22);
   box-shadow: 0 0.0625rem 0.1875rem rgba(60, 60, 50, 0.3);
 }
+/* Sizes live here, not in each caller's stylesheet. Overriding --h from outside looks like it
+   works and then does not: the width is derived from it, so a consumer that also sets `width`
+   breaks the 8:3 the artwork is drawn at. */
 .flag.lg { --h: 4.5rem; }
 
 .scrim {

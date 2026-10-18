@@ -184,8 +184,10 @@ const rows = computed(() => {
       <button class="btn secondary" @click="openGroup = null">{{ t('common.back') }}</button>
     </div>
 
-    <!-- The group's own mark, in the corner. Same destination as the Line card above, offered
-         as the thing people actually recognise rather than as a second labelled button. -->
+    <!-- Corner marks. Out of flow on purpose: they are decoration laid over the board, and as
+         flex children they took their height straight out of the card grid — adding the second
+         one shrank every card from 54px to 21px. Absolute, they cost the layout nothing and can
+         be whatever size suits them. -->
     <div class="mode-mark-row">
       <!-- Bottom left, opposite the Line mark, and only when something is waiting. An unopened
            prize should be the hardest thing on this screen to miss — tucked into a dot on the
@@ -194,16 +196,24 @@ const rows = computed(() => {
         <Icon class="mode-gift-icon" name="gift" />
         <span class="mode-gift-label">{{ t('gift.waiting', { n: giftCount }) }}</span>
       </button>
-      <a
-        class="mode-mark"
-        :href="LINE_URL"
-        target="_blank"
-        rel="noopener noreferrer"
-        :aria-label="t('mode.line')"
-      >
-        <img src="../assets/logo.png" alt="" aria-hidden="true">
-        <span class="mode-mark-bubble">{{ t('mode.lineJoin') }}</span>
-      </a>
+      <!-- Stacked above the Line mark rather than placed beside it: both are marks in the
+           same corner, and a second one on the same line would read as a pair of equals. -->
+      <div class="mode-marks">
+        <button class="mode-mark" :aria-label="t('leaderboard.title')" @click="emit('pick', 'leaderboard')">
+          <img src="../assets/images/leaderboard.png" alt="" aria-hidden="true">
+          <span class="mode-mark-bubble mode-mark-bubble-lb">{{ t('leaderboard.title') }}</span>
+        </button>
+        <a
+          class="mode-mark"
+          :href="LINE_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+          :aria-label="t('mode.line')"
+        >
+          <img src="../assets/logo.png" alt="" aria-hidden="true">
+          <span class="mode-mark-bubble">{{ t('mode.lineJoin') }}</span>
+        </a>
+      </div>
     </div>
 
     <!-- Announcements. The track holds as many copies as it takes to stay covered, and slides
@@ -349,15 +359,17 @@ const rows = computed(() => {
 
 .mode-grid {
   --gap: 0.625rem;
-  flex: 7 1 0%;
+  /* The one elastic box on the screen. The title above it and the ticker below are both fixed,
+     so every change — a mode added, a corner mark resized — lands here and nothing else moves. */
+  flex: 1 1 0%;
   min-height: 0;
   width: 100%;
   max-width: 23rem;
   display: flex;
   flex-direction: column;
-  /* Rows collect at the bottom of this slice rather than the middle of it, which is the only
-     thing "anchored toward the ticker" can mean now that the slice itself is fixed-size. */
-  justify-content: flex-end;
+  /* Rows start at the top. Adding a mode makes each card a little shorter rather than pushing
+     the whole block down toward the ticker. */
+  justify-content: flex-start;
   gap: var(--gap);
   padding: 0.25rem 0;
 }
@@ -451,14 +463,26 @@ const rows = computed(() => {
    (small, roughly even) difference, is what actually keeps every section's content inside its
    own box. */
 .mode-mark-row {
-  flex: 0 0 auto;
-  width: 100%;
+  /* Anchored to the board's bottom-right, above the ticker. `bottom` clears the ticker and the
+     credit line beneath it; the marks sit in the empty band between the cards and the ticker,
+     which is space the grid was never using. */
+  position: absolute;
+  left: 0;
+  /* Inset from the edge rather than flush against it — the board's own side padding stops at
+     the flow content, and an absolutely positioned strip would otherwise sit tight to the
+     screen edge while everything else breathes. */
+  right: 0.75rem;
+  bottom: 4.25rem;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   /* The gift grows leftward via its own auto margin rather than `space-between`, which would
      shove the Line mark across whenever no gift is waiting. */
   justify-content: flex-end;
+  pointer-events: none;
 }
+/* Only the marks themselves take clicks — the strip spans the board and would otherwise
+   swallow taps aimed at the cards behind it. */
+.mode-mark-row > * { pointer-events: auto; }
 
 /* Loud on purpose, and animated until it is opened — the reason grants moved out of the
    profile screen is that nobody noticed them there. */
@@ -494,10 +518,25 @@ const rows = computed(() => {
 }
 
 /* Mark and bubble are one target: the whole thing is the invitation, so either half opens it. */
+/* The two marks share a column. Back at full size now that the strip is out of flow and the
+   height costs the cards nothing. */
+.mode-marks {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4375rem;
+}
+
 .mode-mark {
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* It is a <button> for the leaderboard and an <a> for Line; neither should look like either. */
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
   /* Leaves the tail somewhere to sit without it touching the artwork. */
   gap: 0.3125rem;
   text-decoration: none;
@@ -519,6 +558,14 @@ const rows = computed(() => {
   white-space: nowrap;
 }
 
+/* The leaderboard is a screen in this app, not an outside service, so it wears the app's own
+   ink rather than borrowing a brand's colour.
+   No tail either: the Line bubble is speaking for a mark that stands for somewhere else, while
+   this one is just the label of the button it sits under — a pointer back at its own artwork
+   says nothing. */
+.mode-mark-bubble-lb { background: #1F1F1D; }
+.mode-mark-bubble-lb::before { content: none; }
+
 /* The tail, pointing back up at the mark it is speaking for. */
 .mode-mark-bubble::before {
   content: '';
@@ -539,9 +586,12 @@ const rows = computed(() => {
   width: auto;
 }
 
+/* Fixed height, and the only thing on this screen that is pinned. It used to be flex: 1, so
+   anything above it changing size moved it — the ticker is the last line before the credit and
+   has no business drifting because a mode was added or a corner mark moved out of flow. */
 .mode-ticker {
-  flex: 1 1 0%;
-  min-height: 0;
+  flex: none;
+  height: 1.5rem;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -609,8 +659,10 @@ const rows = computed(() => {
    — the grid sitting closer to the ticker now leaves this less room, and clipped attribution
    text is worse than small attribution text. */
 .mode-select .select-credit {
-  flex: 1 1 0%;
-  min-height: 0;
+  /* Natural height, not a share of what's left. It used to grow, which meant it and the grid
+     split the slack between them — so the ticker and the credit floated in the middle of the
+     screen instead of sitting at the bottom of it. The grid is the only elastic box here. */
+  flex: none;
   display: flex;
   flex-direction: column;
   justify-content: center;

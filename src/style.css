@@ -18,8 +18,12 @@
   --ink:#3A3A3A;
   --sub:#9A9A93;
   --line:#ECEAE3;
-  --accent:#BFE3D0;
-  --accent-strong:#8FCDA9;
+  /* Selected / focused, in the app's own language rather than a colour borrowed from nowhere.
+     These were a sage green that appeared in no artwork, no button and no logo — it read as a
+     third brand colour every time it showed up. The fill is a pale tint of the lime the primary
+     buttons already use; the line is the same ink as the ticker and the dark pills. */
+  --accent:#EDF7D6;
+  --accent-strong:#1F1F1D;
   --danger:#F3A8A8;
   --heal:#9FD6B5;
   --amp:#B6E28E;

@@ -79,7 +79,7 @@ function pick(node) {
             :key="line.key"
             :d="line.d"
             fill="none"
-            :stroke="line.active ? '#8FCDA9' : '#DEDACD'"
+            :stroke="line.active ? '#1F1F1D' : '#DEDACD'"
             :stroke-width="line.active ? 0.1875 : 0.125"
           />
         </svg>
@@ -99,7 +99,7 @@ function pick(node) {
             background: 'var(--card)',
             cursor: nodeStatus(node) === 'reachable' ? 'pointer' : 'default',
             opacity: nodeStatus(node) === 'locked' ? 0.35 : 1,
-            border: nodeStatus(node) === 'current' ? '0.09375rem solid #AEFF3E' : (nodeStatus(node) === 'reachable' ? '0.09375rem solid #8FCDA9' : '0.09375rem solid transparent')
+            border: nodeStatus(node) === 'current' ? '0.09375rem solid #AEFF3E' : (nodeStatus(node) === 'reachable' ? '0.09375rem solid #1F1F1D' : '0.09375rem solid transparent')
           }"
           @click="pick(node)"
         >

@@ -29,7 +29,9 @@ const traits = computed(() => (selected.value ? traitsOf(selected.value.id) : nu
 // The chart wears the character's own type colour, so the shape and the portrait beside it
 // read as one thing. The solid chip colour rather than the pale portrait background: a 35%
 // fill of an already-pale colour disappears against the card.
-const tint = computed(() => (selected.value ? typeChipColor(selected.value.type) : '#8FCDA9'))
+// Falls back to the ink the rest of the app outlines things with, not to a colour that
+// appears nowhere else.
+const tint = computed(() => (selected.value ? typeChipColor(selected.value.type) : '#1F1F1D'))
 
 // --- chart geometry ---
 //

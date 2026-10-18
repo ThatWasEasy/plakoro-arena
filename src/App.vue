@@ -8,6 +8,7 @@ import { useStageLayout } from './composables/useStageLayout'
 import Board from './components/Board.vue'
 import OnlineRoomPanel from './components/OnlineRoomPanel.vue'
 import OnlineApp from './components/online/OnlineApp.vue'
+import LeaderboardApp from './components/LeaderboardApp.vue'
 import FirstPickWheel from './components/FirstPickWheel.vue'
 import SelectBoard from './components/SelectBoard.vue'
 import MoveSelectPanel from './components/MoveSelectPanel.vue'
@@ -185,6 +186,7 @@ onBeforeUnmount(uninstallButtonSfx)
       <PlayerProfileApp v-else-if="mode === 'profile'" @back="leaveMode()" />
       <GiftRevealApp v-else-if="mode === 'gifts'" @back="leaveMode()" />
       <OnlineApp v-else-if="mode === 'online'" @back="leaveMode()" />
+      <LeaderboardApp v-else-if="mode === 'leaderboard'" @back="leaveMode()" />
 
       <!-- Signing in lands on the main screen, not the profile. Signing in is how you reach
            everything, not a visit to one screen — and the gift badge only exists out there, so
