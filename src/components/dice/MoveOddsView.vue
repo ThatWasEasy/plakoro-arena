@@ -8,6 +8,7 @@ import { moveExpectedValue } from '../../game/moveExpectedValue'
 import { buildTempoTable } from '../../game/tempoValue'
 import { ASSUMED_ENEMY_LAST_DAMAGE } from '../../game/suggestedDice'
 import MoveCard from '../MoveCard.vue'
+import html2canvas from 'html2canvas'
 
 // Which dice sets exist upstream, and their labels, so this view can report a move's odds
 // under each configuration side by side.
@@ -162,7 +163,11 @@ function successText(row, si) {
     const j = entry.joint[si]
     parts.push(oddsText(j.payable, j.total))
   })
-  return parts.join('/')
+  // Counts-on readings already contain their own "/" (as in "120/216"), so joining those with
+  // "/" too reads as one long ambiguous fraction. "・" stays a list separator either way; plain
+  // percentages have no "/" of their own, so "/" is left alone there since it's shorter and
+  // already unambiguous.
+  return parts.join(showCounts.value ? '・' : '/')
 }
 
 // Rounding leaves the odd -0.00000001 behind, which would print as a startling "-0.0".
@@ -273,6 +278,35 @@ const moveRows = computed(() => {
   return rows
 })
 
+// Snapshots the character header + dice controls + move list as a PNG, so a player can share
+// exactly the reading they're looking at (this build, this character) without a screenshot
+// tool cropping in the surrounding UI chrome. Excludes the "Back" button below it on purpose —
+// that control has no meaning once this is a static image.
+const exportTargetRef = ref(null)
+const exporting = ref(false)
+
+async function exportImage() {
+  if (!exportTargetRef.value || exporting.value) return
+  exporting.value = true
+  try {
+    const canvas = await html2canvas(exportTargetRef.value, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true
+    })
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `plakoro-move-odds-${selectedCharacter.value.name}.png`
+    a.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    exporting.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -300,6 +334,7 @@ const moveRows = computed(() => {
 
     <!-- odds table -->
     <template v-else>
+      <div ref="exportTargetRef" style="display:flex; flex-direction:column; align-items:center; width:100%;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; width:100%; max-width:40rem; padding:0 0.625rem 0.5rem;">
         <div style="display:flex; align-items:center; gap:0.375rem;">
           <div style="width:2rem; height:2rem; border-radius:0.375rem; overflow:hidden; flex-shrink:0;">
@@ -339,6 +374,9 @@ const moveRows = computed(() => {
           </label>
           <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="showSettings = !showSettings">
             {{ t('diceBuilder.moveOdds.settings') }}
+          </button>
+          <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" :disabled="exporting" @click="exportImage">
+            {{ exporting ? t('diceBuilder.moveOdds.exportingImage') : t('diceBuilder.moveOdds.exportImage') }}
           </button>
         </div>
       </div>
@@ -414,23 +452,34 @@ const moveRows = computed(() => {
                  right edge; a single set already fills the width on its own, and a second
                  set gets its own row underneath rather than squeezing both into one line -->
             <div style="display:flex; flex-direction:column; gap:0.125rem;">
+              <!-- Counts make the success reading long, sometimes several payable/total pairs
+                   long — one per character-die effect — so it stacks above the expected value
+                   instead of sharing a line with it, which is what used to send the two
+                   crashing into each other once the text outgrew the row's width. -->
               <div
                 v-for="(o, si) in row.odds"
                 :key="si"
-                style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0 0.125rem;"
+                :style="{
+                  display: 'flex',
+                  flexDirection: showCounts ? 'column' : 'row',
+                  alignItems: showCounts ? 'flex-start' : 'center',
+                  justifyContent: showCounts ? 'flex-start' : 'space-between',
+                  gap: showCounts ? '0.125rem' : '0.5rem',
+                  padding: '0 0.125rem'
+                }"
               >
-                <div style="display:flex; align-items:baseline; gap:0.25rem; min-width:0;">
+                <div style="display:flex; align-items:baseline; flex-wrap:wrap; gap:0.25rem; min-width:0;">
                   <span v-if="hasCompare" style="font-size:0.5625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ setLabels[si] }}</span>
                   <span style="font-size:0.5625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.successRate') }}</span>
-                  <!-- the move's own success rate, slash-joined with one more figure per
-                       character-die effect it has (joint with that effect landing too) -->
-                  <span :style="{ fontSize: '1.0625rem', fontWeight: 900, whiteSpace: 'nowrap', color: o.payable === 0 ? 'var(--line)' : 'var(--ink)' }">{{ successText(row, si) }}</span>
+                  <!-- the move's own success rate, joined with one more figure per character-die
+                       effect it has (joint with that effect actually landing too) -->
+                  <span :style="{ fontSize: '0.8125rem', fontWeight: 900, whiteSpace: showCounts ? 'normal' : 'nowrap', color: o.payable === 0 ? 'var(--line)' : 'var(--ink)' }">{{ successText(row, si) }}</span>
                 </div>
 
                 <!-- the headline figure: what the move is worth per cast -->
                 <div style="display:flex; align-items:baseline; gap:0.25rem; min-width:0;">
                   <span style="font-size:0.5625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.expectedValue') }}</span>
-                  <span :style="{ fontSize: '1.0625rem', fontWeight: 900, whiteSpace: 'nowrap', color: row.evs[si].ev === 0 ? 'var(--line)' : 'var(--ink)' }">{{ evText(row.evs[si].ev) }}</span>
+                  <span :style="{ fontSize: '0.8125rem', fontWeight: 900, whiteSpace: 'nowrap', color: row.evs[si].ev === 0 ? 'var(--line)' : 'var(--ink)' }">{{ evText(row.evs[si].ev) }}</span>
                 </div>
               </div>
             </div>
@@ -471,6 +520,7 @@ const moveRows = computed(() => {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       <div style="display:flex; justify-content:center; padding:0.875rem 0 0.25rem;">
