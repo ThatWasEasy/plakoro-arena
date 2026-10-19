@@ -44,6 +44,12 @@
     },
     "STC09-001": {
       "name": "Lucario"
+    },
+    "STC10-001": {
+      "name": "Altaria"
+    },
+    "STC11-001": {
+      "name": "Dragonite"
     }
   },
   "waza": {
@@ -580,6 +586,67 @@
     },
     "STW09-007": {
       "name": "Metal Claw",
+      "chara_effect1": "Adds 40 damage."
+    },
+    "STW10-001": {
+      "name": "Peck",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "STW10-002": {
+      "name": "Fluffy Flight",
+      "chara_effect1": "On the opponent's next turn, if their character die lands on landscape-left or landscape-right, you take no damage from this move. (Other effects still apply.)"
+    },
+    "STW10-003": {
+      "name": "Roost",
+      "effect": "Heals 20 HP for this Pokémon.",
+      "chara_effect1": "Heals an additional 20."
+    },
+    "STW10-004": {
+      "name": "Aerial Ace",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "STW10-005": {
+      "name": "Fly",
+      "chara_effect1": "On the opponent's next turn, this Pokémon takes no move damage.",
+      "chara_effect2": "This move fails."
+    },
+    "STW10-006": {
+      "name": "Sky Attack",
+      "chara_effect1": "Adds 50 damage.",
+      "chara_effect2": "On your next turn, roll 2 fewer energy dice."
+    },
+    "STW10-007": {
+      "name": "Moonblast",
+      "chara_effect1": "If the opponent is Dragon-type, adds 40 damage."
+    },
+    "STW11-001": {
+      "name": "Dragon Pulse",
+      "chara_effect1": "Adds 30 damage.",
+      "chara_effect2": "On your next turn, roll 1 fewer energy die."
+    },
+    "STW11-002": {
+      "name": "Slashing Claws",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "STW11-003": {
+      "name": "Crush",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "STW11-004": {
+      "name": "Dragon Blast",
+      "chara_effect1": "Adds 40 damage."
+    },
+    "STW11-005": {
+      "name": "Scale Press",
+      "chara_effect1": "On the opponent's next turn, this Pokémon takes 50 less damage."
+    },
+    "STW11-006": {
+      "name": "Hurricane Tail",
+      "effect": "This move rolls the character die 3 times in total.",
+      "chara_effect1": "Each success on the character die adds 20 damage."
+    },
+    "STW11-007": {
+      "name": "Extreme Speed",
       "chara_effect1": "Adds 40 damage."
     }
   }

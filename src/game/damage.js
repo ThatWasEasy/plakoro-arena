@@ -19,6 +19,10 @@ export function isCharaColorConditionMet(effType, owner, opponent) {
     const wazaId = successSelfMatch[1]
     return owner.committedLastMoveId !== null && String(owner.committedLastMoveId) === String(wazaId) && !owner.committedLastMoveFailed
   }
+  const vsTypeMatch = /^DAMAGE_EXTRA_VS_TYPE_(.+)$/.exec(effType)
+  if (vsTypeMatch) {
+    return !!(opponent.character && opponent.character.type === vsTypeMatch[1])
+  }
   const hpLowMatch = /^DAMAGE_EXTRA_(\d+)HP_LOW$/.exec(effType)
   if (hpLowMatch) {
     const n = parseInt(hpLowMatch[1], 10)

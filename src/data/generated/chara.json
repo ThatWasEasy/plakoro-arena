@@ -163,5 +163,27 @@
     "weakness_type2": null,
     "weakness_damage2": null,
     "image_URL": "https://zukan.pokemon.co.jp/zukan-api/up/images/index/8037e4cc218b880b5552d4b91979d746.png"
+  },
+  {
+    "id": "STC10-001",
+    "name": "チルタリス",
+    "type": "ひこう",
+    "HP": 120,
+    "weakness_type1": "みず",
+    "weakness_damage1": 20,
+    "weakness_type2": null,
+    "weakness_damage2": null,
+    "image_URL": null
+  },
+  {
+    "id": "STC11-001",
+    "name": "カイリュー",
+    "type": "ドラゴン",
+    "HP": 120,
+    "weakness_type1": "ドラゴン",
+    "weakness_damage1": 20,
+    "weakness_type2": null,
+    "weakness_damage2": null,
+    "image_URL": null
   }
 ]

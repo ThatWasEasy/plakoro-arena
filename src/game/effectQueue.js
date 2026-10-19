@@ -117,6 +117,19 @@ export function runEffectQueue(queue, idx, ctx, hooks, done) {
     })
     return
   }
+  // Bonus damage conditional on the opponent's own species type (not their move's type) —
+  // e.g. ムーンフォース's "opponent is Dragon-type" clause. The condition is knowable the
+  // instant a move is cast (ctx.opp.character is already picked), unlike the die-based
+  // effects above, so it needs no prompt and resolves inline.
+  const vsTypeMatch = /^DAMAGE_EXTRA_VS_TYPE_(.+)$/.exec(eff.type)
+  if (vsTypeMatch) {
+    if (ctx.opp.character && ctx.opp.character.type === vsTypeMatch[1]) {
+      ctx.dmgToOpp += eff.value
+    }
+    next()
+    return
+  }
+
   // Pins a player's character die for their next turn: rows whose orientations fall outside the
   // fixed set become unselectable (see charaDiceOrientationAllowed). Mirrors `charaDiceBlocked`
   // in lifecycle — set here, consumed next turn, cleared when that turn resolves.

@@ -168,6 +168,14 @@ function applyEffect(eff, state, env) {
     return
   }
 
+  // Conditional on the opponent's species type, which this calculator has no opponent to look
+  // up — same unknowable shape as DAMAGE_BY_ENEMY_3DICE above, just keyed by type instead of a
+  // dice mean.
+  if (/^DAMAGE_EXTRA_VS_TYPE_/.test(type)) {
+    addNote(state, type, NOTE_UNKNOWN)
+    return
+  }
+
   switch (type) {
     case 'DAMAGE_EXTRA':
       state.damage += value
