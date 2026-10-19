@@ -7,6 +7,8 @@ import MoveOddsView from './MoveOddsView.vue'
 import DicePartsPlanView from './DicePartsPlanView.vue'
 import ChipIcon from './ChipIcon.vue'
 import { pureDie } from '../../game/suggestedDice'
+import { loadSavedSets, saveSets } from '../../data/diceBuilderMemory'
+import html2canvas from 'html2canvas'
 
 // Three.js + cannon-es (pulled in by DiceRoll3DCanvas and diceTextures) add roughly 600kB to
 // the bundle — code-split so only players who actually open the dice builder and roll pay
@@ -20,10 +22,10 @@ const props = defineProps({
 const emit = defineEmits(['back'])
 const { t } = useI18n()
 
-// Up to two dice sets can exist side by side, so their roll probabilities can be compared
-// against each other. Set A always exists; set B is opt-in and starts as a copy of A, since
-// the usual reason to compare is "what changes if I swap this one face".
-const SET_LABELS = ['A', 'B']
+// No fixed count any more — set A always exists, every other set is an opt-in copy of it, and
+// there's no longer a hard stop past two. 26 covers any reasonable comparison; the labels are
+// just A, B, C... so running past Z would mean something else is wrong long before that.
+const SET_LABELS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))
 
 function cloneDie(die) {
   return {
@@ -47,7 +49,10 @@ function cloneDiceSet(set) {
   return { dice: set.dice.map(cloneDie), sameAsDie1: [...set.sameAsDie1] }
 }
 
-const sets = ref([newDiceSet()])
+// A saved build from last time beats a fresh random one — the player came back to keep
+// tweaking, not to start over. `openOdds` below still wins when it's set: that deep link
+// carries its own specific build, which is the whole reason it's there.
+const sets = ref(loadSavedSets() || [newDiceSet()])
 const hasCompare = computed(() => sets.value.length > 1)
 
 function syncCheckedDice() {
@@ -64,26 +69,39 @@ function syncCheckedDice() {
 // dice[1]/dice[2], which aren't part of the watched source.
 watch(() => sets.value.map(s => s.dice[0]), syncCheckedDice, { deep: true })
 
+// Every edit (a face repick, toggling compare on/off, adding/clearing set B) persists
+// immediately, so there's never a "forgot to save" moment — reloading mid-tweak keeps
+// whatever was last on screen.
+watch(sets, saveSets, { deep: true })
+
 function onToggleSame(setIndex, dieIndex, checked) {
   const set = sets.value[setIndex]
   set.sameAsDie1[dieIndex - 1] = checked
   if (checked) set.dice[dieIndex] = cloneDie(set.dice[0])
 }
 
+// No cap: a player comparing more than two builds at once just gets more rows, same as
+// deciding to compare two did.
 function addCompareSet() {
-  if (sets.value.length > 1) return
   sets.value.push(cloneDiceSet(sets.value[0]))
-  // A previous roll only covered set A, so it would render as a lone set-A row under a
-  // header that now promises two. Clear it and let the player roll both together.
+  // A previous roll didn't cover the new set, so it would render as a short row under a
+  // header that now promises one more. Clear it and let the player roll them all together.
   rollResults.value = null
   charaRollResult.value = null
 }
 
-function removeCompareSet() {
-  sets.value.splice(1)
-  // Drop any state still pointing at the set that no longer exists.
-  if (editingSlot.value && editingSlot.value.setIndex > 0) editingSlot.value = null
-  if (rollResults.value) rollResults.value = rollResults.value.slice(0, 1)
+// Removes one specific set by index rather than always trimming back to set A — each card
+// owns its own ✕ now, so which one goes is whichever card it's clicked on. Set A (index 0)
+// can't be removed: there's always at least one build on screen.
+function removeSet(index) {
+  if (index === 0 || sets.value.length <= 1) return
+  sets.value.splice(index, 1)
+  // Drop or reindex any state still pointing at a set index, now that one's gone.
+  if (editingSlot.value) {
+    if (editingSlot.value.setIndex === index) editingSlot.value = null
+    else if (editingSlot.value.setIndex > index) editingSlot.value = { ...editingSlot.value, setIndex: editingSlot.value.setIndex - 1 }
+  }
+  if (rollResults.value) rollResults.value = rollResults.value.filter((_, i) => i !== index)
   closeQuickApply()
   // A filter or grouping can be pinned to a type only set B carried. Its icon disappears
   // from the control row with set B, which would leave an invisible filter silently
@@ -566,6 +584,33 @@ function openProbTable() {
   groupByType.value = null
   expandedGroupCounts.clear()
 }
+
+// Snapshots the dice grid (every set, every face) as a PNG, so a build can be shared as a
+// picture instead of asking the other person to recreate it face by face from a description.
+const diceGridRef = ref(null)
+const exportingDiceImage = ref(false)
+
+async function exportDiceImage() {
+  if (!diceGridRef.value || exportingDiceImage.value) return
+  exportingDiceImage.value = true
+  try {
+    const canvas = await html2canvas(diceGridRef.value, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true
+    })
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'plakoro-dice-build.png'
+    a.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    exportingDiceImage.value = false
+  }
+}
 </script>
 
 <template>
@@ -733,13 +778,22 @@ function openProbTable() {
     </div>
   </div>
 
-  <div v-else class="board select-board" style="overflow-y:auto; align-items:center;">
-    <div class="modal-title" style="margin:0.5rem 0 0.25rem;">{{ t('diceBuilder.title') }}</div>
-    <div class="center-hint" style="padding-bottom:0.375rem;">{{ t('diceBuilder.hint') }}</div>
+  <div v-else class="board select-board" style="align-items:center;">
+    <div class="modal-title" style="margin:0.5rem 0 0.25rem; flex-shrink:0;">{{ t('diceBuilder.title') }}</div>
+    <div class="center-hint" style="padding-bottom:0.375rem; flex-shrink:0;">{{ t('diceBuilder.hint') }}</div>
 
+    <div style="flex:1; min-height:0; width:100%; overflow-y:auto; display:flex; flex-direction:column; align-items:center;">
+    <div ref="diceGridRef" style="width:100%; display:flex; flex-direction:column; align-items:center;">
     <div v-for="(set, si) in sets" :key="si" style="width:100%; max-width:47.5rem; display:flex; flex-direction:column; align-items:center;">
       <div class="select-card" style="width:100%; align-items:stretch; padding:0.875rem;">
-        <div v-if="hasCompare" style="font-size:0.875rem; font-weight:800; color:var(--ink); padding-bottom:0.375rem;">{{ t('diceBuilder.set', { label: SET_LABELS[si] }) }}</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding-bottom:0.375rem;">
+          <div v-if="hasCompare" style="font-size:0.875rem; font-weight:800; color:var(--ink);">{{ t('diceBuilder.set', { label: SET_LABELS[si] }) }}</div>
+          <div v-else></div>
+          <div style="display:flex; gap:0.375rem; flex-shrink:0;">
+            <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="addCompareSet">{{ t('diceBuilder.addCompare') }}</button>
+            <button v-if="si > 0" class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="removeSet(si)">{{ t('diceBuilder.removeSet') }}</button>
+          </div>
+        </div>
         <div style="display:grid; grid-template-columns: 4.375rem repeat(6, 1fr); gap:0.5rem 0.375rem; align-items:center;">
           <div></div>
           <div v-for="row in FACE_ROWS" :key="row.key" style="font-size:0.8125rem; font-weight:800; color:var(--sub); text-align:center;">{{ t('diceBuilder.face.' + row.labelKey) }}</div>
@@ -770,17 +824,18 @@ function openProbTable() {
         </div>
       </div>
 
-      <button v-if="si === 0 && !hasCompare" class="btn secondary" style="margin-top:0.5rem; padding:0.4375rem 0.875rem; font-size:0.8125rem;" @click="addCompareSet">{{ t('diceBuilder.addCompare') }}</button>
-      <button v-else-if="si === 1" class="btn secondary" style="margin-top:0.5rem; padding:0.4375rem 0.875rem; font-size:0.8125rem;" @click="removeCompareSet">{{ t('diceBuilder.removeCompare') }}</button>
+    </div>
+    </div>
     </div>
 
-    <div style="display:flex; gap:0.625rem; justify-content:center; flex-wrap:wrap; padding:0.875rem 0 0.25rem;">
-      <button class="btn" @click="openDiceRoll3D">{{ t('diceBuilder.rollButton') }}</button>
-      <button class="btn secondary" @click="openQuickApply()">{{ t('diceBuilder.quickApplyButton') }}</button>
-      <button class="btn secondary" @click="openProbTable">{{ t('diceBuilder.probButton') }}</button>
-      <button class="btn secondary" @click="showMoveOdds = true">{{ t('diceBuilder.moveOddsButton') }}</button>
-      <button class="btn secondary" @click="showPartsPlan = true">{{ t('diceBuilder.partsPlanButton') }}</button>
-      <button class="btn secondary" @click="emit('back')">{{ t('common.back') }}</button>
+    <div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap; padding:0.875rem 0 0.25rem; flex-shrink:0;">
+      <button class="btn" style="padding:0.4375rem 0.875rem; font-size:0.8125rem;" @click="openDiceRoll3D">{{ t('diceBuilder.rollButton') }}</button>
+      <button class="btn secondary" style="padding:0.4375rem 0.875rem; font-size:0.8125rem;" @click="openQuickApply()">{{ t('diceBuilder.quickApplyButton') }}</button>
+      <button class="btn secondary" style="padding:0.4375rem 0.875rem; font-size:0.8125rem;" @click="openProbTable">{{ t('diceBuilder.probButton') }}</button>
+      <button class="btn secondary" style="padding:0.4375rem 0.875rem; font-size:0.8125rem;" @click="showMoveOdds = true">{{ t('diceBuilder.moveOddsButton') }}</button>
+      <button class="btn secondary" style="padding:0.4375rem 0.875rem; font-size:0.8125rem;" @click="showPartsPlan = true">{{ t('diceBuilder.partsPlanButton') }}</button>
+      <button class="btn secondary" style="padding:0.4375rem 0.875rem; font-size:0.8125rem;" :disabled="exportingDiceImage" @click="exportDiceImage">{{ exportingDiceImage ? t('diceBuilder.exportingImage') : t('diceBuilder.exportImage') }}</button>
+      <button class="btn secondary" style="padding:0.4375rem 0.875rem; font-size:0.8125rem;" @click="emit('back')">{{ t('common.back') }}</button>
     </div>
   </div>
 
