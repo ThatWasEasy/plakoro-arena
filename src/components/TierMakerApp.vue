@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { asset } from '../data/assetPath'
 import { typeBgColor } from '../data/constants'
 import { typeAffinity } from '../game/typeAffinity'
-import { defaultTiers, loadTierMaker, newInstanceId, saveTierMaker, TIER_PALETTE } from '../data/tierMaker'
+import { defaultTiers, loadTierMaker, newInstanceId, parseTierMakerPayload, saveTierMaker, TIER_PALETTE } from '../data/tierMaker'
 
 const emit = defineEmits(['back'])
 const { characters, moves } = inject('characterData')
@@ -134,6 +134,26 @@ const MAX_TYPES = 2
 // Always an array, including for instances saved before there was one.
 function typesOf(entry) {
   return Array.isArray(entry.types) ? entry.types : (entry.type ? [entry.type] : [])
+}
+
+// null for instances saved before this existed, same as an unset `types`.
+function turnOrderOf(entry) {
+  return entry.turnOrder || null
+}
+
+// A tap-to-cycle toggle rather than a picker sheet: unlike type, there are only ever two
+// real options, so a sheet would spend a whole modal on a single yes/no choice. Unset -> first
+// -> second -> unset, so "nobody tapped this yet" stays reachable instead of being a dead end
+// once you've cycled past it.
+function cycleTurnOrder(tierId, instanceId) {
+  const list = listFor(tierId)
+  const idx = list.findIndex(e => e.id === instanceId)
+  if (idx === -1) return
+  const current = turnOrderOf(list[idx])
+  const next = current === null ? 'first' : current === 'first' ? 'second' : null
+  const arr = [...list]
+  arr[idx] = { ...arr[idx], turnOrder: next }
+  entries.value = { ...entries.value, [tierId]: arr }
 }
 
 // Tapping the badge opens a picker rather than cycling to the next type.
@@ -390,6 +410,62 @@ async function exportImage() {
     exporting.value = false
   }
 }
+
+// The board's own save shape ({ title, tiers, entries }) — exporting anything else would mean
+// import has to understand two formats instead of one.
+function exportJson() {
+  const payload = { title: title.value, tiers: tiers.value, entries: entries.value }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  const safeName = title.value.trim().replace(/[\\/:*?"<>|]/g, '-')
+  a.download = `${safeName || 'tier-list'}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const importJsonInput = ref(null)
+const importError = ref('')
+// Same arm/confirm pattern as resetPlacements above, for the same reason: this replaces
+// whatever's on the board right now, and that's real arranging work to lose by one stray tap.
+const confirmingImport = ref(false)
+
+function triggerImportJson() {
+  if (!confirmingImport.value) {
+    confirmingImport.value = true
+    return
+  }
+  confirmingImport.value = false
+  importError.value = ''
+  importJsonInput.value?.click()
+}
+
+async function onImportJsonFile(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  try {
+    const parsed = parseTierMakerPayload(JSON.parse(await file.text()))
+    if (!parsed) {
+      importError.value = t('tierMaker.importInvalid')
+      return
+    }
+    // A file from a build with a roster this one doesn't have would otherwise crash the board
+    // the moment it tries to render an instance's portrait for a character that no longer
+    // exists — dropping those entries is the only reading of "import this" that still renders.
+    const knownEntries = {}
+    for (const [tierId, list] of Object.entries(parsed.entries)) {
+      knownEntries[tierId] = list.filter(e => characterById(e.characterId))
+    }
+    tiers.value = parsed.tiers
+    entries.value = knownEntries
+    if (parsed.title) title.value = parsed.title
+    importError.value = ''
+  } catch (e) {
+    importError.value = t('tierMaker.importInvalid')
+  }
+}
 </script>
 
 <template>
@@ -431,6 +507,13 @@ async function exportImage() {
             >
               <img :src="characterById(e.characterId).imageUrl || asset(`image/CHARA/${characterById(e.characterId).name}.png`)" class="img-icon" :alt="characterById(e.characterId).name">
               <span v-if="isSelectedInstance(e.id)" class="tm-delete-badge" @click.stop="deleteInstance(tier.id, e.id)">✕</span>
+              <!-- Unset -> first -> second -> unset. Stays a plain click, no sheet: see
+                   cycleTurnOrder's comment for why a picker would be overkill here. -->
+              <span
+                class="tm-turn-badge"
+                :class="{ 'tm-turn-badge-empty': !turnOrderOf(e) }"
+                @click.stop="cycleTurnOrder(tier.id, e.id)"
+              >{{ turnOrderOf(e) === 'first' ? t('tierMaker.turnFirst') : turnOrderOf(e) === 'second' ? t('tierMaker.turnSecond') : '' }}</span>
               <!-- One dot per type, up to two. The whole strip is the tap target, including
                    when it is empty — an instance with no type still has to be reachable. -->
               <span class="tm-badges" @click.stop="openPicker(tier.id, e.id)">
@@ -474,15 +557,21 @@ async function exportImage() {
       </div>
     </div>
 
-    <div style="display:flex; gap:0.625rem; justify-content:center; padding:0.875rem 0 0.25rem;">
+    <div style="display:flex; gap:0.625rem; justify-content:center; flex-wrap:wrap; padding:0.875rem 0 0.25rem;">
       <button class="btn secondary" :disabled="exporting" @click="exportImage">
         {{ exporting ? t('tierMaker.exporting') : t('tierMaker.exportButton') }}
       </button>
+      <button class="btn secondary" @click="exportJson">{{ t('tierMaker.exportJsonButton') }}</button>
+      <button class="btn secondary" @click="triggerImportJson" @blur="confirmingImport = false">
+        {{ confirmingImport ? t('tierMaker.importConfirm') : t('tierMaker.importJsonButton') }}
+      </button>
+      <input ref="importJsonInput" type="file" accept="application/json,.json" style="display:none;" @change="onImportJsonFile">
       <button class="btn secondary" @click="resetPlacements" @blur="confirmingReset = false">
         {{ confirmingReset ? t('tierMaker.resetConfirm') : t('tierMaker.resetButton') }}
       </button>
       <button class="btn secondary" @click="emit('back')">{{ t('common.back') }}</button>
     </div>
+    <div v-if="importError" style="color:#c0392b; font-size:0.75rem; font-weight:800; text-align:center; padding-bottom:0.5rem;">{{ importError }}</div>
   </div>
 
     <!-- Type picker. A sheet rather than a popover anchored to the dot: the dot is a quarter of
@@ -662,6 +751,32 @@ async function exportImage() {
 /* No type picked yet — stay fully invisible rather than drawing an empty outline, so an unset
    badge doesn't read as its own bit of UI; the click target is still there, just unseen. */
 .tm-badge-empty {
+  background: none;
+  border: none;
+}
+
+/* Bottom-left mirrors the delete badge's top-right: the only remaining corner the type dots
+   (bottom-right) and delete badge (top-right) leave free. */
+.tm-turn-badge {
+  position: absolute;
+  left: -0.1875rem;
+  bottom: -0.1875rem;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.1875rem;
+  border-radius: 999px;
+  border: 0.09375rem solid #fff;
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  font-size: 0.5rem;
+  font-weight: 900;
+  line-height: 0.8125rem;
+  text-align: center;
+  z-index: 1;
+  cursor: pointer;
+}
+/* Unset — stay reachable but invisible, same reasoning as .tm-badge-empty above. */
+.tm-turn-badge-empty {
   background: none;
   border: none;
 }

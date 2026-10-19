@@ -30,12 +30,19 @@ function withTypesArray(entries) {
   return out
 }
 
+// Shared by the localStorage load and by importing a JSON file someone exported earlier —
+// both are "somebody else's claim about what a tier list looks like", so both run through the
+// same shape check and the same `types` migration rather than trusting the source.
+export function parseTierMakerPayload(parsed) {
+  if (!parsed || !Array.isArray(parsed.tiers) || typeof parsed.entries !== "object" || parsed.entries === null) return null
+  return { ...parsed, entries: withTypesArray(parsed.entries) }
+}
+
 export function loadTierMaker() {
   try {
     const raw = localStorage.getItem(TIER_MAKER_STORAGE_KEY)
     const parsed = raw ? JSON.parse(raw) : null
-    if (!parsed || !Array.isArray(parsed.tiers) || typeof parsed.entries !== "object") return null
-    return { ...parsed, entries: withTypesArray(parsed.entries) }
+    return parseTierMakerPayload(parsed)
   } catch (e) {
     return null
   }
