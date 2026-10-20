@@ -282,7 +282,7 @@
     "removeSet": "Delete this dice set",
     "probTypeHeader": "Types",
     "applyToLabel": "Apply to which set?",
-    "applyToBoth": "Apply to both",
+    "applyToAll": "Apply to all",
     "probButton": "Probability Table",
     "probTitle": "Type Odds",
     "probHint": "All 3 dice rolled together, tallied by the resulting energy-type combo (sorted by odds)",

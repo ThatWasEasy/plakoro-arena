@@ -282,7 +282,7 @@
     "removeSet": "刪除此骰組",
     "probTypeHeader": "類型",
     "applyToLabel": "要套用到哪一組？",
-    "applyToBoth": "兩組都套",
+    "applyToAll": "全部套用",
     "probButton": "結果機率表",
     "probTitle": "各類型出現機率",
     "probHint": "三顆骰子一起擲，依最終集齊的能量種類組合統計機率（依機率高低排序）",

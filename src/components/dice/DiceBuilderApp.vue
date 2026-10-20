@@ -25,6 +25,10 @@ const { t } = useI18n()
 // No fixed count any more — set A always exists, every other set is an opt-in copy of it, and
 // there's no longer a hard stop past two. 26 covers any reasonable comparison; the labels are
 // just A, B, C... so running past Z would mean something else is wrong long before that.
+//
+// This is the ALPHABET, not the sets. Anything rendering one label per set reads `setLabels`
+// below instead — rendering this directly is what asked "which of twenty-six groups?" when two
+// were open.
 const SET_LABELS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))
 
 function cloneDie(die) {
@@ -53,6 +57,10 @@ function cloneDiceSet(set) {
 // tweaking, not to start over. `openOdds` below still wins when it's set: that deep link
 // carries its own specific build, which is the whole reason it's there.
 const sets = ref(loadSavedSets() || [newDiceSet()])
+
+// The labels that actually exist right now. Derived rather than sliced at each call site,
+// because every site that sliced it by hand was one that could forget to.
+const setLabels = computed(() => SET_LABELS.slice(0, sets.value.length))
 const hasCompare = computed(() => sets.value.length > 1)
 
 function syncCheckedDice() {
@@ -617,12 +625,12 @@ async function exportDiceImage() {
   <MoveOddsView
     v-if="showMoveOdds"
     :sets="sets"
-    :set-labels="SET_LABELS.slice(0, sets.length)"
+    :set-labels="setLabels"
     :initial-character-id="openOdds ? openOdds.characterId : null"
     @back="showMoveOdds = false"
   />
 
-  <DicePartsPlanView v-else-if="showPartsPlan" :sets="sets" :set-labels="SET_LABELS.slice(0, sets.length)" @back="showPartsPlan = false" />
+  <DicePartsPlanView v-else-if="showPartsPlan" :sets="sets" :set-labels="setLabels" @back="showPartsPlan = false" />
 
   <div v-else-if="showDiceRoll3D" class="board select-board" style="display:flex; flex-direction:column; align-items:center; min-height:0;">
     <div class="modal-title" style="margin:0.5rem 0 0.25rem; flex-shrink:0;">{{ t('diceBuilder.rollButton') }}</div>
@@ -711,7 +719,7 @@ async function exportDiceImage() {
       <div v-if="hasCompare" style="display:flex; align-items:center; justify-content:space-between; gap:0.625rem; padding:0 0.125rem 0.25rem; border-bottom:0.125rem solid var(--line);">
         <span style="font-size:0.6875rem; font-weight:800; color:var(--sub);">{{ t('diceBuilder.probTypeHeader') }}</span>
         <div style="display:flex; gap:0.5rem; flex-shrink:0;">
-          <span v-for="(label, si) in SET_LABELS" :key="si" :style="{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--sub)', width: figureColWidth, textAlign: 'right', whiteSpace: 'nowrap' }">{{ t('diceBuilder.set', { label }) }}</span>
+          <span v-for="(label, si) in setLabels" :key="si" :style="{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--sub)', width: figureColWidth, textAlign: 'right', whiteSpace: 'nowrap' }">{{ t('diceBuilder.set', { label }) }}</span>
         </div>
       </div>
 
@@ -945,9 +953,13 @@ async function exportDiceImage() {
           </div>
           <span style="font-size:0.8125rem; font-weight:800; color:var(--sub);">{{ t('diceBuilder.applyToLabel') }}</span>
         </div>
+        <!-- Only the sets that exist. SET_LABELS runs A-Z so that adding a set never needs a
+             new label; offering all 26 as targets asked which of twenty-six groups to apply to
+             when two were open. -->
         <div style="display:flex; flex-wrap:wrap; gap:0.625rem; justify-content:center;">
-          <button v-for="(label, si) in SET_LABELS" :key="si" class="btn secondary" @click="commitQuickApply([si])">{{ t('diceBuilder.set', { label }) }}</button>
-          <button class="btn" @click="commitQuickApply([0, 1])">{{ t('diceBuilder.applyToBoth') }}</button>
+          <button v-for="(label, si) in setLabels" :key="si" class="btn secondary" @click="commitQuickApply([si])">{{ t('diceBuilder.set', { label }) }}</button>
+          <!-- "all of them" rather than "both": there can be more than two. Pointless with one. -->
+          <button v-if="sets.length > 1" class="btn" @click="commitQuickApply(sets.map((_, i) => i))">{{ t('diceBuilder.applyToAll') }}</button>
         </div>
       </template>
     </div>

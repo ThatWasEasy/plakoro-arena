@@ -282,7 +282,7 @@
     "removeSet": "このダイスセットを削除",
     "probTypeHeader": "タイプ",
     "applyToLabel": "どのセットに適用する？",
-    "applyToBoth": "両方に適用",
+    "applyToAll": "すべてに適用",
     "probButton": "確率表を見る",
     "probTitle": "各タイプの出現確率",
     "probHint": "3つのダイスを一緒に振り、最終的に揃うエネルギータイプの組み合わせごとに確率を集計（確率順）",
