@@ -14,6 +14,9 @@ export function isCharaColorConditionMet(effType, owner, opponent) {
   if (effType === "DAMAGE_EXTRA_DICE_MISS_SELF") {
     return !!owner.committedLastMoveFailed
   }
+  if (effType === "DAMAGE_EXTRA_IF_UNHURT") {
+    return !owner.tookMoveDamage
+  }
   const successSelfMatch = /^DAMAGE_EXTRA_DICE_SUCCESS_SELF_(.+)$/.exec(effType) || /^DAMAGE_SELF_DICE_SUCCESS_SELF_(.+)$/.exec(effType)
   if (successSelfMatch) {
     const wazaId = successSelfMatch[1]
@@ -36,6 +39,17 @@ export function isCharaColorConditionMet(effType, owner, opponent) {
     return owner.hp <= n
   }
   return false
+}
+
+// NULLIFY_TAKEN_LE ("受けるダメージが N 以下なら、そのダメージを受けない"). Applied to the
+// final figure — after weakness, damage modifiers and every character-die addition — since
+// the card measures the damage actually taken. computeDisplayDamage deliberately leaves it
+// out: the figure it shows is the floor a character-die bonus is added onto, and zeroing that
+// floor would zero the bonus with it.
+export function applyNullifyAtMost(target, dmg) {
+  const limit = target.incomingDamageNullifyAtMost
+  if (limit === null || limit === undefined) return dmg
+  return dmg <= limit ? 0 : dmg
 }
 
 export function computeDisplayDamage(mv, mover, target, movesMap) {

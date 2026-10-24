@@ -86,9 +86,11 @@ async function throwDice() {
 function onDiceRolled(results, transforms) {
   const charaFace = results[results.length - 1]
   const energyResults = results.slice(0, -1)
-  const rolledTypes = energyResults.flatMap((faceKey, i) => faceTypes(lastRollDice[i], faceKey))
+  // Kept per die as well as flat: an opponent's REROLL_DICE_ENEMY swaps out single dice.
+  const perDie = energyResults.map((faceKey, i) => faceTypes(lastRollDice[i], faceKey))
+  const rolledTypes = perDie.flat()
   const success = canPayCost(rolledTypes, mv.value.cost)
-  battle.setDiceRollResult(charaFace, rolledTypes, success, transforms)
+  battle.setDiceRollResult(charaFace, rolledTypes, success, transforms, perDie)
 }
 
 // Online only, opponent's side: replays the mover's exact throw (same dice, same final pose) —
@@ -159,6 +161,16 @@ function pickFail() {
 }
 function goBack() {
   battle.backToMoveSelect()
+}
+
+// SPECIAL_PICK_ENEMY_WAZA: the opponent chose this move, so going back to swap it is closed.
+const backLocked = computed(() => state.repeatActive || !!p.value.movePickedByOpponent)
+
+// REROLL_CHARADICE_SELF, online only: offered on the settled result, before it's confirmed,
+// since that's the one point where the player has seen the face and not yet committed to it.
+const canRerollChara = computed(() => !!online.role.value && hasChara.value && p.value.charaRerolls > 0 && !!state.charaDieFace)
+function rerollChara() {
+  battle.rerollCharaDie()
 }
 </script>
 
@@ -267,6 +279,7 @@ function goBack() {
           <div v-if="hasChara" class="dr-inline-icon half"><img :src="asset(`image/ICON/${state.charaDieFace}.png`)" class="img-icon" :alt="state.charaDieFace"></div>
         </div>
         <div class="dr-result-ack-label" :class="state.energySuccess ? 'succ' : 'fail'">{{ state.energySuccess ? t('common.success') : t('common.fail') }}</div>
+        <button v-if="canRerollChara" class="btn wide" @click="rerollChara">{{ t('dice.rerollCharaDie', { n: p.charaRerolls }) }}</button>
         <button class="btn wide" @click="resultAcked = true">{{ t('common.confirm') }}</button>
       </div>
     </div>
@@ -304,8 +317,8 @@ function goBack() {
         <div class="dr-back-box">
           <button
             class="dr-back-btn"
-            :disabled="state.repeatActive"
-            :style="state.repeatActive ? 'opacity:.35; pointer-events:none;' : ''"
+            :disabled="backLocked"
+            :style="backLocked ? 'opacity:.35; pointer-events:none;' : ''"
             @click="goBack"
           >{{ t('common.back') }}</button>
         </div>

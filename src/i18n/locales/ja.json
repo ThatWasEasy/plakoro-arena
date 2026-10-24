@@ -38,7 +38,8 @@
     "notSelected": "未選択",
     "incomingDamageEffect": "効果: 次に受けるダメージ{sign}{value}",
     "guest": "ゲスト",
-    "level": "Lv.{n}"
+    "level": "Lv.{n}",
+    "incomingDamageNullifyAtMost": "効果: 次に受けるダメージが{value}以下なら受けない"
   },
   "select": {
     "pickPokemon": "ポケモンを<br>選ぶ",
@@ -62,12 +63,16 @@
   "energyDice": {
     "title": "エネコロを設定しよう",
     "hint": "面をタップしてエネルギーを変更。この3個を対戦中ずっと使います。",
-    "confirm": "設定完了"
+    "confirm": "設定完了",
+    "swapTitle": "チップをつけ替える",
+    "swapHint": "エネコロを1個選び、チップを好きなだけつけ替えよう（凸面・凹面は変えられない）"
   },
   "moveSelect": {
     "title": "{name} のワザを4つ選択",
     "confirm": "選択したワザで確定",
-    "opponentThinking": "相手がワザを選択中…"
+    "opponentThinking": "相手がワザを選択中…",
+    "pickForOpponent": "{source}：相手が使うワザを選ぼう",
+    "opponentPickingForYou": "{source}：相手があなたのワザを選択中…"
   },
   "moveCard": {
     "usedLastTurn": "前ターン使用",
@@ -83,7 +88,8 @@
     "moveFail": "ワザ失敗",
     "throwCharaDie": "サイコロを振る",
     "opponentResolving": "相手がワザを判定中…",
-    "opponentRolled": "相手のロール結果"
+    "opponentRolled": "相手のロール結果",
+    "rerollCharaDie": "キャラコロを振りなおす（残り{n}回）"
   },
   "effectPrompt": {
     "diceRollLabel": "{n}個",
@@ -100,7 +106,8 @@
     "charaDiceComboPrefix": "相手のキャラコロを{n}回振り、",
     "charaDiceComboSuffix": "が出るたびに{dmg}ダメージ追加。成功した数を選択。",
     "charaDiceSelectSelfTitle": "出たキャラコロの向きを選択。次の自分の番、自分のキャラコロはその向きになります。",
-    "charaDiceSelectEnemyTitle": "出たキャラコロの向きを選択。次の相手の番、相手のキャラコロはその向きになります。"
+    "charaDiceSelectEnemyTitle": "出たキャラコロの向きを選択。次の相手の番、相手のキャラコロはその向きになります。",
+    "swapChipSub": "エネコロを1個選んでチップをつけ替えよう"
   },
   "turnResult": {
     "title": "このターンの結果",
@@ -114,7 +121,11 @@
     "charaProgressRepeat": "連続成功{count}回、失敗するまで続けます",
     "throwAgain": "もう一度振る",
     "energyYourTurn": "あなたの番です。エネコロを{n}個振ってください",
-    "energyWaiting": "相手がエネコロを{n}個振っています…"
+    "energyWaiting": "相手がエネコロを{n}個振っています…",
+    "energyRerollPick": "相手に振りなおさせるエネコロを選ぼう（{n}個まで）",
+    "energyRerollPickWaiting": "相手が振りなおすエネコロを選択中…",
+    "energyRerollConfirm": "{n}個振りなおさせる",
+    "energyRerollSkip": "振りなおさせない"
   },
   "win": {
     "victorySuffix": "勝利！",
@@ -309,6 +320,7 @@
       "prevEnemyFailed": "前の相手の番、相手のエネコロが失敗した",
       "prevSelfFailed": "前の自分の番、自分のエネコロが失敗した",
       "prevPrereqSucceeded": "前の自分の番、指定のワザが成功した",
+      "prevSelfUnhurt": "前の相手の番、ワザのダメージを受けていない",
       "evHint": "期待値＝（相手に与えるダメージ − 自分が受けるダメージ）の平均に成功率を掛けた値。回復はプラスとして数えます。弱点をつくにチェックすると、表記ダメージが0より大きいワザすべてに弱点ダメージが加わります。下段の内訳は足すと期待値になります（与ダメ計は小計です）。相手のダメージ軽減と弱点は1回ごとのダメージに適用して（0未満にはならない）計算します。灰色の取り消し線は軽減・弱点なしの期待値です",
       "noteNeedsHp": "残りHPを入れると計算されます",
       "noteNeedsPrev": "上の前提条件に基づく数値",

@@ -185,5 +185,71 @@
     "weakness_type2": null,
     "weakness_damage2": null,
     "image_URL": null
+  },
+  {
+    "id": "EBC02-001",
+    "name": "ゲッコウガ",
+    "type": "みず",
+    "HP": 120,
+    "weakness_type1": "くさ",
+    "weakness_damage1": 20,
+    "weakness_type2": null,
+    "weakness_damage2": null,
+    "image_URL": null
+  },
+  {
+    "id": "EBC02-002",
+    "name": "カヌチャン",
+    "type": "ちょう",
+    "HP": 120,
+    "weakness_type1": "ほのお",
+    "weakness_damage1": 20,
+    "weakness_type2": null,
+    "weakness_damage2": null,
+    "image_URL": null
+  },
+  {
+    "id": "EBC02-003",
+    "name": "ヤミラミ",
+    "type": "あく",
+    "HP": 120,
+    "weakness_type1": "ちょう",
+    "weakness_damage1": 20,
+    "weakness_type2": null,
+    "weakness_damage2": null,
+    "image_URL": null
+  },
+  {
+    "id": "EBC02-004",
+    "name": "ボスゴドラ",
+    "type": "はがね",
+    "HP": 120,
+    "weakness_type1": "かくとう",
+    "weakness_damage1": 20,
+    "weakness_type2": null,
+    "weakness_damage2": null,
+    "image_URL": null
+  },
+  {
+    "id": "EBC02-005",
+    "name": "レックウザ",
+    "type": "ドラゴン",
+    "HP": 120,
+    "weakness_type1": "ドラゴン",
+    "weakness_damage1": 20,
+    "weakness_type2": null,
+    "weakness_damage2": null,
+    "image_URL": null
+  },
+  {
+    "id": "EBC02-006",
+    "name": "ラッキー",
+    "type": "無色",
+    "HP": 120,
+    "weakness_type1": "かくとう",
+    "weakness_damage1": 20,
+    "weakness_type2": null,
+    "weakness_damage2": null,
+    "image_URL": null
   }
 ]

@@ -82,15 +82,28 @@ function dedupeIds(moves) {
   return out
 }
 
+// Effect values that aren't amounts of HP: a damage threshold, a count of rerolls, a flag.
+// Scaling them like damage would turn "reroll 1 die" into "reroll 0" on the first floor that
+// multiplies at all, so they pass through as printed.
+const UNSCALED_EFFECT_TYPES = new Set([
+  'NULLIFY_TAKEN_LE',
+  'REROLL_DICE_ENEMY',
+  'REROLL_CHARADICE_SELF',
+  'SPECIAL_PICK_ENEMY_WAZA',
+  'SPECIAL_SWAP_CHIP',
+  'HEAL_SELF_FULL'
+])
+
 // Scales a move's numeric power fields by the floor damage multiplier, returning a
 // standalone copy so the shared damage/effect-queue logic can operate on it unmodified.
 export function scaleMoveForFloor(mv, multiplier) {
   const scale = n => Math.round((n * multiplier) / 5) * 5
+  const scaleFor = (type, n) => (UNSCALED_EFFECT_TYPES.has(type) ? n : scale(n))
   return {
     ...mv,
     baseDamage: scale(mv.baseDamage),
-    effectValue: mv.effectValue ? scale(mv.effectValue) : mv.effectValue,
-    chara: mv.chara.map(ce => ({ ...ce, value: scale(ce.value) }))
+    effectValue: mv.effectValue ? scaleFor(mv.effectType, mv.effectValue) : mv.effectValue,
+    chara: mv.chara.map(ce => ({ ...ce, value: scaleFor(ce.type, ce.value) }))
   }
 }
 

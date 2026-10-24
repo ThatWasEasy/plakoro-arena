@@ -12,7 +12,11 @@ import ChipIcon from './dice/ChipIcon.vue'
 // side's picker. Local component state confirms once, at the very end (see emit('confirm')),
 // which is the only piece that ever needs to reach the opponent.
 const props = defineProps({
-  initialDice: { type: Array, default: null }
+  initialDice: { type: Array, default: null },
+  // SPECIAL_SWAP_CHIP (へんげぎり): re-chip ONE die mid-match. The fixed convex/concave faces
+  // aren't chips, so they stay put; once one die has been touched the other two lock; and the
+  // result is that single die, emitted as { dieIndex, die }.
+  swapOneDie: { type: Boolean, default: false }
 })
 const emit = defineEmits(['close', 'confirm'])
 const { t } = useI18n()
@@ -50,8 +54,22 @@ const editingSlot = ref(null) // { dieIndex, faceKey } | null
 const currentMeta = computed(() => editingSlot.value ? slotMeta(editingSlot.value.faceKey) : null)
 const editingDie = computed(() => editingSlot.value ? dice.value[editingSlot.value.dieIndex] : null)
 
+// Which die a swap has started on, so the others can be locked. null until the first change.
+const swapDieIndex = ref(null)
+
+function slotEditable(dieIndex, faceKey) {
+  if (!props.swapOneDie) return true
+  if (faceKey === 'convex' || faceKey === 'concave') return false
+  return swapDieIndex.value === null || swapDieIndex.value === dieIndex
+}
+
 function openPicker(dieIndex, faceKey) {
+  if (!slotEditable(dieIndex, faceKey)) return
   editingSlot.value = { dieIndex, faceKey }
+}
+
+function markSwapped() {
+  if (props.swapOneDie && swapDieIndex.value === null && editingSlot.value) swapDieIndex.value = editingSlot.value.dieIndex
 }
 function closePicker() {
   editingSlot.value = null
@@ -82,6 +100,7 @@ function pickType(type) {
   else if (meta.kind === 'concave') die.concaveType = type
   else if (meta.kind === 'single') die.singleSlots[meta.slotIndex] = { kind: 'single', type }
   else return
+  markSwapped()
   closePicker()
 }
 
@@ -90,6 +109,7 @@ function setDualType(half, type) {
   const die = editingDie.value
   if (!die || !meta || meta.kind !== 'dual') return
   die.dualSlots[meta.slotIndex].types[half] = type
+  markSwapped()
 }
 
 const pickerTitleKey = computed(() => {
@@ -120,6 +140,11 @@ function applyPureType(type) {
 }
 
 function confirm() {
+  if (props.swapOneDie) {
+    const i = swapDieIndex.value
+    emit('confirm', i === null ? null : { dieIndex: i, die: dice.value[i] })
+    return
+  }
   emit('confirm', dice.value)
 }
 </script>
@@ -127,8 +152,8 @@ function confirm() {
 <template>
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal-sheet" style="max-height:85%; overflow-y:auto;">
-      <div class="modal-title">{{ t('energyDice.title') }}</div>
-      <div class="center-hint" style="padding:0 0.625rem 0.5rem; text-align:center;">{{ t('energyDice.hint') }}</div>
+      <div class="modal-title">{{ swapOneDie ? t('energyDice.swapTitle') : t('energyDice.title') }}</div>
+      <div class="center-hint" style="padding:0 0.625rem 0.5rem; text-align:center;">{{ swapOneDie ? t('energyDice.swapHint') : t('energyDice.hint') }}</div>
 
       <div style="display:flex; flex-direction:column; gap:0.625rem; padding:0 0.625rem;">
         <div v-for="(die, di) in dice" :key="di" class="select-card" style="width:100%; align-items:stretch; padding:0.75rem;">
@@ -136,7 +161,7 @@ function confirm() {
           <div style="display:grid; grid-template-columns: repeat(6, 1fr); gap:0.375rem;">
             <div v-for="row in FACE_ROWS" :key="row.key" style="display:flex; flex-direction:column; align-items:center; gap:0.125rem;">
               <span style="font-size:0.5625rem; font-weight:800; color:var(--sub);">{{ t('diceBuilder.face.' + row.labelKey) }}</span>
-              <div style="cursor:pointer;" @click="openPicker(di, row.key)">
+              <div :style="slotEditable(di, row.key) ? 'cursor:pointer;' : 'cursor:default; opacity:.35;'" @click="openPicker(di, row.key)">
                 <ChipIcon :types="faceTypes(die, row.key)" :size="CELL" />
               </div>
             </div>
@@ -145,7 +170,7 @@ function confirm() {
       </div>
 
       <div style="display:flex; gap:0.625rem; justify-content:center; flex-wrap:wrap; padding:0.875rem 0 0.25rem;">
-        <button class="btn secondary" @click="showQuickApply = true">{{ t('diceBuilder.quickApplyButton') }}</button>
+        <button v-if="!swapOneDie" class="btn secondary" @click="showQuickApply = true">{{ t('diceBuilder.quickApplyButton') }}</button>
         <button class="btn wide" style="max-width:16rem;" @click="confirm">{{ t('energyDice.confirm') }}</button>
       </div>
     </div>

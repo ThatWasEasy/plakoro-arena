@@ -130,6 +130,18 @@ export function runEffectQueue(queue, idx, ctx, hooks, done) {
     return
   }
 
+  // "Count of <type> energy that came up" where the counted type isn't the move's own — e.g.
+  // ドラゴンバースト is a Dragon move that counts Lightning. The bare DAMAGE_EXTRA_ENE in the
+  // switch below keeps counting the move's own type, which is what every earlier card meant.
+  const eneTypeMatch = /^DAMAGE_EXTRA_ENE_(.+)$/.exec(eff.type)
+  if (eneTypeMatch) {
+    hooks.showEneCountPrompt(eff.value, ctx, count => {
+      ctx.dmgToOpp += count * eff.value
+      next()
+    }, eneTypeMatch[1])
+    return
+  }
+
   // Pins a player's character die for their next turn: rows whose orientations fall outside the
   // fixed set become unselectable (see charaDiceOrientationAllowed). Mirrors `charaDiceBlocked`
   // in lifecycle — set here, consumed next turn, cleared when that turn resolves.
@@ -236,6 +248,64 @@ export function runEffectQueue(queue, idx, ctx, hooks, done) {
       break
     case "DAMAGE_EXTRA_DICE_MISS_SELF":
       if (ctx.mover.committedLastMoveFailed) ctx.dmgToOpp += eff.value
+      next()
+      break
+    // Healing written as its own type. Same arithmetic as a negative DAMAGE_SELF (はねやすめ's
+    // -20), so it rides the existing heal path in proceedToAnimateWithCtx unchanged.
+    case "HEAL_SELF":
+      ctx.dmgToSelf -= eff.value
+      next()
+      break
+    // "HP をすべて回復する": however much is missing right now. Taken as a floor on dmgToSelf
+    // rather than added to it, so a flat heal queued before it in the same move (タマゴうみ's
+    // own +20) isn't counted twice on top of a full heal.
+    case "HEAL_SELF_FULL":
+      ctx.dmgToSelf = Math.min(ctx.dmgToSelf, -(ctx.mover.maxHp - ctx.mover.hp))
+      next()
+      break
+    // "受けるダメージが N 以下なら、そのダメージを受けない": a threshold on the final figure,
+    // so it can only be checked once every addition has landed — see proceedToAnimateWithCtx.
+    // Same lifecycle as incomingDamageNullify: set now, consumed by the opponent's next hit.
+    case "NULLIFY_TAKEN_LE":
+      ctx.mover.incomingDamageNullifyAtMost = eff.value
+      next()
+      break
+    // "前の相手の番、このポケモンがワザのダメージを受けていないなら": tookMoveDamage is
+    // cleared when the opponent's turn starts and set by any hit landing in it, so it reads
+    // as exactly that previous turn.
+    case "DAMAGE_EXTRA_IF_UNHURT":
+      if (!ctx.mover.tookMoveDamage) ctx.dmgToOpp += eff.value
+      next()
+      break
+    // Both rerolls are spent during a later turn's dice phase, not here: the caster gets to
+    // re-throw N of the opponent's energy dice after the opponent's next throw, or their own
+    // character die on their own next turn. Taken as a maximum rather than a sum, since
+    // チャンスタックル's die result says "2 instead of 1", not "1 more".
+    case "REROLL_DICE_ENEMY":
+      ctx.opp.energyRerollByOpponent = Math.max(ctx.opp.energyRerollByOpponent || 0, eff.value)
+      pushDiceModBadge(ctx.opp, ctx.mv.name, ctx.mv.type)
+      next()
+      break
+    case "REROLL_CHARADICE_SELF":
+      ctx.mover.charaRerolls = Math.max(ctx.mover.charaRerolls || 0, eff.value)
+      pushDiceModBadge(ctx.mover, ctx.mv.name, ctx.mv.type)
+      next()
+      break
+    // The caster picks which move the opponent uses on their next turn; the move-select step
+    // reads this and hands the choice to the caster (see MoveSelectPanel.vue / useSoloRun).
+    case "SPECIAL_PICK_ENEMY_WAZA":
+      ctx.opp.movePickedByOpponent = { sourceName: ctx.mv.name, sourceType: ctx.mv.type }
+      pushDiceModBadge(ctx.opp, ctx.mv.name, ctx.mv.type)
+      next()
+      break
+    // Re-chipping one of the caster's own energy dice. Only online mode holds the dice as data;
+    // everywhere else they're physical and the player just does it at the table, so a mode
+    // without the hook has nothing to resolve.
+    case "SPECIAL_SWAP_CHIP":
+      if (hooks.showSwapChipPrompt) {
+        hooks.showSwapChipPrompt(eff.value, ctx, () => next())
+        return
+      }
       next()
       break
     default: {

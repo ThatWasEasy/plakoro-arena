@@ -50,7 +50,9 @@ function premiseOf(mv) {
   for (const type of types) {
     const hp = /_(\d+)HP_LOW$/.exec(type)
     if (hp) return { kind: 'hp', threshold: parseInt(hp[1], 10) }
-    if (type === 'DAMAGE_EXTRA_DICE_MISS_ENEMY' || type === 'DAMAGE_EXTRA_DICE_MISS_SELF') {
+    // "前の相手の番、ワザのダメージを受けていないなら" holds exactly when the opponent's last
+    // move went unpaid (or hit for nothing), so it shares the dice-miss frequency.
+    if (type === 'DAMAGE_EXTRA_DICE_MISS_ENEMY' || type === 'DAMAGE_EXTRA_DICE_MISS_SELF' || type === 'DAMAGE_EXTRA_IF_UNHURT') {
       return { kind: 'miss' }
     }
     const combo = /_DICE_SUCCESS_SELF_(.+)$/.exec(type)
@@ -125,7 +127,7 @@ export function rankCharacters(characters, movesById, options = {}) {
       const build = suggestedBuild(character, movesById)
       if (!build) return null
       const rolls = enumerateRolls(build.dice)
-      const base = { rolls, enemyDice: build.dice, tempoValues, enemyLastDamage, countDefensiveValue }
+      const base = { rolls, enemyDice: build.dice, tempoValues, enemyLastDamage, countDefensiveValue, selfMaxHp: character.hp }
       const plainResults = new Map()
       build.moveList.forEach(mv => plainResults.set(mv.id, moveExpectedValue(mv, base)))
       const unconditional = build.moveList.filter(mv => premiseOf(mv) === null)
@@ -173,7 +175,7 @@ export function rankCharacters(characters, movesById, options = {}) {
           return plain + holds * (met - plain)
         }
 
-        const met = moveExpectedValue(mv, { ...base, selfHp, prev: { enemyMoveFailed: true, selfMoveFailed: true } }).ev
+        const met = moveExpectedValue(mv, { ...base, selfHp, prev: { enemyMoveFailed: true, selfMoveFailed: true, selfUnhurt: true } }).ev
         return plain + freq.diceMissed * (met - plain)
       }
 

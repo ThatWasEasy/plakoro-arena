@@ -99,6 +99,7 @@ const enemyWeak = ref(false)
 const prevEnemyFailed = ref(true)
 const prevSelfFailed = ref(true)
 const prevPrereqSucceeded = ref(true)
+const prevSelfUnhurt = ref(true)
 
 // Pricing what a move denies the opponent means running the whole roster against itself
 // several times over — a few hundred milliseconds, enough to drop a frame. It's held outside
@@ -274,11 +275,14 @@ const moveRows = computed(() => {
       // so it assumes a mirror of this set and flags that it did.
       enemyDice: props.sets[si].dice,
       selfHp: selfHp.value,
+      // Only a heal-to-full reads it, against the HP entered above.
+      selfMaxHp: character.hp,
       enemyLastDamage: enemyLastDamage.value,
       prev: {
         enemyMoveFailed: prevEnemyFailed.value,
         selfMoveFailed: prevSelfFailed.value,
-        prereqMoveSucceeded: prevPrereqSucceeded.value
+        prereqMoveSucceeded: prevPrereqSucceeded.value,
+        selfUnhurt: prevSelfUnhurt.value
       },
       countDefensiveValue: countDefensiveValue.value,
       tempoValues: countTempoValue.value ? tempoTable.value : null,
@@ -480,6 +484,10 @@ async function exportImage() {
           <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
             <input type="checkbox" v-model="prevPrereqSucceeded" style="width:0.75rem; height:0.75rem; margin:0;">
             {{ t('diceBuilder.moveOdds.prevPrereqSucceeded') }}
+          </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="prevSelfUnhurt" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.prevSelfUnhurt') }}
           </label>
         </div>
         <div style="font-size:0.5625rem; font-weight:600; color:var(--sub); line-height:1.5;">

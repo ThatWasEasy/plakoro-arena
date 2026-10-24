@@ -17,6 +17,7 @@ const MUTATING_ACTIONS = [
   'confirmCharacterMoves', 'onCardTap', 'startBattle', 'setReadyForFirst', 'setEnergyDice',
   'pickMove', 'backToMoveSelect', 'setDiceRollResult', 'resolveTurn', 'submitEffectPrompt',
   'pickBindWazaMove', 'confirmTurnResult', 'submitCharaThrowResult', 'submitEnergyThrowResult',
+  'toggleEnergyRerollPick', 'confirmEnergyRerollPick', 'submitEnergyRerollResult', 'rerollCharaDie',
   'resetGame'
 ]
 

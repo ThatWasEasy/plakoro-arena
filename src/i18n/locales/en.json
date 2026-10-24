@@ -38,7 +38,8 @@
     "notSelected": "Not selected",
     "incomingDamageEffect": "Effect: next damage taken {sign}{value}",
     "guest": "Guest",
-    "level": "Lv.{n}"
+    "level": "Lv.{n}",
+    "incomingDamageNullifyAtMost": "Effect: next hit of {value} or less is ignored"
   },
   "select": {
     "pickPokemon": "Pick a<br>Pokémon",
@@ -62,12 +63,16 @@
   "energyDice": {
     "title": "Set up your energy dice",
     "hint": "Tap any face to change its energy — these 3 dice get thrown for the whole match.",
-    "confirm": "Done"
+    "confirm": "Done",
+    "swapTitle": "Swap chips",
+    "swapHint": "Pick one energy die and swap as many of its chips as you like (convex/concave faces stay fixed)"
   },
   "moveSelect": {
     "title": "Choose 4 moves for {name}",
     "confirm": "Confirm selected moves",
-    "opponentThinking": "Opponent is choosing a move…"
+    "opponentThinking": "Opponent is choosing a move…",
+    "pickForOpponent": "{source}: choose the move your opponent uses this turn",
+    "opponentPickingForYou": "{source}: your opponent is choosing your move…"
   },
   "moveCard": {
     "usedLastTurn": "Used last turn",
@@ -83,7 +88,8 @@
     "moveFail": "Move Fails",
     "throwCharaDie": "Throw Dice",
     "opponentResolving": "Opponent is resolving their move…",
-    "opponentRolled": "Opponent's roll result"
+    "opponentRolled": "Opponent's roll result",
+    "rerollCharaDie": "Reroll character die ({n} left)"
   },
   "effectPrompt": {
     "diceRollLabel": "{n}",
@@ -100,7 +106,8 @@
     "charaDiceComboPrefix": "Roll the opponent's character die {n} times; each landing on",
     "charaDiceComboSuffix": " adds {dmg} damage. Choose the number of successes.",
     "charaDiceSelectSelfTitle": "Choose the orientation the character die landed on — yours is fixed to it next turn.",
-    "charaDiceSelectEnemyTitle": "Choose the orientation the character die landed on — the opponent's is fixed to it next turn."
+    "charaDiceSelectEnemyTitle": "Choose the orientation the character die landed on — the opponent's is fixed to it next turn.",
+    "swapChipSub": "Pick one energy die and swap its chips"
   },
   "turnResult": {
     "title": "Turn Result",
@@ -114,7 +121,11 @@
     "charaProgressRepeat": "{count} success(es) in a row — keep going until it misses",
     "throwAgain": "Throw Again",
     "energyYourTurn": "Your turn to throw {n} energy dice",
-    "energyWaiting": "Opponent is throwing {n} energy dice…"
+    "energyWaiting": "Opponent is throwing {n} energy dice…",
+    "energyRerollPick": "Choose energy dice for your opponent to reroll (up to {n})",
+    "energyRerollPickWaiting": "Opponent is choosing which of your energy dice to reroll…",
+    "energyRerollConfirm": "Make them reroll {n}",
+    "energyRerollSkip": "No reroll"
   },
   "win": {
     "victorySuffix": " Wins!",
@@ -309,6 +320,7 @@
       "prevEnemyFailed": "Opponent's energy dice failed last turn",
       "prevSelfFailed": "Your energy dice failed last turn",
       "prevPrereqSucceeded": "The prerequisite move landed last turn",
+      "prevSelfUnhurt": "Took no move damage on the opponent's last turn",
       "evHint": "Expected value = average of (damage dealt − damage taken by yourself), multiplied by the success rate. Healing counts as a gain. With weakness ticked, every move whose printed damage is above 0 adds the weakness bonus. The parts underneath add up to the figure (Dmg is a subtotal, not another part). The opponent's damage reduction and weakness apply to each cast (never below 0) before anything is averaged; the struck-through grey figure is the value with neither.",
       "noteNeedsHp": "Counted once you enter remaining HP",
       "noteNeedsPrev": "Based on the assumptions above",

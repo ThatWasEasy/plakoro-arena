@@ -79,6 +79,15 @@ export function tempoWorth(type, value, table) {
       return table.nullifyDamage
     case 'SPECIAL_BIND_WAZA':
       return table.bindMove
+    case 'SPECIAL_PICK_ENEMY_WAZA':
+      return table.pickEnemyMove
+    // Keyed by threshold, since the table prices each one the roster actually prints.
+    case 'NULLIFY_TAKEN_LE':
+      return table[nullifyAtMostKey(value)] || 0
+    case 'REROLL_DICE_ENEMY':
+      return value >= 2 ? table.rerollEnemyDice2 : value >= 1 ? table.rerollEnemyDice1 : 0
+    case 'REROLL_CHARADICE_SELF':
+      return value >= 2 ? table.gainCharaReroll2 : value >= 1 ? table.gainCharaReroll1 : 0
     case 'MOD_DICE_STEAL':
       return table.denyDice1 + table.gainDice1
     // The only one that can come out negative: a few moves cost the caster their own dice.
@@ -91,6 +100,10 @@ export function tempoWorth(type, value, table) {
     default:
       return 0
   }
+}
+
+export function nullifyAtMostKey(limit) {
+  return `nullifyAtMost${limit}`
 }
 
 function addTempo(state, type, value, env) {
@@ -187,12 +200,33 @@ function applyEffect(eff, state, env) {
     return
   }
 
+  // Same conditional mean as DAMAGE_EXTRA_ENE, for a counted type other than the move's own.
+  const eneType = /^DAMAGE_EXTRA_ENE_(.+)$/.exec(type)
+  if (eneType) {
+    state.damage += env.payingTypeMean(eneType[1]) * value
+    return
+  }
+
   switch (type) {
     case 'DAMAGE_EXTRA':
       state.damage += value
       break
     case 'DAMAGE_SELF':
       state.self += value
+      break
+    case 'HEAL_SELF':
+      state.self -= value
+      break
+    // Whatever is missing, so it needs both ends of the HP bar. A floor rather than a sum, as
+    // in effectQueue.js: a flat heal earlier in the same move is part of the full heal.
+    case 'HEAL_SELF_FULL':
+      if (env.selfHp === null || env.selfMaxHp === null) addNote(state, type, NOTE_NEEDS_HP)
+      else state.self = Math.min(state.self, -Math.max(0, env.selfMaxHp - env.selfHp))
+      break
+    // Whether the opponent's last turn landed a hit is a premise like the dice-miss pair above.
+    case 'DAMAGE_EXTRA_IF_UNHURT':
+      addNote(state, type, NOTE_NEEDS_PREV)
+      if (env.prev.selfUnhurt) state.damage += value
       break
     case 'DAMAGE_MULTIPLY':
       state.damage *= value
@@ -238,6 +272,13 @@ function applyEffect(eff, state, env) {
     case 'MOD_CHARADICE_ENEMY':
     case 'MOD_DICE-CHARADICE_ENEMY':
     case 'SPECIAL_BIND_WAZA':
+    case 'SPECIAL_PICK_ENEMY_WAZA':
+    case 'NULLIFY_TAKEN_LE':
+    case 'REROLL_DICE_ENEMY':
+    case 'REROLL_CHARADICE_SELF':
+    // Re-chipping a die changes every later roll, which the table has no way to price; like the
+    // die pins above it stays a known zero rather than an unknown.
+    case 'SPECIAL_SWAP_CHIP':
       addTempo(state, type, value, env)
       break
     // Handled by weaknessBonus, which reads the move's effect type directly.
@@ -293,7 +334,12 @@ function resolveBranch(mv, ce, env) {
 // from; `weight` is how much of the move's outcome the branch accounts for. They differ for
 // a multi-roll effect, which owns the die outright: there is no face on which the move
 // resolves without it, so its branch is unconditional and no miss branch exists.
-function buildBranches(mv, charaDiceInPlay) {
+//
+// `charaRerolls` (REROLL_CHARADICE_SELF) lets the caster throw the die again: they take it
+// whenever it lands where nothing fires, so the miss branch shrinks to missed^(k+1) and the
+// effect branches grow in proportion. That greedy rule isn't always optimal — a move whose
+// only effect hurts its caster would rather keep a miss — but no printed card pairs the two.
+function buildBranches(mv, charaDiceInPlay, charaRerolls = 0) {
   if (!charaDiceInPlay || mv.chara.length === 0) {
     return [{ ce: null, hits: 0, weight: 1 }]
   }
@@ -308,7 +354,13 @@ function buildBranches(mv, charaDiceInPlay) {
     branches.push({ ce, hits, weight: hits / CHARA_DIE_FACE_COUNT })
   })
   const missed = CHARA_DIE_FACE_COUNT - claimed
-  if (missed > 0) branches.push({ ce: null, hits: 0, weight: missed / CHARA_DIE_FACE_COUNT })
+  if (missed > 0) {
+    const pMiss = missed / CHARA_DIE_FACE_COUNT
+    const pMissAfter = Math.pow(pMiss, charaRerolls + 1)
+    const grow = pMiss < 1 ? (1 - pMissAfter) / (1 - pMiss) : 1
+    branches.forEach(branch => { branch.weight *= grow })
+    branches.push({ ce: null, hits: 0, weight: pMissAfter })
+  }
   return branches
 }
 
@@ -367,6 +419,9 @@ export function largestTypePileMean(dice) {
  *                                            no shield up
  * @param {number} [options.enemyWeakness]  weakness bonus every damaging cast collects; 0 for
  *                                           weakness left out
+ * @param {number|null} [options.selfMaxHp]  the caster's full HP, for a heal-to-full; null
+ *                                            leaves it uncounted, like selfHp
+ * @param {number} [options.charaRerolls]  re-throws of the character die on offer this turn
  */
 export function moveExpectedValue(mv, options) {
   const {
@@ -379,7 +434,9 @@ export function moveExpectedValue(mv, options) {
     countDefensiveValue = false,
     tempoValues = null,
     enemyReduction = 0,
-    enemyWeakness = 0
+    enemyWeakness = 0,
+    selfMaxHp = null,
+    charaRerolls = 0
   } = options
 
   const odds = payableCount(rolls, mv.cost)
@@ -387,11 +444,12 @@ export function moveExpectedValue(mv, options) {
 
   // Both of these cost a pass of their own and only one printed move each needs them, so
   // they stay lazy and memoised rather than being computed for every move in the list.
-  let payingTypeMeanCache = null
+  const payingTypeMeanCache = new Map()
   let enemyDiceMeanCache = null
   const env = {
     charaHits: CHARA_DIE_FACE_COUNT,
     selfHp,
+    selfMaxHp,
     enemyLastDamage,
     countDefensiveValue,
     tempoValues,
@@ -400,13 +458,14 @@ export function moveExpectedValue(mv, options) {
       enemyMoveFailed: false,
       selfMoveFailed: false,
       prereqMoveSucceeded: false,
+      selfUnhurt: false,
       ...prev
     },
-    payingTypeMean: () => {
-      if (payingTypeMeanCache === null) {
-        payingTypeMeanCache = conditionalTypeMean(rolls, mv.cost, mv.type)
+    payingTypeMean: (type = mv.type) => {
+      if (!payingTypeMeanCache.has(type)) {
+        payingTypeMeanCache.set(type, conditionalTypeMean(rolls, mv.cost, type))
       }
-      return payingTypeMeanCache
+      return payingTypeMeanCache.get(type)
     },
     enemyDiceMean: () => {
       if (!enemyDice || enemyDice.length === 0) return null
@@ -427,7 +486,7 @@ export function moveExpectedValue(mv, options) {
   let defensiveOnHit = 0
   let tempoOnHit = 0
 
-  const branches = buildBranches(mv, charaDiceInPlay).map(branch => {
+  const branches = buildBranches(mv, charaDiceInPlay, charaRerolls).map(branch => {
     const state = resolveBranch(mv, branch.ce, { ...env, charaHits: branch.hits })
     // Mirrors proceedToAnimateWithCtx: a move can't heal the opponent, so damage floors at 0 —
     // after the opponent's reduction and weakness have been applied, which is what makes the
