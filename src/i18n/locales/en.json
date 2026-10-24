@@ -139,7 +139,8 @@
     "line": "Official Line",
     "lineJoin": "Join Line",
     "online": "Online Battle",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "moveAdvisor": "Move recommendations"
   },
   "admin": {
     "switchTitle": "Account Admin",
@@ -792,5 +793,16 @@
     },
     "comingSoon": "Online battle is coming soon",
     "notRankedOnline": "You have no online battles yet"
+  },
+  "moveAdvisor": {
+    "title": "Move recommendations",
+    "hint": "Pick up to {team} Pokémon to see the {deck} moves worth the most for each",
+    "floor": "at least one {n}-energy move",
+    "calculating": "working…",
+    "empty": "Pick a Pokémon above",
+    "dice": "{n} dice",
+    "unmet": "no {costs}-energy move exists, so that floor was dropped",
+    "free": "no cost",
+    "assumptions": "Every Pokémon is assumed to throw three pure dice of whichever type its own moves are worth the most on. Weakness and the opposing Pokémon are left out. Move names stay in Japanese so they match the printed cards."
   }
 }

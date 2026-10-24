@@ -64,6 +64,8 @@ function buildCharaEffect(die, effectStr, type, val) {
 }
 
 const MOVES_BASE = {}
+// What the card prints, before any per-game modifier — the move advisor ranks printed moves.
+export const printedMoves = MOVES_BASE
 wazaRaw.forEach(w => {
   const chara = []
   const c1 = buildCharaEffect(w.chara_die1, w.chara_effect1, w.chara_effect_type1, w.chara_effect_value1)

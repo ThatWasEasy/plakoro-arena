@@ -37,6 +37,7 @@ import StoreInfoApp from './components/StoreInfoApp.vue'
 import TournamentApp from './components/tournament/TournamentApp.vue'
 import TierListApp from './components/TierListApp.vue'
 import TypeChartApp from './components/TypeChartApp.vue'
+import MoveAdvisorApp from './components/MoveAdvisorApp.vue'
 import TierMakerApp from './components/TierMakerApp.vue'
 import TraitChartApp from './components/TraitChartApp.vue'
 // d3 (scale/shape/array) rides along with this view — code-split so only players who open the
@@ -186,6 +187,8 @@ onBeforeUnmount(uninstallButtonSfx)
       />
 
       <TypeChartApp v-else-if="mode === 'typeChart'" @back="leaveMode()" />
+
+      <MoveAdvisorApp v-else-if="mode === 'moveAdvisor'" @back="leaveMode()" />
 
       <TierMakerApp v-else-if="mode === 'tierMaker'" @back="leaveMode()" />
 

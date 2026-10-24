@@ -139,7 +139,8 @@
     "line": "官方 Line",
     "lineJoin": "加入 Line",
     "online": "線上對戰",
-    "comingSoon": "即將上線"
+    "comingSoon": "即將上線",
+    "moveAdvisor": "招式推薦"
   },
   "admin": {
     "switchTitle": "帳號管理",
@@ -791,5 +792,16 @@
     },
     "comingSoon": "線上對戰即將上線",
     "notRankedOnline": "你還沒有線上對戰紀錄"
+  },
+  "moveAdvisor": {
+    "title": "招式推薦",
+    "hint": "最多選 {team} 隻，各自列出期望效益最高的 {deck} 招",
+    "floor": "至少帶一招 {n} 能量",
+    "calculating": "計算中…",
+    "empty": "從上面挑寶可夢",
+    "dice": "{n} 顆骰",
+    "unmet": "沒有 {costs} 能量的招式，已略過該條件",
+    "free": "免費",
+    "assumptions": "每隻寶可夢都假設帶著「自己的招式用起來期望效益最高的屬性」所組成的 3 顆純屬骰。不計弱點、也不指定對手。招式名保留日文，才對得上實體卡。"
   }
 }

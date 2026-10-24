@@ -46,6 +46,7 @@ const MODES = [
   // up front pushed the front page past the point where every card still fit.
   { key: 'tournament', group: 'tools' },
   { key: 'tierMaker', group: 'tools' },
+  { key: 'moveAdvisor', group: 'tools' },
   // Admin-only: the trait numbers are hand-maintained and incomplete, so publishing them as
   // a player-facing chart would present guesses as data.
   { key: 'traitChart', group: 'tools', adminOnly: true },
