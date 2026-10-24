@@ -15,6 +15,14 @@
 // with 「相手のワザを１つ選ぶ」 — which is why it's offered rather than assumed.
 export const SUSTAINABLE_SLOTS = 2
 
+// A normal turn throws 3 energy dice; the first turn of a game throws 2.
+export const NORMAL_DICE = 3
+
+// How many moves a player brings to a battle. Not used for deck-building here, but the
+// tempo pricing below needs to know what an opponent's "best four moves" look like, and
+// a deck is defined the same way everywhere this model looks at it.
+export const DECK_SIZE = 4
+
 /**
  * Mean of the best `slots` scores, or of all of them when there are fewer.
  *

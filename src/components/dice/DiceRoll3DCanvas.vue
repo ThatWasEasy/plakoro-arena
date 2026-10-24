@@ -32,7 +32,7 @@ onBeforeUnmount(() => {
 // Resolves with null instead if the drop is superseded before the dice settle.
 async function setDice(faceList) {
   const results = await controller.setDice(faceList)
-  if (results) emit('rolled', results)
+  if (results) emit('rolled', results, controller.getLastTransforms())
   return results
 }
 
@@ -41,8 +41,14 @@ async function setDice(faceList) {
 // forwarded to the physics roll so a real flick actually throws the dice that way.
 async function roll(screenVX = 0, screenVY = 0) {
   const results = await controller.roll(screenVX, screenVY)
-  if (results) emit('rolled', results)
+  if (results) emit('rolled', results, controller.getLastTransforms())
   return results
+}
+
+// Reproduces another client's throw exactly: same textures, tweened (no physics) straight to
+// the exact final pose their real roll settled on — see useDiceRoll3D's replay()/getLastTransforms().
+function replay(faceList, transforms) {
+  controller.replay(faceList, transforms)
 }
 
 let lastClientX = 0
@@ -116,7 +122,7 @@ function onPointerUp(e) {
   velY = 0
 }
 
-defineExpose({ setDice, roll })
+defineExpose({ setDice, roll, replay })
 </script>
 
 <template>

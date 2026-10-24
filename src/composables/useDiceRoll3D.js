@@ -54,10 +54,20 @@ export function useDiceRoll3D(canvasEl) {
   let renderer, scene, camera, world
   let groundMaterial, diceMaterial
   let dice = [] // { mesh, body, faceByAxis }
+  // Non-physics stand-ins for a peer's throw (see replay()) — tweened straight to a given final
+  // pose instead of being simulated, so two different clients can render the identical result.
+  let replayDice = [] // { mesh, fromPos, toPos, fromQuat, toQuat, startTime, duration }
+  let lastTransforms = []
   let frameId = null
   let resizeObserver = null
   let rollResolve = null
   let settleCheckActive = false
+  // A die can occasionally settle into a near-static wobble that never quite crosses
+  // allSettled()'s velocity threshold (most often a single die with nothing else to collide
+  // with and damp it) — this caps how long the check window waits before forcing a result off
+  // whatever orientation the die currently reads, rather than leaving the caller waiting forever.
+  let settleDeadline = 0
+  const MAX_SETTLE_WAIT_MS = 6000
   let rollSoundPlayed = false // only the first table impact of a roll makes a sound, not every bounce
   // (x, z) followed by the pointer while gathering; y stays fixed at GATHER_HEIGHT.
   const gatherCenter = new CANNON.Vec3(0, GATHER_HEIGHT, -TABLE_Z_OFFSET)
@@ -201,6 +211,13 @@ export function useDiceRoll3D(canvasEl) {
     // the physics engine's de-penetration response to that looks like an explosion, flinging
     // dice sideways instead of just letting them drop.
     body.position.set(offsetX, 4 + Math.random() * 1.2, -TABLE_Z_OFFSET + offsetZ)
+    // Every die otherwise starts from the same identity orientation, and the small drop from here
+    // rarely tumbles a cube far enough to change which face ends up on top — so without this, a
+    // fresh setDice() (every online dice-system throw, not just the drag-and-throw roll() path
+    // below) settles on the same face over and over instead of landing anywhere close to a fair
+    // 1-in-6 spread. Matches the randomized starting quaternion roll() already uses for its own
+    // throw.
+    body.quaternion.setFromEuler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)
     // A little random drift/spin on the initial drop — otherwise every die falls from the exact
     // same height with zero velocity and lands in an identical, robotic-looking pose every time
     // setDice() places a fresh set (before the player has thrown anything themselves).
@@ -243,6 +260,57 @@ export function useDiceRoll3D(canvasEl) {
       world.removeBody(body)
     })
     dice = []
+    clearReplayDice()
+  }
+
+  function clearReplayDice() {
+    replayDice.forEach(({ mesh }) => {
+      scene.remove(mesh)
+      mesh.geometry.dispose()
+      mesh.material.forEach(m => {
+        if (m.map) m.map.dispose()
+        m.dispose()
+      })
+    })
+    replayDice = []
+  }
+
+  // Reproduces a peer's throw exactly: same face textures, tweened (no physics) straight to the
+  // exact final position/quaternion their real physics roll settled on — see getLastTransforms().
+  // `transforms[i]` is `{ position: [x,y,z], quaternion: [x,y,z,w] }`, one per die in `faceList`.
+  const REPLAY_DURATION_MS = 900
+  function replay(faceList, transforms) {
+    abandonPendingRoll()
+    clearDice()
+    const now = performance.now()
+    faceList.forEach((faces, i) => {
+      const t = transforms[i]
+      if (!t) return
+      const materials = faces.canvases.map(canvas => new THREE.MeshStandardMaterial({
+        map: new THREE.CanvasTexture(canvas)
+      }))
+      const mesh = new THREE.Mesh(
+        new RoundedBoxGeometry(DIE_SIZE, DIE_SIZE, DIE_SIZE, 3, DIE_CORNER_RADIUS),
+        materials
+      )
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      scene.add(mesh)
+
+      const toPos = new THREE.Vector3(...t.position)
+      const toQuat = new THREE.Quaternion(...t.quaternion)
+      const fromPos = new THREE.Vector3(toPos.x, toPos.y + 4 + Math.random() * 1.2, toPos.z)
+      const fromQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2
+      ))
+      mesh.position.copy(fromPos)
+      mesh.quaternion.copy(fromQuat)
+      replayDice.push({ mesh, fromPos, toPos, fromQuat, toQuat, startTime: now, duration: REPLAY_DURATION_MS })
+    })
+  }
+
+  function getLastTransforms() {
+    return lastTransforms
   }
 
   // Sets up (or replaces) the dice in the tray from a list of { canvases, faceByAxis }. Placed
@@ -282,7 +350,10 @@ export function useDiceRoll3D(canvasEl) {
     return new Promise(resolve => {
       rollResolve = resolve
       settleCheckActive = false
-      setTimeout(() => { settleCheckActive = true }, SETTLE_CHECK_DELAY_MS)
+      setTimeout(() => {
+        settleCheckActive = true
+        settleDeadline = performance.now() + MAX_SETTLE_WAIT_MS
+      }, SETTLE_CHECK_DELAY_MS)
     })
   }
 
@@ -410,7 +481,10 @@ export function useDiceRoll3D(canvasEl) {
       })
       // Give the last die a moment to actually leave the ground before checking for "settled",
       // otherwise a die that hasn't launched yet reads as already at rest.
-      setTimeout(() => { settleCheckActive = true }, (dice.length - 1) * STAGGER_MS + 300)
+      setTimeout(() => {
+        settleCheckActive = true
+        settleDeadline = performance.now() + MAX_SETTLE_WAIT_MS
+      }, (dice.length - 1) * STAGGER_MS + 300)
     })
   }
 
@@ -460,11 +534,24 @@ export function useDiceRoll3D(canvasEl) {
       entry.mesh.position.copy(entry.body.position)
       entry.mesh.quaternion.copy(entry.body.quaternion)
     })
+
+    const replayNow = performance.now()
+    replayDice.forEach(entry => {
+      const t = Math.min(1, (replayNow - entry.startTime) / entry.duration)
+      const eased = 1 - Math.pow(1 - t, 3)
+      entry.mesh.position.lerpVectors(entry.fromPos, entry.toPos, eased)
+      entry.mesh.quaternion.slerpQuaternions(entry.fromQuat, entry.toQuat, eased)
+    })
+
     renderer.render(scene, camera)
 
-    if (settleCheckActive && rollResolve && allSettled()) {
+    if (settleCheckActive && rollResolve && (allSettled() || performance.now() > settleDeadline)) {
       settleCheckActive = false
       const results = dice.map(({ body, faceByAxis }) => faceByAxis[topFaceOf(body)])
+      lastTransforms = dice.map(({ body }) => ({
+        position: [body.position.x, body.position.y, body.position.z],
+        quaternion: [body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w]
+      }))
       const resolve = rollResolve
       rollResolve = null
       resolve(results)
@@ -481,5 +568,5 @@ export function useDiceRoll3D(canvasEl) {
     if (renderer) renderer.dispose()
   }
 
-  return { init, setDice, gather, moveGatherTarget, roll, dispose }
+  return { init, setDice, gather, moveGatherTarget, roll, replay, getLastTransforms, dispose }
 }

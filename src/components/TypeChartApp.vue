@@ -29,10 +29,7 @@ const rows = computed(() =>
 
 <template>
   <div class="board select-board" style="overflow-y:auto; align-items:center;">
-    <div class="modal-title" style="margin:0.5rem 0 0.25rem;">{{ t('typeChart.title') }}</div>
-    <div class="center-hint" style="padding-bottom:0.5rem;">
-      {{ uniformWeakness !== null ? t('typeChart.hint', { n: uniformWeakness }) : t('typeChart.hintMixed') }}
-    </div>
+    <div class="modal-title" style="margin:0.5rem 0 1rem;">{{ t('typeChart.title') }}</div>
 
     <!-- Two per row. A row is a name and three icons, which leaves half the stage empty in a
          single column, and fifteen characters then need scrolling to compare. The stage is a

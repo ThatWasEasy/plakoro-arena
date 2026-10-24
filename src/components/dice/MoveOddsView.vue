@@ -9,6 +9,7 @@ import { buildTempoTable } from '../../game/tempoValue'
 import { ASSUMED_ENEMY_LAST_DAMAGE } from '../../game/suggestedDice'
 import { DEFAULT_WEAKNESS_DAMAGE } from '../../composables/useCharacterData'
 import MoveCard from '../MoveCard.vue'
+import html2canvas from 'html2canvas'
 
 // Which dice sets exist upstream, and their labels, so this view can report a move's odds
 // under each configuration side by side.
@@ -72,6 +73,7 @@ const rollsPerSet = computed(() =>
 )
 
 const showCounts = ref(false)
+const showBreakdownDetail = ref(false)
 
 // Premises the expected value depends on but the dice can't supply: a few moves only pay out
 // below an HP threshold or after a particular previous turn, and the two kinds of non-damage
@@ -97,6 +99,7 @@ const enemyWeak = ref(false)
 const prevEnemyFailed = ref(true)
 const prevSelfFailed = ref(true)
 const prevPrereqSucceeded = ref(true)
+const prevSelfUnhurt = ref(true)
 
 // Pricing what a move denies the opponent means running the whole roster against itself
 // several times over — a few hundred milliseconds, enough to drop a frame. It's held outside
@@ -168,6 +171,22 @@ function pct(payable, total) {
 function oddsText(payable, total) {
   const percentage = `${pct(payable, total)}%`
   return showCounts.value ? `${payable}/${total}（${percentage}）` : percentage
+}
+
+// The move's own success rate, then one more figure per character-die effect it has (joint
+// with that effect actually landing) — slash-joined into one number so the two readings sit
+// together without needing the die's own orientation icons repeated up here.
+function successText(row, si) {
+  const parts = [oddsText(row.odds[si].payable, row.odds[si].total)]
+  row.charaEffects.forEach(entry => {
+    const j = entry.joint[si]
+    parts.push(oddsText(j.payable, j.total))
+  })
+  // Counts-on readings already contain their own "/" (as in "120/216"), so joining those with
+  // "/" too reads as one long ambiguous fraction. "・" stays a list separator either way; plain
+  // percentages have no "/" of their own, so "/" is left alone there since it's shorter and
+  // already unambiguous.
+  return parts.join(showCounts.value ? '・' : '/')
 }
 
 // Rounding leaves the odd -0.00000001 behind, which would print as a startling "-0.0".
@@ -256,11 +275,14 @@ const moveRows = computed(() => {
       // so it assumes a mirror of this set and flags that it did.
       enemyDice: props.sets[si].dice,
       selfHp: selfHp.value,
+      // Only a heal-to-full reads it, against the HP entered above.
+      selfMaxHp: character.hp,
       enemyLastDamage: enemyLastDamage.value,
       prev: {
         enemyMoveFailed: prevEnemyFailed.value,
         selfMoveFailed: prevSelfFailed.value,
-        prereqMoveSucceeded: prevPrereqSucceeded.value
+        prereqMoveSucceeded: prevPrereqSucceeded.value,
+        selfUnhurt: prevSelfUnhurt.value
       },
       countDefensiveValue: countDefensiveValue.value,
       tempoValues: countTempoValue.value ? tempoTable.value : null,
@@ -291,6 +313,35 @@ const moveRows = computed(() => {
   return rows
 })
 
+// Snapshots the character header + dice controls + move list as a PNG, so a player can share
+// exactly the reading they're looking at (this build, this character) without a screenshot
+// tool cropping in the surrounding UI chrome. Excludes the "Back" button below it on purpose —
+// that control has no meaning once this is a static image.
+const exportTargetRef = ref(null)
+const exporting = ref(false)
+
+async function exportImage() {
+  if (!exportTargetRef.value || exporting.value) return
+  exporting.value = true
+  try {
+    const canvas = await html2canvas(exportTargetRef.value, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true
+    })
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `plakoro-move-odds-${selectedCharacter.value.name}.png`
+    a.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    exporting.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -318,6 +369,7 @@ const moveRows = computed(() => {
 
     <!-- odds table -->
     <template v-else>
+      <div ref="exportTargetRef" style="display:flex; flex-direction:column; align-items:center; width:100%;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; width:100%; max-width:40rem; padding:0 0.625rem 0.5rem;">
         <div style="display:flex; align-items:center; gap:0.375rem;">
           <div style="width:2rem; height:2rem; border-radius:0.375rem; overflow:hidden; flex-shrink:0;">
@@ -351,8 +403,15 @@ const moveRows = computed(() => {
             <input type="checkbox" v-model="showCounts" style="width:0.75rem; height:0.75rem; margin:0;">
             {{ t('diceBuilder.showCountsLabel') }}
           </label>
+          <label style="display:flex; align-items:center; gap:0.1875rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="showBreakdownDetail" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.showBreakdownDetail') }}
+          </label>
           <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="showSettings = !showSettings">
             {{ t('diceBuilder.moveOdds.settings') }}
+          </button>
+          <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" :disabled="exporting" @click="exportImage">
+            {{ exporting ? t('diceBuilder.moveOdds.exportingImage') : t('diceBuilder.moveOdds.exportImage') }}
           </button>
         </div>
       </div>
@@ -426,6 +485,10 @@ const moveRows = computed(() => {
             <input type="checkbox" v-model="prevPrereqSucceeded" style="width:0.75rem; height:0.75rem; margin:0;">
             {{ t('diceBuilder.moveOdds.prevPrereqSucceeded') }}
           </label>
+          <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="prevSelfUnhurt" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.prevSelfUnhurt') }}
+          </label>
         </div>
         <div style="font-size:0.5625rem; font-weight:600; color:var(--sub); line-height:1.5;">
           {{ t('diceBuilder.moveOdds.evHint') }}
@@ -441,40 +504,49 @@ const moveRows = computed(() => {
 
         <div class="move-pick-list">
           <div v-for="row in moveRows" :key="row.mv.id" style="display:flex; flex-direction:column; gap:0.25rem; min-width:0;">
-            <!-- odds sit above the card so the card itself stays exactly as it looks in game -->
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.375rem; padding:0 0.125rem;">
-              <span style="font-size:0.625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.successRate') }}</span>
-              <div style="display:flex; gap:0.5rem; flex-shrink:0;">
-                <span
-                  v-for="(o, si) in row.odds"
-                  :key="si"
-                  :style="{ display: 'flex', alignItems: 'baseline', gap: '0.1875rem', fontSize: '0.75rem', fontWeight: 600, color: o.payable === 0 ? 'var(--line)' : 'var(--sub)', whiteSpace: 'nowrap' }"
-                >
-                  <span v-if="hasCompare" style="font-weight:800;">{{ setLabels[si] }}</span>
-                  <span :style="{ fontSize: '1.25rem', fontWeight: 900, color: o.payable === 0 ? 'var(--line)' : 'var(--ink)' }">{{ oddsText(o.payable, o.total) }}</span>
-                </span>
+            <!-- one row per dice set, success rate on its left edge and expected value on its
+                 right edge; a single set already fills the width on its own, and a second
+                 set gets its own row underneath rather than squeezing both into one line -->
+            <div style="display:flex; flex-direction:column; gap:0.125rem;">
+              <!-- Counts make the success reading long, sometimes several payable/total pairs
+                   long — one per character-die effect — so it stacks above the expected value
+                   instead of sharing a line with it, which is what used to send the two
+                   crashing into each other once the text outgrew the row's width. -->
+              <div
+                v-for="(o, si) in row.odds"
+                :key="si"
+                :style="{
+                  display: 'flex',
+                  flexDirection: showCounts ? 'column' : 'row',
+                  alignItems: showCounts ? 'flex-start' : 'center',
+                  justifyContent: showCounts ? 'flex-start' : 'space-between',
+                  gap: showCounts ? '0.125rem' : '0.5rem',
+                  padding: '0 0.125rem'
+                }"
+              >
+                <div style="display:flex; align-items:baseline; flex-wrap:wrap; gap:0.25rem; min-width:0;">
+                  <span v-if="hasCompare" style="font-size:0.5625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ setLabels[si] }}</span>
+                  <span style="font-size:0.5625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.successRate') }}</span>
+                  <!-- the move's own success rate, joined with one more figure per character-die
+                       effect it has (joint with that effect actually landing too) -->
+                  <span :style="{ fontSize: '0.8125rem', fontWeight: 900, whiteSpace: showCounts ? 'normal' : 'nowrap', color: o.payable === 0 ? 'var(--line)' : 'var(--ink)' }">{{ successText(row, si) }}</span>
+                </div>
+
+                <!-- the headline figure: what the move is worth per cast -->
+                <div style="display:flex; align-items:baseline; gap:0.25rem; min-width:0;">
+                  <span style="font-size:0.5625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.expectedValue') }}</span>
+                  <span :style="{ fontSize: '0.8125rem', fontWeight: 900, whiteSpace: 'nowrap', color: row.evs[si].ev === 0 ? 'var(--line)' : 'var(--ink)' }">{{ evText(row.evs[si].ev) }}</span>
+                  <span v-if="unmodifiedText(row.evs[si])" style="font-size:0.5625rem; font-weight:700; text-decoration:line-through; color:var(--sub); white-space:nowrap;">{{ unmodifiedText(row.evs[si]) }}</span>
+                </div>
               </div>
             </div>
 
-            <!-- the headline figure: what the move is worth per cast, success rate included -->
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.375rem; padding:0 0.125rem;">
-              <span style="font-size:0.625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.expectedValue') }}</span>
-              <div style="display:flex; gap:0.5rem; flex-shrink:0;">
-                <span
-                  v-for="(result, si) in row.evs"
-                  :key="si"
-                  :style="{ display: 'flex', alignItems: 'baseline', gap: '0.1875rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--sub)', whiteSpace: 'nowrap' }"
-                >
-                  <span v-if="hasCompare" style="font-weight:800;">{{ setLabels[si] }}</span>
-                  <span :style="{ fontSize: '1.25rem', fontWeight: 900, color: result.ev === 0 ? 'var(--line)' : 'var(--ink)' }">{{ evText(result.ev) }}</span>
-                  <span v-if="unmodifiedText(result)" style="font-size:0.625rem; font-weight:700; text-decoration:line-through; color:var(--sub);">{{ unmodifiedText(result) }}</span>
-                </span>
-              </div>
-            </div>
-
-            <!-- where that figure came from. One line per dice set whether or not it has
-                 anything to say, so every card in the grid starts at the same height. -->
+            <!-- where that figure came from, shown only on request — turned off by default
+                 like showCounts, since most players read the headline figure and move on.
+                 One line per dice set whether or not it has anything to say, so every card
+                 in the grid starts at the same height. -->
             <div
+              v-if="showBreakdownDetail"
               :style="{
                 display: 'flex',
                 flexDirection: 'column',
@@ -503,33 +575,9 @@ const moveRows = computed(() => {
                 style="font-size:0.5rem; font-weight:700; color:var(--sub); line-height:1.4;"
               >＊{{ t(`diceBuilder.moveOdds.${key}`) }}</div>
             </div>
-
-            <!-- character-die odds, keyed to the orientation icons on the card's lower half.
-                 Reported separately because it rides on a different die from the energy cost. -->
-            <div v-if="row.charaEffects.length > 0" style="display:flex; flex-direction:column; gap:0.125rem; padding:0 0.125rem;">
-              <div v-for="(entry, ei) in row.charaEffects" :key="ei" style="display:flex; align-items:center; justify-content:space-between; gap:0.375rem;">
-                <div style="display:flex; align-items:center; gap:0.1875rem; min-width:0;">
-                  <span style="font-size:0.625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.charaDieOdds') }}</span>
-                  <div style="display:flex; gap:0.0625rem; flex-shrink:0;">
-                    <div v-for="(ori, oi) in entry.ce.orientations" :key="oi" style="width:0.875rem; height:0.875rem; flex-shrink:0;">
-                      <img :src="asset(`image/ICON/${ori}.png`)" class="img-icon" :alt="ori">
-                    </div>
-                  </div>
-                </div>
-                <div style="display:flex; gap:0.5rem; flex-shrink:0;">
-                  <span
-                    v-for="(j, si) in entry.joint"
-                    :key="si"
-                    :style="{ display: 'flex', alignItems: 'baseline', gap: '0.125rem', whiteSpace: 'nowrap' }"
-                  >
-                    <span v-if="hasCompare" style="font-size:0.625rem; font-weight:800; color:var(--sub);">{{ setLabels[si] }}</span>
-                    <span :style="{ fontSize: '1rem', fontWeight: 900, color: j.payable === 0 ? 'var(--line)' : 'var(--ink)' }">{{ oddsText(j.payable, j.total) }}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
+      </div>
       </div>
 
       <div style="display:flex; justify-content:center; padding:0.875rem 0 0.25rem;">

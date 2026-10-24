@@ -99,7 +99,7 @@ function pickBindMove(mid) {
     </template>
 
     <template v-else-if="ep.kind === 'eneCount'">
-      <div class="overlay-title">{{ t('effectPrompt.eneCountTitle') }}</div>
+      <div class="overlay-title">{{ t('effectPrompt.eneCountTitle') }}<img v-if="ep.eneType" :src="asset(`image/ICON/${ep.eneType}.png`)" :alt="ep.eneType" style="height:1em; width:1em; object-fit:contain; vertical-align:-0.15em; margin-left:0.25rem;"></div>
       <div style="width:100%; max-width:18.75rem; margin:0.625rem auto 0;">
         <MoveCard :mv="ep.mv" :dmg-info="ep.dmgInfo" :owner="ep.mover" :opponent="ep.opp" :clickable="false" style="min-height:10.75rem;" />
       </div>
@@ -121,6 +121,42 @@ function pickBindMove(mid) {
       <div style="display:flex; gap:0.75rem; justify-content:center; margin-top:0.875rem;">
         <button class="btn" @click="submit(true)">{{ t('common.success') }}</button>
         <button class="btn fail" @click="submit(false)">{{ t('common.fail') }}</button>
+      </div>
+    </template>
+
+    <!-- Opponent rolls their character die n times; the player reports the hit count. Buttons
+         0..n rather than a stepper, so a 3-roll answer is one tap like the other count prompt. -->
+    <template v-else-if="ep.kind === 'charaDiceComboEnemy'">
+      <div class="overlay-title">
+        {{ t('effectPrompt.charaDiceComboPrefix', { n: ep.n }) }}<img v-for="(ori, i) in ep.orientations" :key="i" :src="asset(`image/ICON/${ori}.png`)" :alt="ori" style="height:1em; width:1em; object-fit:contain; vertical-align:-0.15em; margin:0 0.0625rem;">{{ t('effectPrompt.charaDiceComboSuffix', { dmg: ep.effectValue }) }}
+      </div>
+      <div style="width:100%; max-width:18.75rem; margin:0.625rem auto 0;">
+        <MoveCard :mv="ep.mv" :dmg-info="ep.dmgInfo" :owner="ep.mover" :opponent="ep.opp" :clickable="false" style="min-height:10.75rem;" />
+      </div>
+      <div style="display:flex; gap:0.625rem; flex-wrap:wrap; justify-content:center; margin-top:0.875rem;">
+        <button v-for="n in ep.n + 1" :key="n" class="btn" @click="submit(n - 1)">{{ n - 1 }}</button>
+      </div>
+    </template>
+
+    <!-- Which orientation the die actually landed on — only the player at the table can see it,
+         so it's reported rather than rolled. Each choice is its own icon button. -->
+    <template v-else-if="ep.kind === 'charaDiceSelect'">
+      <div class="overlay-title">
+        {{ ep.target === 'enemy' ? t('effectPrompt.charaDiceSelectEnemyTitle') : t('effectPrompt.charaDiceSelectSelfTitle') }}
+      </div>
+      <div style="width:100%; max-width:18.75rem; margin:0.625rem auto 0;">
+        <MoveCard :mv="ep.mv" :dmg-info="ep.dmgInfo" :owner="ep.mover" :opponent="ep.opp" :clickable="false" style="min-height:10.75rem;" />
+      </div>
+      <div style="display:flex; gap:0.625rem; flex-wrap:wrap; justify-content:center; margin-top:0.875rem;">
+        <button
+          v-for="(ori, i) in ep.orientations"
+          :key="i"
+          class="btn"
+          style="display:flex; align-items:center; gap:0.25rem; padding:0.5rem 0.75rem;"
+          @click="submit(ori)"
+        >
+          <img :src="asset(`image/ICON/${ori}.png`)" :alt="ori" style="height:1.25rem; width:1.25rem; object-fit:contain;">
+        </button>
       </div>
     </template>
   </div>

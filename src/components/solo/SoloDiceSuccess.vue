@@ -3,6 +3,7 @@ import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { typeBgColor } from '../../data/constants'
 import { isCharaColorConditionMet } from '../../game/damage'
+import { charaDiceOrientationAllowed } from '../../game/effectQueue'
 import { asset } from '../../data/assetPath'
 
 const solo = inject('solo')
@@ -33,19 +34,33 @@ const displayCost = computed(() => {
 // panel — it's not something the player rolls for, so keep it colorless for the AI too.
 const displayType = computed(() => state.turn === 'ai' ? '無色' : mv.value.type)
 
+// Same badges duel mode's DiceOverlay shows: the moves whose effects shape this throw. Solo dice
+// are physical, so for REROLL_DICE_ENEMY / REROLL_CHARADICE_SELF this badge is the whole
+// effect — it's what tells the player a reroll is owed at the table.
+const diceModBadges = computed(() => (mover.value.diceModBadges || []).map(b => ({ label: b.name, color: typeBgColor(b.type) })))
+// The opponent chose this move, so stepping back to pick another isn't on offer.
+const canGoBack = computed(() => state.turn === 'player' && !mover.value.movePickedByOpponent)
+
 const successDmgClass = computed(() => {
   const m = dmgInfo.value.mode
   return m === 'weak' ? 'weak' : m === 'up' ? 'up' : m === 'down' ? 'down' : ''
 })
 
+// A pinned character die (FIX_CHARADICE_*) leaves only the rows covering the pinned
+// orientations selectable, unlike charaDiceBlocked which disables the lot.
+function charaAvailable(ce) {
+  return hasChara.value && charaDiceOrientationAllowed(ce.orientations, mover.value.fixCharaDice)
+}
+
 function charaHighlighted(ce) {
+  if (!charaAvailable(ce)) return false
   return isCharaColorConditionMet(ce.type, mover.value, opp.value)
 }
 function pickSuccessOnly() {
   solo.chooseSuccessOnly()
 }
 function pickChara(ce) {
-  if (!hasChara.value) return
+  if (!charaAvailable(ce)) return
   solo.chooseCharaEffect(ce)
 }
 function pickFail() {
@@ -68,8 +83,11 @@ function goBack() {
         </div>
         <div class="dr-move-name mc-name-big">{{ mv.name }}</div>
       </div>
-      <div v-if="mv.effect" class="dr-roll-line" style="flex-direction:column; align-items:flex-start; gap:0.125rem;">
-        <div class="mc-effect" style="position:static; white-space:normal;">{{ mv.effect }}</div>
+      <div v-if="mv.effect || diceModBadges.length > 0" class="dr-roll-line" style="flex-direction:column; align-items:flex-start; gap:0.125rem;">
+        <div v-if="diceModBadges.length > 0" class="dice-mod-badges">
+          <div v-for="(b, i) in diceModBadges" :key="i" class="dice-mod-badge" :style="{ background: b.color }">{{ b.label }}</div>
+        </div>
+        <div v-if="mv.effect" class="mc-effect" style="position:static; white-space:normal;">{{ mv.effect }}</div>
       </div>
     </div>
     <div class="dr-result-cols">
@@ -87,8 +105,8 @@ function goBack() {
             v-for="(ce, i) in mv.chara"
             :key="i"
             class="dr-chara-btn"
-            :class="{ 'chara-unavailable': !hasChara }"
-            :disabled="!hasChara"
+            :class="{ 'chara-unavailable': !charaAvailable(ce) }"
+            :disabled="!charaAvailable(ce)"
             @click="pickChara(ce)"
           >
             <div class="dr-chara-btn-icons">
@@ -103,7 +121,7 @@ function goBack() {
           <div class="dr-col-header dr-header-fail">{{ t('dice.energyShortage') }}</div>
           <button class="dr-fail-btn" @click="pickFail">{{ t('dice.moveFail') }}</button>
         </div>
-        <div v-if="state.turn === 'player'" class="dr-back-box">
+        <div v-if="canGoBack" class="dr-back-box">
           <button class="dr-back-btn" @click="goBack">{{ t('common.back') }}</button>
         </div>
       </div>

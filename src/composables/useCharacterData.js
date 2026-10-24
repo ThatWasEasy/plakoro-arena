@@ -4,10 +4,16 @@ import { i18n } from '../i18n'
 import { asset } from '../data/assetPath'
 import charaRaw from '../data/generated/chara.json'
 import wazaRaw from '../data/generated/waza.json'
+import { reportEffectCoverage } from '../game/effectCoverage'
 import translationsEn from '../data/translations/en.json'
 import translationsZhTW from '../data/translations/zh-TW.json'
 
 const TRANSLATIONS = { en: translationsEn, 'zh-TW': translationsZhTW }
+
+// Fresh data can introduce effect types the engine has no handler for, and an unhandled effect
+// fails silently in play. Surfaced here, at import time, so it shows up the moment a dev opens
+// the app rather than only when someone happens to use that one move.
+if (import.meta.env?.DEV) reportEffectCoverage(wazaRaw)
 
 // The generated JSON mirrors whatever the Supabase rows hold, and those have historically
 // carried stray whitespace (e.g. a waza id of "STW05-002\n"). Anything used as a lookup key
@@ -58,6 +64,8 @@ function buildCharaEffect(die, effectStr, type, val) {
 }
 
 const MOVES_BASE = {}
+// What the card prints, before any per-game modifier — the move advisor ranks printed moves.
+export const printedMoves = MOVES_BASE
 wazaRaw.forEach(w => {
   const chara = []
   const c1 = buildCharaEffect(w.chara_die1, w.chara_effect1, w.chara_effect_type1, w.chara_effect_value1)
@@ -105,14 +113,6 @@ const CHARACTERS_BASE = charaRaw.map(c => {
     moves: charaMoves
   }
 })
-
-// The moves exactly as printed, before any translation overlay.
-//
-// A screen that helps a player pick cards out of a physical box has to name them the way the
-// box does, and the cards are printed in Japanese. Showing only the translated name would
-// leave the reader holding a recommendation they can't match to a card, which is the one job
-// that screen has.
-export const printedMoves = MOVES_BASE
 
 function localizedMoves(locale) {
   const overlay = TRANSLATIONS[locale] && TRANSLATIONS[locale].waza

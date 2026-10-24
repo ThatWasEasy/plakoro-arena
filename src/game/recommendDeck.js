@@ -30,13 +30,11 @@
 import { enumerateRolls } from './energyPayment'
 import { ASSUMED_ENEMY_LAST_DAMAGE, suggestedBuild } from './suggestedDice'
 import { moveExpectedValue } from './moveExpectedValue'
-import { sustainableValue } from './turnValue'
+// The turn and deck sizes live in turnValue.js, where tempoValue.js reads them too; re-exported
+// so the move advisor keeps importing them from here.
+import { sustainableValue, NORMAL_DICE, DECK_SIZE } from './turnValue'
 
-// A normal turn throws 3 energy dice; the first turn of a game throws 2.
-export const NORMAL_DICE = 3
-
-// How many moves a player brings to a battle.
-export const DECK_SIZE = 4
+export { NORMAL_DICE, DECK_SIZE }
 
 // Two decks whose rotations land within this many HP of each other are treated as equal, so
 // the denied-dice comparison gets to decide. Wide enough that float noise never settles a

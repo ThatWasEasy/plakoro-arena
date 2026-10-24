@@ -3,8 +3,12 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { loadTournaments, saveTournament, deleteTournament } from '../../data/tournaments'
 import { pairSwissRound, pairEliminationRound, isTournamentComplete, assignTableNumbers } from '../../game/tournamentPairing'
+import * as adminApi from '../../data/adminApi'
+import { adminToken, isAdminMode } from '../../data/adminSession'
 import TournamentSetup from './TournamentSetup.vue'
 import TournamentDetail from './TournamentDetail.vue'
+import TournamentImportModal from './TournamentImportModal.vue'
+import TournamentDownloadModal from './TournamentDownloadModal.vue'
 
 const emit = defineEmits(['back'])
 const { t } = useI18n()
@@ -13,6 +17,12 @@ const view = ref('list') // 'list' | 'setup' | 'detail'
 const tournaments = ref(loadTournaments())
 const activeTournament = ref(null)
 const confirmDeleteId = ref(null)
+// Admin-only, offered alongside the always-available local delete — unchecked by default so
+// "delete" here keeps meaning exactly what it always has (remove my local copy) unless the
+// admin deliberately opts into also removing the database's record of the event.
+const alsoDeleteCloud = ref(false)
+const importOpen = ref(false)
+const downloadOpen = ref(false)
 
 function openTournament(tour) {
   activeTournament.value = tour
@@ -37,10 +47,46 @@ function onUpdate(updated) {
   activeTournament.value = updated
 }
 
-function confirmDelete() {
+// Imported tournaments arrive with fresh ids, so nothing here can overwrite an existing one —
+// importing the same file twice leaves two copies rather than silently replacing a day's work.
+// Deleting the spare is one click; recovering results that were overwritten is not possible.
+function onImport(tours) {
+  tours.forEach(tour => {
+    saveTournament(tour)
+    tournaments.value.push(tour)
+  })
+  importOpen.value = false
+  // Straight into it when there's one, which is the common case. A batch stays on the list, so
+  // the organiser can see everything that landed.
+  if (tours.length === 1) openTournament(tours[0])
+}
+
+// Not quite the same arrival path as a file import: a downloaded tournament keeps the
+// database's own id (see TournamentDownloadModal.vue) specifically so downloading the same one
+// twice updates the local copy in place instead of leaving two entries in the list that both
+// claim to be it.
+function onDownload(tour) {
+  saveTournament(tour)
+  const idx = tournaments.value.findIndex(x => x.id === tour.id)
+  if (idx >= 0) tournaments.value[idx] = tour
+  else tournaments.value.push(tour)
+  downloadOpen.value = false
+  openTournament(tour)
+}
+
+async function confirmDelete() {
+  if (isAdminMode.value && alsoDeleteCloud.value) {
+    try {
+      await adminApi.deleteTournament(adminToken.value, confirmDeleteId.value)
+    } catch (e) {
+      // The local delete below still happens regardless — losing the local copy is the one
+      // thing this dialog promised, and a failed cloud call shouldn't block that.
+    }
+  }
   deleteTournament(confirmDeleteId.value)
   tournaments.value = tournaments.value.filter(x => x.id !== confirmDeleteId.value)
   confirmDeleteId.value = null
+  alsoDeleteCloud.value = false
 }
 
 function statusLabel(tour) {
@@ -83,16 +129,34 @@ function statusLabel(tour) {
 
     <div style="display:flex; gap:0.625rem; justify-content:center; padding:0.75rem 0 0.25rem; flex-shrink:0;">
       <button class="btn" @click="view = 'setup'">{{ t('tournament.newTournament') }}</button>
+      <button class="btn secondary" @click="importOpen = true">{{ t('tournament.import.button') }}</button>
+      <button v-if="isAdminMode" class="btn secondary" @click="downloadOpen = true">{{ t('admin.downloadButton') }}</button>
       <button class="btn secondary" @click="emit('back')">{{ t('common.back') }}</button>
     </div>
+
+    <TournamentImportModal
+      v-if="importOpen"
+      @close="importOpen = false"
+      @import="onImport"
+    />
+
+    <TournamentDownloadModal
+      v-if="downloadOpen"
+      @close="downloadOpen = false"
+      @download="onDownload"
+    />
 
     <div v-if="confirmDeleteId" class="modal-overlay" style="align-items:center;" @click.self="confirmDeleteId = null">
       <div style="background:var(--bg); border-radius:1.125rem; box-shadow:var(--shadow); padding:1.25rem 1.5rem; max-width:22rem; display:flex; flex-direction:column; align-items:center; gap:0.75rem; text-align:center;">
         <div style="font-size:0.75rem; color:var(--sub); line-height:1.6;">
           {{ t('tournament.deleteConfirm', { name: tournaments.find(x => x.id === confirmDeleteId)?.name || '' }) }}
         </div>
+        <label v-if="isAdminMode" style="display:flex; align-items:center; gap:0.375rem; font-size:0.6875rem; color:var(--sub); cursor:pointer;">
+          <input type="checkbox" v-model="alsoDeleteCloud">
+          {{ t('admin.deleteAlsoCloud') }}
+        </label>
         <div style="display:flex; gap:0.625rem; justify-content:center;">
-          <button class="btn secondary" @click="confirmDeleteId = null">{{ t('common.cancel') }}</button>
+          <button class="btn secondary" @click="confirmDeleteId = null; alsoDeleteCloud = false">{{ t('common.cancel') }}</button>
           <button class="btn fail" @click="confirmDelete">{{ t('tournament.delete') }}</button>
         </div>
       </div>

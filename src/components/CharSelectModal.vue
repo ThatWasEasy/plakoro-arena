@@ -4,13 +4,16 @@ import { useI18n } from 'vue-i18n'
 import { typeBgColor } from '../data/constants'
 import { asset } from '../data/assetPath'
 
+const props = defineProps({
+  playerKey: { type: String, required: true }
+})
+
 const battle = inject('battle')
 const { characters } = inject('characterData')
 const { t } = useI18n()
-const state = battle.state
 
 function pick(c) {
-  battle.openMoveSelect(state.modal.playerKey, c)
+  battle.openMoveSelect(props.playerKey, c)
 }
 </script>
 

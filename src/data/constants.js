@@ -31,6 +31,31 @@ export const TYPE_BG_COLORS = {
 
 export const TYPE_BG_FALLBACK = "#ECEAE3"
 
+// The saturated colour each energy badge is printed in, sampled from the icon PNGs themselves
+// (public/image/ICON/*.png) at full resolution, so the two can never drift apart. Sampling a
+// downscaled copy is not good enough: the averaging shifted every value enough to leave a
+// visible patch where a badge sat on top of a fill that was supposed to match it exactly.
+//
+// Distinct from TYPE_BG_COLORS above, which are the pale card tints. These are needed wherever a
+// chip has to be drawn rather than shown: a dual-energy chip is one square split corner to corner
+// in two colours, and filling it means knowing the colour, not just having the badge image.
+export const TYPE_CHIP_COLORS = {
+  "くさ": "#1FAC48",
+  "ほのお": "#E72148",
+  "みず": "#0077C5",
+  "かみなり": "#FBC200",
+  "はがね": "#8A8FA7",
+  "あく": "#007D97",
+  "かくとう": "#EE7300",
+  "ちょう": "#CE3A90",
+  "ひこう": "#49BDEA",
+  "無色": "#BCACAD"
+}
+
+export function typeChipColor(t) {
+  return TYPE_CHIP_COLORS[t] || TYPE_BG_FALLBACK
+}
+
 export const CARD_BOTTOM_DARK = "#262420"
 
 export function typeBgColor(t) {

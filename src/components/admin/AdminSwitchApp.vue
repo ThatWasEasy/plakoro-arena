@@ -1,0 +1,677 @@
+<!-- Admin-only: "切換身份" in the tools menu, only visible while admin mode is switched on.
+     Search any player by code or name, and see their current badge status read straight from
+     the server — not a local draft, not the signed-in player's own session.
+
+     Every asset is listed, owned or not, and tapping one toggles it. That's the only way the
+     achievement titles (賽到的 / 九死一生 / 怎麼結束了？) can be awarded at all: they depend on
+     battle detail nothing records, so unlike placement rewards there is nothing to derive them
+     from — someone watched it happen and says so. -->
+<script setup>
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import * as adminApi from '../../data/adminApi'
+import { adminToken } from '../../data/adminSession'
+import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl } from '../../data/nameplateAssets'
+import { TITLE_GROUPS, resolveTitle } from '../../data/assetCatalogue'
+import { pointReason } from '../../data/pointReason'
+import PlayerBanner from '../tournament/PlayerBanner.vue'
+
+const emit = defineEmits(['back'])
+const { t } = useI18n()
+
+const query = ref('')
+const results = ref([])
+const busySearch = ref(false)
+
+// Whether the server had more to give. Without saying so, a cut-off list reads as the whole
+// roster — which is how a player who is definitely on file looks deleted.
+const resultsTruncated = ref(false)
+const selectedCode = ref(null)
+const detail = ref(null)
+const busyDetail = ref(false)
+const detailError = ref('')
+
+async function runSearch() {
+  busySearch.value = true
+  try {
+    const { players, truncated } = await adminApi.searchPlayers(adminToken.value, query.value.trim())
+    results.value = players
+    resultsTruncated.value = !!truncated
+  } catch (e) {
+    results.value = []
+    resultsTruncated.value = false
+  } finally {
+    busySearch.value = false
+  }
+}
+
+// Debounced rather than on every keystroke hitting the server, but still live — nobody wants to
+// press a separate search button for an 8-player list.
+let searchTimer = null
+function onQueryInput() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(runSearch, 250)
+}
+runSearch()
+
+async function select(code) {
+  selectedCode.value = code
+  // Clearing it matters: a code left on screen after switching players reads as belonging to
+  // whoever is shown now, and handing the wrong person's code over gives them that account.
+  claimCode.value = ''
+  claimError.value = ''
+  inheritOpen.value = false
+  inheritFrom.value = ''
+  inheritError.value = ''
+  inheritDone.value = null
+  inheritLookup.value = null
+  detail.value = null
+  pointsDelta.value = ''
+  pointsReason.value = ''
+  pointsError.value = ''
+  detailError.value = ''
+  busyDetail.value = true
+  try {
+    detail.value = await adminApi.getPlayer(adminToken.value, code)
+  } catch (e) {
+    detailError.value = e.message
+  } finally {
+    busyDetail.value = false
+  }
+}
+
+// Same shape PlayerBanner already renders everywhere else — built from the fetched row rather
+// than a draft, so what's shown is exactly what the server has on file for them right now.
+const nameplate = computed(() => {
+  if (!detail.value) return null
+  const p = detail.value.player
+  return {
+    playerKey: `code:${p.code}`,
+    name: p.name,
+    code: p.code,
+    avatar: p.avatar,
+    background: p.background,
+    title: resolveTitle(p.title_id),
+    medals: { gold: p.gold, silver: p.silver, bronze: p.bronze },
+    events: p.events,
+    winRate: p.tour_win_rate !== null ? Math.round(p.tour_win_rate * 100) : null
+  }
+})
+
+// Keyed rather than listed: the grid below asks "does this one row exist" once per asset, and
+// three Sets answer that without re-scanning the array every time.
+const owned = computed(() => {
+  const out = { avatar: new Set(), background: new Set(), title: new Set() }
+  detail.value?.unlocks.forEach(u => out[u.kind]?.add(u.asset))
+  return out
+})
+
+// Where each grant came from, so the grid can tell "earned at an event" apart from "someone
+// handed it over". They look identical on a banner and are not the same claim.
+const srcOf = computed(() => {
+  const out = {}
+  detail.value?.unlocks.forEach(u => { out[`${u.kind}:${u.asset}`] = u.src })
+  return out
+})
+
+// Always available, so there is no grant row to toggle and nothing a button could usefully do.
+// Mirrors isAssetAllowed() on the server — if that rule changes, this has to follow.
+function isFree(kind, asset) {
+  return kind === 'title' ? asset === 'gen-rookie' : /-default$/.test(asset)
+}
+
+const TITLE_IDS = TITLE_GROUPS.map(g => ({ label: g.label, ids: g.titles.map(ti => ti.id) }))
+
+const busyKey = ref(null)
+const toggleError = ref('')
+
+// Issued on demand rather than in advance. A player who never wants an account never needs a
+// code, and a code that sits around unused is a credential waiting to be found — it can set
+// the account handle and PIN for the player it names, with nothing else asked for.
+const claimCode = ref('')
+const claimBusy = ref(false)
+const claimError = ref('')
+
+// Merging two codes that turned out to be the same person. Destructive and not reversible
+// from here, so it asks for the source twice over: typing the code is the confirmation.
+// Who the typed code actually belongs to.
+//
+// The direction reads the way the job is actually done: find the orphaned record, then say
+// where it goes. The player on screen is the one being given up; the code typed in is the
+// account that keeps everything. (The API takes it the other way round — target in the path,
+// source in the body — so doInherit swaps them.)
+//
+// A code is six digits with no redundancy, so one wrong keystroke sends the record to somebody
+// else who really exists. Looking it up and showing the name turns "I typed what I meant to"
+// into "I can see who this is", which is the only check that catches that.
+const inheritLookup = ref(null)   // { name, hasAccount } | 'missing' | null
+let inheritTimer = null
+
+function onInheritInput() {
+  inheritLookup.value = null
+  inheritError.value = ''
+  clearTimeout(inheritTimer)
+  const code = inheritFrom.value.trim().toUpperCase()
+  if (!code) return
+  inheritTimer = setTimeout(async () => {
+    try {
+      const d = await adminApi.getPlayer(adminToken.value, code)
+      if (inheritFrom.value.trim().toUpperCase() !== code) return
+      inheritLookup.value = { name: d.player.name, hasAccount: d.hasAccount }
+    } catch (e) {
+      if (inheritFrom.value.trim().toUpperCase() === code) inheritLookup.value = 'missing'
+    }
+  }, 350)
+}
+
+const inheritOpen = ref(false)
+const inheritFrom = ref('')
+const inheritBusy = ref(false)
+const inheritError = ref('')
+const inheritDone = ref(null)
+
+// Nothing to press until the typed code resolves to a real player to hand the record to.
+// Either side having its own login is fine now: nothing is deleted, so no login breaks.
+const inheritReady = computed(() =>
+  !!inheritLookup.value && inheritLookup.value !== 'missing')
+
+async function doInherit() {
+  const keeper = inheritFrom.value.trim().toUpperCase()
+  const givenUp = selectedCode.value
+  if (!keeper || !inheritReady.value || inheritBusy.value) return
+  inheritBusy.value = true
+  inheritError.value = ''
+  inheritDone.value = null
+  try {
+    // Swapped on the way out: the endpoint keeps the player in the path and deletes the one in
+    // the body, which is the reverse of how the screen reads.
+    const r = await adminApi.inheritRecords(adminToken.value, keeper, givenUp)
+    inheritDone.value = r.moved
+    inheritFrom.value = ''
+    inheritLookup.value = null
+    inheritOpen.value = false
+    // The record moved, so the screen follows it. The old code still exists — now empty — and
+    // staying on it would just show a blank profile.
+    selectedCode.value = keeper
+    detail.value = await adminApi.getPlayer(adminToken.value, keeper)
+    await runSearch()
+  } catch (e) {
+    inheritError.value = e.message
+  } finally {
+    inheritBusy.value = false
+  }
+}
+
+// Adding and deducting PTP, from the same screen that already has the player on it — both
+// halves happen at a table with the player standing there, so making the organiser go and find
+// another screen is the one thing this must not do.
+const pointsDelta = ref('')
+const pointsReason = ref('')
+const pointsBusy = ref(false)
+const pointsError = ref('')
+
+const pointsAmount = computed(() => {
+  const n = Math.trunc(Number(pointsDelta.value))
+  return Number.isFinite(n) && n !== 0 ? n : 0
+})
+
+// Mirrors the server's rule rather than trusting it to say no: a deduction is the only line
+// nobody can reconstruct later, so the button stays dead until there is a reason for it.
+//
+// Nothing here checks the balance before deducting — the server owns that, and it holds the
+// only copy that cannot be a few seconds stale.
+const pointsReady = computed(() =>
+  pointsAmount.value !== 0 &&
+  (pointsAmount.value > 0 || pointsReason.value.trim().length > 0)
+)
+
+async function adjustPoints() {
+  if (!pointsReady.value || pointsBusy.value) return
+  pointsBusy.value = true
+  pointsError.value = ''
+  try {
+    detail.value = await adminApi.adjustPoints(
+      adminToken.value, selectedCode.value, pointsAmount.value, pointsReason.value.trim()
+    )
+    pointsDelta.value = ''
+    pointsReason.value = ''
+  } catch (e) {
+    pointsError.value = e.message
+  } finally {
+    pointsBusy.value = false
+  }
+}
+
+async function mintClaim() {
+  if (!selectedCode.value || claimBusy.value) return
+  claimBusy.value = true
+  claimCode.value = ''
+  claimError.value = ''
+  try {
+    const r = await adminApi.mintClaimCode(adminToken.value, selectedCode.value)
+    claimCode.value = r.claimCode
+  } catch (e) {
+    claimError.value = e.message
+  } finally {
+    claimBusy.value = false
+  }
+}
+
+async function toggle(kind, asset) {
+  if (!detail.value || isFree(kind, asset)) return
+  const key = `${kind}:${asset}`
+  if (busyKey.value) return
+  busyKey.value = key
+  toggleError.value = ''
+  try {
+    // Both endpoints answer with the whole player + unlocks after the change, so this replaces
+    // what it holds instead of patching its own copy — which would quietly drift the moment the
+    // server did something the client didn't predict (revoking also unequips, for one).
+    detail.value = owned.value[kind].has(asset)
+      ? await adminApi.revokeUnlock(adminToken.value, selectedCode.value, kind, asset)
+      : await adminApi.grantUnlock(adminToken.value, selectedCode.value, kind, asset)
+  } catch (e) {
+    toggleError.value = e.message
+  } finally {
+    busyKey.value = null
+  }
+}
+</script>
+
+<template>
+  <div class="board select-board as-board">
+    <div class="modal-title">{{ t('admin.switchTitle') }}</div>
+
+    <div class="as-search">
+      <input
+        v-model="query"
+        class="as-input"
+        :placeholder="t('admin.searchPlaceholder')"
+        @input="onQueryInput"
+      >
+    </div>
+
+    <div class="as-body">
+      <div class="as-results">
+        <button
+          v-for="p in results"
+          :key="p.code"
+          :class="['as-result', { on: selectedCode === p.code }]"
+          @click="select(p.code)"
+        >
+          <span class="as-result-name">{{ p.name }}</span>
+          <span class="as-result-code">{{ p.code }}</span>
+        </button>
+        <p v-if="!busySearch && !results.length" class="as-empty">{{ t('admin.noResults') }}</p>
+        <p v-else-if="resultsTruncated" class="as-empty">{{ t('admin.searchTruncated', { n: results.length }) }}</p>
+      </div>
+
+      <div v-if="selectedCode" class="as-detail">
+        <p v-if="detailError" class="as-error">{{ detailError }}</p>
+        <template v-else-if="nameplate">
+          <div class="as-preview"><PlayerBanner :nameplate="nameplate" /></div>
+
+          <div class="as-stats">
+            <span>{{ t('admin.statEvents') }} {{ detail.player.events }}</span>
+            <span>{{ t('admin.statPodiums') }} {{ detail.player.podiums }}</span>
+            <span v-if="detail.player.tour_win_rate !== null">
+              {{ t('admin.statTourWinRate') }} {{ Math.round(detail.player.tour_win_rate * 100) }}%
+            </span>
+            <span v-if="detail.player.online_win_rate !== null">
+              {{ t('admin.statOnlineWinRate') }} {{ Math.round(detail.player.online_win_rate * 100) }}%
+            </span>
+          </div>
+
+          <div class="as-ptp">
+            <div class="as-ptp-head">
+              <span class="as-ptp-balance">{{ detail.points.balance }}</span>
+              <span class="as-ptp-unit">PTP</span>
+              <!-- Granted but not opened yet. Without this the organiser sees an unchanged
+                   balance a second after granting 50 points and concludes it failed. -->
+              <span v-if="detail.points.pending" class="as-ptp-pending">
+                {{ t('points.pending', { n: detail.points.pending }) }}
+              </span>
+            </div>
+
+            <div class="as-ptp-row">
+              <input
+                v-model="pointsDelta"
+                class="as-input as-ptp-amount"
+                type="number"
+                inputmode="numeric"
+                :placeholder="t('points.amountHint')"
+              >
+              <input
+                v-model="pointsReason"
+                class="as-input as-ptp-reason"
+                maxlength="60"
+                :placeholder="pointsAmount < 0 ? t('points.reasonRequired') : t('points.reasonOptional')"
+                @keyup.enter="adjustPoints"
+              >
+              <button class="btn as-claim-btn" :disabled="!pointsReady || pointsBusy" @click="adjustPoints">
+                {{ pointsBusy ? t('points.saving') : (pointsAmount < 0 ? t('points.deduct') : t('points.add')) }}
+              </button>
+            </div>
+            <span v-if="pointsError" class="as-error">{{ pointsError }}</span>
+
+            <!-- The statement, newest first. An organiser settling an argument at the table needs
+                 to see what was taken off and why, not just the number that is left. -->
+            <div v-if="detail.points.entries.length" class="as-ptp-list">
+              <div v-for="e in detail.points.entries" :key="e.id" :class="['as-ptp-entry', { unopened: !e.claimed }]">
+                <span :class="['as-ptp-delta', e.delta > 0 ? 'plus' : 'minus']">
+                  {{ e.delta > 0 ? '+' : '' }}{{ e.delta }}
+                </span>
+                <span class="as-ptp-why">{{ pointReason(e, t) }}</span>
+                <span v-if="!e.claimed" class="as-ptp-tag">{{ t('points.unopened') }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Only for players who have no account yet. Someone already signed in has nothing
+               to claim, and minting a code for them would be a way to take their account over. -->
+          <div v-if="!detail.hasAccount" class="as-claim">
+            <button class="btn secondary as-claim-btn" :disabled="claimBusy" @click="mintClaim">
+              {{ claimBusy ? t('admin.claimMinting') : t('admin.claimMint') }}
+            </button>
+            <code v-if="claimCode" class="as-claim-code">{{ claimCode }}</code>
+            <span v-if="claimCode" class="as-claim-note">{{ t('admin.claimHint') }}</span>
+            <span v-if="claimError" class="as-error">{{ claimError }}</span>
+          </div>
+
+          <div class="as-claim">
+            <button class="btn secondary as-claim-btn" @click="inheritOpen = !inheritOpen">
+              {{ t('admin.inherit') }}
+            </button>
+            <span v-if="inheritDone" class="as-claim-note">
+              {{ t('admin.inheritDone', inheritDone) }}
+            </span>
+          </div>
+
+          <div v-if="inheritOpen" class="as-inherit">
+            <!-- Reads left to right the way the job is done: this record → that account. -->
+            <div class="as-inherit-row">
+              <span class="as-inherit-from">
+                {{ t('admin.inheritFromLabel', { name: detail.player.name, code: selectedCode }) }}
+              </span>
+              <input
+                v-model="inheritFrom"
+                class="as-input as-inherit-input"
+                :placeholder="t('admin.inheritTo')"
+                maxlength="12"
+                @input="onInheritInput"
+                @keyup.enter="doInherit"
+              >
+              <button
+                class="btn fail as-claim-btn"
+                :disabled="!inheritReady || inheritBusy"
+                @click="doInherit"
+              >{{ inheritBusy ? t('admin.inheritBusy') : t('admin.inheritDo') }}</button>
+            </div>
+            <p v-if="inheritLookup === 'missing'" class="as-error">
+              {{ t('admin.inheritNotFound', { code: inheritFrom.trim().toUpperCase() }) }}
+            </p>
+            <!-- Both names, out loud, before anything happens. A code that resolves to the
+                 wrong person is the failure this is here to catch. -->
+            <p v-else-if="inheritLookup" class="as-inherit-warn">
+              {{ t('admin.inheritConfirm', {
+                   from: detail.player.name, fromCode: selectedCode,
+                   to: inheritLookup.name, toCode: inheritFrom.trim().toUpperCase() }) }}
+            </p>
+            <p v-else class="as-inherit-warn">{{ t('admin.inheritWarn') }}</p>
+            <span v-if="inheritError" class="as-error">{{ inheritError }}</span>
+          </div>
+
+          <p class="as-hint">{{ t('admin.toggleHint') }}</p>
+          <p v-if="toggleError" class="as-error">{{ toggleError }}</p>
+
+          <div class="as-owned">
+            <div class="as-owned-group">
+              <span class="as-owned-label">{{ t('profile.avatar') }}</span>
+              <div class="as-owned-grid">
+                <button
+                  v-for="id in AVATAR_IDS"
+                  :key="id"
+                  :class="['as-cell', { on: owned.avatar.has(id), free: isFree('avatar', id),
+                                        busy: busyKey === `avatar:${id}` }]"
+                  :title="srcOf[`avatar:${id}`] || id"
+                  :disabled="isFree('avatar', id) || busyKey !== null"
+                  @click="toggle('avatar', id)"
+                >
+                  <img :src="avatarUrl(id)" alt="" loading="lazy">
+                </button>
+              </div>
+            </div>
+
+            <div class="as-owned-group">
+              <span class="as-owned-label">{{ t('profile.flag') }}</span>
+              <div class="as-owned-grid wide">
+                <button
+                  v-for="id in BACKGROUND_IDS"
+                  :key="id"
+                  :class="['as-cell', 'flag', { on: owned.background.has(id), free: isFree('background', id),
+                                                busy: busyKey === `background:${id}` }]"
+                  :title="srcOf[`background:${id}`] || id"
+                  :disabled="isFree('background', id) || busyKey !== null"
+                  @click="toggle('background', id)"
+                >
+                  <img :src="backgroundUrl(id)" alt="" loading="lazy">
+                </button>
+              </div>
+            </div>
+
+            <!-- Grouped the way the catalogue groups them, because that is how someone looks for
+                 one: "the Meetup#2 ones", "the achievements". -->
+            <div v-for="g in TITLE_IDS" :key="g.label" class="as-owned-group">
+              <span class="as-owned-label">{{ t('profile.titleLabel') }} · {{ g.label }}</span>
+              <div class="as-owned-titles">
+                <button
+                  v-for="id in g.ids"
+                  :key="id"
+                  :class="['as-owned-title', { on: owned.title.has(id), free: isFree('title', id),
+                                               busy: busyKey === `title:${id}` }]"
+                  :title="srcOf[`title:${id}`] || id"
+                  :disabled="isFree('title', id) || busyKey !== null"
+                  @click="toggle('title', id)"
+                >{{ resolveTitle(id)?.text || id }}</button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="as-foot">
+      <button class="btn secondary" @click="emit('back')">{{ t('common.back') }}</button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.as-board { display: flex; flex-direction: column; min-height: 0; }
+
+.as-search { flex-shrink: 0; padding: 0 0.75rem 0.5rem; }
+.as-input {
+  width: 100%;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 0.4375rem 0.5rem;
+  border: 0.125rem solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.as-input:focus { outline: none; border-color: var(--accent-strong); }
+
+.as-body { flex: 1; min-height: 0; display: flex; gap: 0.75rem; padding: 0 0.75rem; overflow: hidden; }
+
+.as-results { width: 9rem; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; }
+.as-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.0625rem;
+  padding: 0.375rem 0.5rem;
+  border: 0.0625rem solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.as-result.on { border-color: var(--accent-strong); background: var(--card); }
+.as-result-name { font-size: 0.75rem; font-weight: 700; color: var(--ink); }
+.as-result-code { font-size: 0.625rem; color: var(--sub); font-variant-numeric: tabular-nums; }
+.as-empty { font-size: 0.6875rem; color: var(--sub); padding: 0.5rem 0.25rem; }
+
+.as-detail { flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0.625rem; }
+.as-preview { display: flex; justify-content: center; padding: 0.25rem 0; }
+.as-stats { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.6875rem; font-weight: 700; color: var(--sub); }
+
+.as-inherit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  border: 0.0625rem solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.as-inherit-warn { margin: 0; font-size: 0.5625rem; color: #C0392B; font-weight: 700; line-height: 1.6; }
+.as-inherit-row { display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; }
+/* The whole row is set at one size. The label had no rule at all and so came out at the board's
+   default — nearly half as large again as the field beside it, which read as emphasis nobody
+   asked for. */
+.as-inherit-from { font-size: 0.6875rem; font-weight: 800; color: var(--ink); white-space: nowrap; }
+.as-inherit-input {
+  width: 6.5rem;
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.375rem;
+  text-transform: uppercase;
+}
+.as-inherit-row .as-claim-btn { padding: 0.25rem 0.5rem; font-size: 0.625rem; }
+
+/* PTP sits directly under the stats line: it is another fact about this player, and the two
+   get read together when somebody asks what they are owed. */
+.as-ptp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4375rem;
+  padding: 0.625rem;
+  border-radius: 0.625rem;
+  background: var(--card);
+}
+.as-ptp-head { display: flex; align-items: baseline; gap: 0.375rem; }
+.as-ptp-balance {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.as-ptp-unit { font-size: 0.6875rem; font-weight: 800; color: var(--sub); letter-spacing: 0.08em; }
+.as-ptp-pending {
+  margin-left: auto;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--line);
+  font-size: 0.625rem;
+  font-weight: 800;
+  color: var(--sub);
+}
+
+.as-ptp-row { display: flex; gap: 0.375rem; align-items: stretch; }
+/* Fixed, because the amount is three or four characters and the reason is a sentence. */
+.as-ptp-amount { width: 5rem; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.as-ptp-reason { flex: 1 1 auto; min-width: 0; }
+
+.as-ptp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  /* The ledger only grows. Capped so one busy player cannot push the asset grid off the screen,
+     and scrolled inside itself so nothing is actually hidden. */
+  max-height: 7rem;
+  overflow-y: auto;
+}
+.as-ptp-entry { display: flex; gap: 0.5rem; font-size: 0.6875rem; font-weight: 700; }
+.as-ptp-delta { width: 2.75rem; flex: none; text-align: right; font-weight: 900; font-variant-numeric: tabular-nums; }
+.as-ptp-delta.plus { color: #2E9E6B; }
+.as-ptp-delta.minus { color: #C0392B; }
+.as-ptp-why { color: var(--sub); overflow-wrap: anywhere; }
+/* Dimmed rather than hidden: it is a real line that just hasn't reached the player yet. */
+.as-ptp-entry.unopened { opacity: .6; }
+.as-ptp-tag { margin-left: auto; flex: none; font-size: 0.5625rem; font-weight: 800; color: var(--sub); }
+
+.as-claim { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.as-claim-btn { padding: 0.3125rem 0.625rem; font-size: 0.6875rem; }
+/* Monospace and spaced out, because this gets read aloud or retyped from a screenshot and
+   O/0 and I/1 have to be told apart. */
+.as-claim-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.1875rem 0.4375rem;
+  border-radius: var(--radius-sm);
+  background: #2A2A28;
+  color: var(--accent-strong);
+  user-select: all;
+}
+.as-claim-note { font-size: 0.5625rem; color: var(--sub); }
+
+.as-hint { margin: 0; font-size: 0.625rem; font-weight: 600; color: var(--sub); line-height: 1.6; }
+
+.as-owned { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* Not-owned is the dimmed state rather than the hidden one: the whole point of listing every
+   asset is being able to see what someone hasn't got yet and hand it over. */
+.as-cell {
+  padding: 0;
+  border: 0.125rem solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  cursor: pointer;
+  overflow: hidden;
+  aspect-ratio: 1;
+  opacity: 0.3;
+  filter: grayscale(1);
+  transition: opacity 0.12s, filter 0.12s;
+}
+.as-cell.flag { aspect-ratio: 8 / 3; }
+.as-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.as-cell.on { opacity: 1; filter: none; border-color: var(--accent-strong); }
+/* Free assets need no grant, so there is nothing to toggle — shown at full strength so they
+   don't read as "missing", but not offered as a button. */
+.as-cell.free { opacity: 1; filter: none; cursor: default; }
+.as-cell.busy { opacity: 0.6; }
+.as-cell:focus-visible { outline: 0.125rem solid var(--accent-strong); outline-offset: 0.125rem; }
+.as-owned-label { font-size: 0.625rem; font-weight: 800; color: var(--sub); letter-spacing: 0.04em; }
+.as-owned-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr)); gap: 0.375rem; margin-top: 0.25rem; }
+.as-owned-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-sm); box-shadow: var(--shadow); display: block; }
+.as-owned-grid.wide img { aspect-ratio: 8 / 3; }
+.as-owned-titles { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
+.as-owned-title {
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.1875rem 0.4375rem;
+  border: 0.125rem solid transparent;
+  border-radius: var(--radius-sm);
+  background: #2A2A28;
+  color: #fff;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+  /* Same convention as the asset cells above: dimmed means not held. */
+  opacity: 0.35;
+  transition: opacity 0.12s;
+}
+.as-owned-title.on { opacity: 1; border-color: var(--accent-strong); }
+.as-owned-title.free { opacity: 1; cursor: default; }
+.as-owned-title.busy { opacity: 0.6; }
+.as-owned-title:focus-visible { outline: 0.125rem solid var(--accent-strong); outline-offset: 0.125rem; }
+.as-error { font-size: 0.75rem; font-weight: 700; color: #C0392B; }
+
+.as-foot { flex-shrink: 0; display: flex; justify-content: center; padding: 0.75rem 0 0.25rem; }
+</style>

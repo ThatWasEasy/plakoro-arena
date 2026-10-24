@@ -1,2 +1,22 @@
 /node_modules
 /reference
+
+# Tournament files exported from the app. They carry real players' names, and they are each
+# organiser's own data rather than part of the project.
+/tournament-exports
+
+# Local DATABASE_URL etc. — see .env.example for what belongs here.
+.env
+.env.*
+
+# Full-resolution nameplate artwork. The build uses the compressed copies beside it; these are
+# 14 MB of source that git has no reason to carry.
+/src/assets/_original
+
+# A snapshot of someone's local dev DB (`npm run db:dump`) — may hold real test-player data, and
+# the schema it came from is already in db/migrations/, so there is nothing here worth versioning.
+/db/dump.sql
+
+# Notes that shouldn't ride along in git history at all (PINs, secrets, anything else sensitive
+# enough that even a private repo is the wrong place for it) — backed up manually instead.
+/backup

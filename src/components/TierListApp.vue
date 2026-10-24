@@ -72,6 +72,10 @@ const barMax = computed(() => rows.value.reduce((max, row) => Math.max(max, row.
 function toggle(id) {
   expandedId.value = expandedId.value === id ? null : id
 }
+
+// Folded away by default, same as the odds view's own "計算前提" — the caveats matter, but
+// most players read the numbers first and only want the fine print on request.
+const showNotes = ref(false)
 </script>
 
 <template>
@@ -164,7 +168,16 @@ function toggle(id) {
       </div>
     </div>
 
-    <div style="width:100%; max-width:34rem; padding:0.625rem 0.75rem 0; font-size:0.5rem; font-weight:700; color:var(--sub); line-height:1.6; display:flex; flex-direction:column; gap:0.25rem;">
+    <div style="width:100%; max-width:34rem; padding:0.625rem 0.75rem 0; display:flex; justify-content:center;">
+      <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="showNotes = !showNotes">
+        {{ t('common.methodology') }}
+      </button>
+    </div>
+
+    <div
+      v-if="showNotes"
+      style="width:100%; max-width:34rem; padding:0.5rem 0.75rem 0; font-size:0.5rem; font-weight:700; color:var(--sub); line-height:1.6; display:flex; flex-direction:column; gap:0.25rem;"
+    >
       <div>{{ t('tierList.assumptions') }}</div>
       <div>{{ t('tierList.rotationNote') }}</div>
       <div>{{ t('tierList.premiseNote') }}</div>

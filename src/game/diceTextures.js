@@ -1,11 +1,12 @@
-// Builds the 6 face textures for a 3D die as <canvas> elements — reusing the same visual
-// language as the 2D dice builder (single-type faces show one centered icon; dual-type
-// faces show two icons in diagonally-split corners with a divider line).
+// Builds the 6 face textures for a 3D die as <canvas> elements, in the same visual language as
+// the 2D chips (see ChipIcon.vue): a single-type face is flat type colour with its glyph centred,
+// a dual-type face is the square split corner to corner into the two type colours with a glyph in
+// each half.
 import { asset } from '../data/assetPath'
+import { typeChipColor } from '../data/constants'
 
 const TEX_SIZE = 256
 const imageCache = new Map()
-const iconColorCache = new Map()
 
 function loadImage(src) {
   if (imageCache.has(src)) return imageCache.get(src)
@@ -31,26 +32,17 @@ function fillBackground(ctx, color) {
   ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE)
 }
 
-// Each ICON/{type}.png is already a solid-colored rounded-square badge (e.g. Grass is a fully
-// saturated green square with a white leaf) — the "type color" already lives in the art itself.
-// A flat design-system swatch (e.g. constants.js's pastel typeBgColor) is a different, lighter
-// shade of the same hue, so filling the face with it under the icon produced a two-tone face that
-// didn't read as one consistent color. Sampling the icon's own pixel color guarantees an exact
-// match instead.
-function sampleIconColor(img) {
-  if (iconColorCache.has(img.src)) return iconColorCache.get(img.src)
-  const sampleCanvas = document.createElement('canvas')
-  sampleCanvas.width = img.naturalWidth
-  sampleCanvas.height = img.naturalHeight
-  const sctx = sampleCanvas.getContext('2d')
-  sctx.drawImage(img, 0, 0)
-  // Top-center edge sits inside the badge's solid-color square for every icon, clear of the
-  // rounded corners (which only cut into the very corners) and of the white symbol in the middle.
-  const [r, g, b] = sctx.getImageData(Math.floor(img.naturalWidth / 2), 2, 1, 1).data
-  const color = `rgb(${r}, ${g}, ${b})`
-  iconColorCache.set(img.src, color)
-  return color
-}
+// The face is painted from the type's own colour and its glyph, rather than by stamping the whole
+// ICON/{type}.png badge onto a matching background.
+//
+// Stamping the badge is what made these faces look wrong: the badge carries a white outline, so
+// laying it over a same-coloured fill left a white square drawn inside the face — and on a
+// dual-type face, two of them, which is exactly the "two chips" reading the 2D chips had.
+// TYPE_CHIP_COLORS is sampled from the badges at full resolution, and glyph/{type}.png is the
+// same artwork with plate and outline removed, so the two always agree.
+//
+// The old code sampled the colour live from pixel (width/2, 2) — two pixels down the top edge,
+// which is on the outline, not the fill.
 
 function drawBorder(ctx) {
   ctx.strokeStyle = '#DEDACD'
@@ -64,21 +56,36 @@ function drawBorder(ctx) {
 export async function buildSingleFaceTexture(type, { tintFromIcon = true } = {}) {
   const canvas = makeCanvas()
   const ctx = canvas.getContext('2d')
-  const img = await loadImage(asset(`image/ICON/${type}.png`))
-  fillBackground(ctx, tintFromIcon ? sampleIconColor(img) : '#FFFFFF')
-  drawBorder(ctx)
-  const pad = TEX_SIZE * 0.08
-  ctx.drawImage(img, pad, pad, TEX_SIZE - pad * 2, TEX_SIZE - pad * 2)
+  if (tintFromIcon) {
+    // Energy face: flat type colour with the white glyph on it.
+    fillBackground(ctx, typeChipColor(type))
+    drawBorder(ctx)
+    const img = await loadImage(asset(`image/ICON/glyph/${type}.png`))
+    const size = TEX_SIZE * 0.62
+    const at = (TEX_SIZE - size) / 2
+    ctx.drawImage(img, at, at, size, size)
+  } else {
+    // Character die: black line art on white, so it goes down as-is — there's no coloured plate
+    // to strip and no glyph-only version of these.
+    fillBackground(ctx, '#FFFFFF')
+    drawBorder(ctx)
+    const img = await loadImage(asset(`image/ICON/${type}.png`))
+    const pad = TEX_SIZE * 0.08
+    ctx.drawImage(img, pad, pad, TEX_SIZE - pad * 2, TEX_SIZE - pad * 2)
+  }
   return canvas
 }
 
 export async function buildDualFaceTexture(types) {
   const canvas = makeCanvas()
   const ctx = canvas.getContext('2d')
-  const [imgA, imgB] = await Promise.all(types.map(t => loadImage(asset(`image/ICON/${t}.png`))))
+  const [imgA, imgB] = await Promise.all(
+    types.map(t => loadImage(asset(`image/ICON/glyph/${t}.png`))))
   const iconSize = TEX_SIZE * 0.42
-  const inset = TEX_SIZE * 0.05
+  const inset = TEX_SIZE * 0.06
 
+  // Two triangles of flat colour meeting on the diagonal, then a glyph in each. No divider is
+  // drawn — the colour change is the split, and a line over it only reads as a seam.
   ctx.save()
   ctx.beginPath()
   ctx.moveTo(0, 0)
@@ -86,8 +93,7 @@ export async function buildDualFaceTexture(types) {
   ctx.lineTo(0, TEX_SIZE)
   ctx.closePath()
   ctx.clip()
-  fillBackground(ctx, sampleIconColor(imgA))
-  ctx.drawImage(imgA, inset, inset, iconSize, iconSize)
+  fillBackground(ctx, typeChipColor(types[0]))
   ctx.restore()
 
   ctx.save()
@@ -97,16 +103,11 @@ export async function buildDualFaceTexture(types) {
   ctx.lineTo(0, TEX_SIZE)
   ctx.closePath()
   ctx.clip()
-  fillBackground(ctx, sampleIconColor(imgB))
-  ctx.drawImage(imgB, TEX_SIZE - inset - iconSize, TEX_SIZE - inset - iconSize, iconSize, iconSize)
+  fillBackground(ctx, typeChipColor(types[1]))
   ctx.restore()
 
-  ctx.strokeStyle = '#9A9A93'
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.moveTo(TEX_SIZE, 0)
-  ctx.lineTo(0, TEX_SIZE)
-  ctx.stroke()
+  ctx.drawImage(imgA, inset, inset, iconSize, iconSize)
+  ctx.drawImage(imgB, TEX_SIZE - inset - iconSize, TEX_SIZE - inset - iconSize, iconSize, iconSize)
 
   drawBorder(ctx)
 

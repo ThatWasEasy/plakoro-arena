@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { computeDisplayDamage as computeDisplayDamagePure, isCharaColorConditionMet } from '../game/damage'
+import { computeDisplayDamage as computeDisplayDamagePure, isCharaColorConditionMet, applyNullifyAtMost } from '../game/damage'
 import { runEffectQueue as runEffectQueueShared } from '../game/effectQueue'
 import { buildAiOpponentForTier, scaleMoveForFloor, maxAffordableCostForTier } from '../game/aiOpponent'
 import { generateActMap, reachableNodeIds as mapReachableNodeIds } from '../game/mapGen'
@@ -35,6 +35,13 @@ function newCombatant() {
     committedLastMoveFailed: false,
     incomingDamageMod: 0,
     incomingDamageNullify: null,
+    // See useBattleState for these five. Solo dice are physical, so the two rerolls only ever
+    // surface as badges on the dice screen.
+    incomingDamageNullifyAtMost: null,
+    tookMoveDamage: false,
+    energyRerollByOpponent: 0,
+    charaRerolls: 0,
+    movePickedByOpponent: null,
     diceMod: 0,
     diceModBadges: [],
     bannedMoveIds: [],
@@ -42,6 +49,8 @@ function newCombatant() {
     committedBannedMoveIds: [],
     committedBannedMoveSourceName: "",
     charaDiceBlocked: false,
+    // See useBattleState: set by FIX_CHARADICE_*, consumed on this player's next turn.
+    fixCharaDice: null,
     attackAnim: null,
     hitBlink: false,
     dmgOverlay: null,
@@ -161,6 +170,11 @@ export function useSoloRun(charactersRef, movesRef) {
     c.committedLastMoveFailed = false
     c.incomingDamageMod = 0
     c.incomingDamageNullify = null
+    c.incomingDamageNullifyAtMost = null
+    c.tookMoveDamage = false
+    c.energyRerollByOpponent = 0
+    c.charaRerolls = 0
+    c.movePickedByOpponent = null
     c.diceMod = 0
     c.diceModBadges = []
     c.bannedMoveIds = []
@@ -168,6 +182,7 @@ export function useSoloRun(charactersRef, movesRef) {
     c.committedBannedMoveIds = []
     c.committedBannedMoveSourceName = ""
     c.charaDiceBlocked = false
+    c.fixCharaDice = null
     c.attackAnim = null
     c.hitBlink = false
     c.dmgOverlay = null
@@ -254,8 +269,31 @@ export function useSoloRun(charactersRef, movesRef) {
     state.phase = "diceSuccess"
   }
 
+  // SPECIAL_PICK_ENEMY_WAZA cast by the player on the AI: what the player may pick from. Same
+  // legality as the AI's own pick below, including its last-resort repeat.
+  function aiPickableMoveIds() {
+    const ai = state.ai
+    const notSealed = ai.moveIds.filter(mid => !(ai.committedBannedMoveIds || []).includes(mid))
+    const pool = notSealed.filter(mid => mid !== ai.committedLastMoveId)
+    return pool.length > 0 ? pool : notSealed
+  }
+
+  // The same effect cast by the AI on the player: it hands the player their weakest legal move,
+  // by printed damage — the simplest reading of "pick the move that hurts the AI least".
+  function aiPickPlayerMove() {
+    const legal = availableMoveIds("player")
+    if (legal.length === 0) return
+    const weakest = [...legal].sort((a, b) => movesRef.value[a].baseDamage - movesRef.value[b].baseDamage)[0]
+    pickMove(weakest)
+  }
+
   function aiTakeTurn() {
     const ai = state.ai
+    // The player picks for the AI this turn; SoloMoveSelect.vue shows the AI's moves for it.
+    if (ai.movePickedByOpponent && aiPickableMoveIds().length > 0) {
+      state.phase = "moveSelect"
+      return
+    }
     const notSealed = ai.moveIds.filter(mid => !(ai.committedBannedMoveIds || []).includes(mid))
     if (notSealed.length === 0) {
       // Every move the AI knows is actually sealed — it truly has nothing it can do.
@@ -285,6 +323,9 @@ export function useSoloRun(charactersRef, movesRef) {
     // seal outlast its intended one-turn duration.
     ai.bannedMoveIds = []
     ai.bannedMoveSourceName = ""
+    ai.movePickedByOpponent = null
+    // No move was cast, so nothing hit the player this turn.
+    state.player.tookMoveDamage = false
     state.turn = "player"
     state.selectedMove = null
     state.phase = "moveSelect"
@@ -303,6 +344,8 @@ export function useSoloRun(charactersRef, movesRef) {
     // seal fields have to be cleared here or they'd be re-committed on every later turn.
     p.bannedMoveIds = []
     p.bannedMoveSourceName = ""
+    p.movePickedByOpponent = null
+    state.ai.tookMoveDamage = false
     state.turn = "ai"
     state.selectedMove = null
     state.phase = "moveSelect"
@@ -311,6 +354,7 @@ export function useSoloRun(charactersRef, movesRef) {
 
   function backToMoveSelect() {
     if (state.repeatActive) return
+    if (state[state.turn].movePickedByOpponent) return
     state.selectedMove = null
     state.phase = "moveSelect"
   }
@@ -331,7 +375,9 @@ export function useSoloRun(charactersRef, movesRef) {
     showCharaDiceRepeatPrompt,
     showBindWazaPrompt,
     showEneCountPrompt,
-    showCharaDiceEnemyManualPrompt
+    showCharaDiceEnemyManualPrompt,
+    showCharaDiceComboEnemyPrompt,
+    showCharaDiceSelectPrompt
   }
 
   function resolveTurn(result) {
@@ -347,11 +393,17 @@ export function useSoloRun(charactersRef, movesRef) {
     mover.diceMod = 0
     mover.diceModBadges = []
     mover.charaDiceBlocked = false
+    mover.fixCharaDice = null
+    mover.energyRerollByOpponent = 0
+    mover.charaRerolls = 0
+    mover.movePickedByOpponent = null
+    if (!state.repeatActive) opp.tookMoveDamage = false
     state.phase = "resolve"
 
     if (result.kind === "fail") {
       opp.incomingDamageMod = 0
       opp.incomingDamageNullify = null
+      opp.incomingDamageNullifyAtMost = null
       proceedToAnimateWithCtx({ moverKey, mover, oppKey, opp, mv, dmgToOpp: 0, dmgToSelf: 0, isMiss: true })
       return
     }
@@ -368,8 +420,8 @@ export function useSoloRun(charactersRef, movesRef) {
 
   // --- effect prompts (same shapes as duel mode) ---
 
-  function showDicePrompt(maxNum, multiplier, onPick) {
-    state.effectPrompt = { kind: "diceNumber", max: maxNum, multiplier, onPick }
+  function showDicePrompt(n, multiplier, ctx, onPick) {
+    state.effectPrompt = { kind: "diceNumber", max: n * 2, multiplier, onPick }
     state.phase = "effectPrompt"
   }
   function showCharaDiceCountPrompt(n, effectValue, ctx, onPick) {
@@ -386,14 +438,30 @@ export function useSoloRun(charactersRef, movesRef) {
     state.effectPrompt = { kind: "bindWaza", targetKey, count, picked: [], onDone }
     state.phase = "effectPrompt"
   }
-  function showEneCountPrompt(effectValue, ctx, onPick) {
+  function showEneCountPrompt(effectValue, ctx, onPick, eneType = null) {
     const dmgInfo = computeDisplayDamage(ctx.mv, ctx.mover, ctx.opp)
-    state.effectPrompt = { kind: "eneCount", effectValue, mv: ctx.mv, dmgInfo, mover: ctx.mover, opp: ctx.opp, onPick }
+    state.effectPrompt = { kind: "eneCount", effectValue, eneType: eneType || ctx.mv.type, mv: ctx.mv, dmgInfo, mover: ctx.mover, opp: ctx.opp, onPick }
     state.phase = "effectPrompt"
   }
   function showCharaDiceEnemyManualPrompt(orientations, effectValue, ctx, onPick) {
     const dmgInfo = computeDisplayDamage(ctx.mv, ctx.mover, ctx.opp)
     state.effectPrompt = { kind: "charaDiceEnemyManual", orientations, effectValue, mv: ctx.mv, dmgInfo, mover: ctx.mover, opp: ctx.opp, onPick }
+    state.phase = "effectPrompt"
+  }
+
+  // The opponent rolls their character die n times; the player reports how many landed on one
+  // of `orientations`. A count, not a yes/no — that's what separates it from the prompt above.
+  function showCharaDiceComboEnemyPrompt(n, orientations, effectValue, ctx, onPick) {
+    const dmgInfo = computeDisplayDamage(ctx.mv, ctx.mover, ctx.opp)
+    state.effectPrompt = { kind: "charaDiceComboEnemy", n, orientations, effectValue, mv: ctx.mv, dmgInfo, mover: ctx.mover, opp: ctx.opp, onPick }
+    state.phase = "effectPrompt"
+  }
+
+  // The player reports which orientation their character die actually showed, and that becomes
+  // the orientation their (or the opponent's) die is pinned to next turn.
+  function showCharaDiceSelectPrompt(orientations, effectValue, ctx, target, onPick) {
+    const dmgInfo = computeDisplayDamage(ctx.mv, ctx.mover, ctx.opp)
+    state.effectPrompt = { kind: "charaDiceSelect", orientations, effectValue, target, mv: ctx.mv, dmgInfo, mover: ctx.mover, opp: ctx.opp, onPick }
     state.phase = "effectPrompt"
   }
 
@@ -483,10 +551,13 @@ export function useSoloRun(charactersRef, movesRef) {
       ? Math.max(opp.incomingDamageNullify, 0)
       : Math.max(ctx.dmgToOpp, 0)
     dmgToOpp = Math.max(dmgToOpp - (opp.defBonus || 0), 0)
+    // After defBonus: the threshold is on the damage actually taken.
+    dmgToOpp = applyNullifyAtMost(opp, dmgToOpp)
     const dmgToSelf = ctx.dmgToSelf
 
     playEffectOn(oppKey, dmgToOpp, () => {
       opp.hp = Math.max(opp.hp - dmgToOpp, 0)
+      if (dmgToOpp > 0) opp.tookMoveDamage = true
 
       const finishSelf = () => {
         if (opp.hp <= 0 || mover.hp <= 0) {
@@ -511,6 +582,7 @@ export function useSoloRun(charactersRef, movesRef) {
         state.repeatActive = false
         opp.incomingDamageMod = 0
         opp.incomingDamageNullify = null
+        opp.incomingDamageNullifyAtMost = null
         mover.committedLastMoveId = mover.lastMoveId
         mover.committedLastMoveFailed = mover.lastMoveFailed
         mover.committedBannedMoveIds = mover.bannedMoveIds
@@ -521,6 +593,7 @@ export function useSoloRun(charactersRef, movesRef) {
         state.selectedMove = null
         state.phase = "moveSelect"
         if (state.turn === "ai") aiTakeTurn()
+        else if (state.player.movePickedByOpponent) aiPickPlayerMove()
       }
 
       if (dmgToSelf !== 0) {
@@ -641,6 +714,7 @@ export function useSoloRun(charactersRef, movesRef) {
     enterNode,
     returnToMap,
     availableMoveIds,
+    aiPickableMoveIds,
     pickMove,
     skipAiTurn,
     skipPlayerTurn,
