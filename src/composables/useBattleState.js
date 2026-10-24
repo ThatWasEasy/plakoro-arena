@@ -1,7 +1,8 @@
 import { reactive } from 'vue'
 import { loadMoveHistory, saveMoveHistoryForChar } from '../data/moveHistory'
-import { computeDisplayDamage as computeDisplayDamagePure, isCharaColorConditionMet } from '../game/damage'
+import { computeDisplayDamage as computeDisplayDamagePure, isCharaColorConditionMet, applyNullifyAtMost } from '../game/damage'
 import { runEffectQueue as runEffectQueueShared } from '../game/effectQueue'
+import { canPayCost } from '../game/energyPayment'
 
 // Set by useOnlineRoom on host()/join()/leave(). Lets the handful of effect hooks below tell
 // "real synced dice are available" (online) from "nothing to read but a self-report" (hotseat/
@@ -28,6 +29,20 @@ function newPlayer() {
     lastMoveId: null,
     incomingDamageMod: 0,
     incomingDamageNullify: null,
+    // NULLIFY_TAKEN_LE: the next hit is dropped if its final figure is at most this. Same
+    // lifecycle as incomingDamageNullify.
+    incomingDamageNullifyAtMost: null,
+    // Whether a move's damage landed on this player during the opponent's most recent turn —
+    // read by DAMAGE_EXTRA_IF_UNHURT. Cleared when the opponent's turn starts.
+    tookMoveDamage: false,
+    // REROLL_DICE_ENEMY: how many of this player's energy dice the opponent may make them
+    // re-throw on their next turn. REROLL_CHARADICE_SELF: how many times this player may
+    // re-throw their own character die on their next turn. Both cleared when that turn resolves.
+    energyRerollByOpponent: 0,
+    charaRerolls: 0,
+    // SPECIAL_PICK_ENEMY_WAZA: { sourceName, sourceType } while the opponent picks this
+    // player's next move; null the rest of the time.
+    movePickedByOpponent: null,
     diceMod: 0,
     diceModBadges: [],
     bannedMoveIds: [],
@@ -77,8 +92,15 @@ function freshState() {
     // reset whenever a fresh dice-roll phase begins.
     charaDieFace: null,
     energyRolledTypes: null,
+    // Online only: the same roll split per die (one array of types per thrown die), which is
+    // what an energy reroll needs to swap out single dice.
+    energyRolledDice: null,
     energySuccess: null,
     diceTransforms: null,
+    // Online only: REROLL_DICE_ENEMY in progress on this turn's energy roll — see
+    // beginEnergyRerollTask(). `energyRerollDone` stops it from triggering twice in one turn.
+    energyRerollTask: null,
+    energyRerollDone: false,
     // Online only: gates the handoff to the next turn behind the receiving side actually
     // acknowledging the damage + dice result — see showTurnResultConfirm()/confirmTurnResult().
     turnResult: null,
@@ -204,8 +226,11 @@ export function useBattleState(movesRef) {
   function clearDiceRoll() {
     state.charaDieFace = null
     state.energyRolledTypes = null
+    state.energyRolledDice = null
     state.energySuccess = null
     state.diceTransforms = null
+    state.energyRerollTask = null
+    state.energyRerollDone = false
   }
 
   function pickMove(mid) {
@@ -216,6 +241,9 @@ export function useBattleState(movesRef) {
 
   function backToMoveSelect() {
     if (state.repeatActive) return
+    // The opponent chose this move (SPECIAL_PICK_ENEMY_WAZA); going back would let the mover
+    // swap it for one of their own choosing.
+    if (state.players[state.turnPlayer].movePickedByOpponent) return
     state.selectedMove = null
     clearDiceRoll()
     state.phase = "moveSelect"
@@ -227,11 +255,103 @@ export function useBattleState(movesRef) {
   // is the real cost check (canPayCost against those types); `transforms` is each die's exact
   // final position/quaternion from that physics run, broadcast so the opponent's canvas can
   // replay the identical result instead of guessing.
-  function setDiceRollResult(charaDieFace, energyRolledTypes, energySuccess, transforms) {
+  function setDiceRollResult(charaDieFace, energyRolledTypes, energySuccess, transforms, energyRolledDice = null) {
     state.charaDieFace = charaDieFace
     state.energyRolledTypes = energyRolledTypes
+    state.energyRolledDice = energyRolledDice
     state.energySuccess = energySuccess
     state.diceTransforms = transforms
+    const mover = state.players[state.turnPlayer]
+    if (onlineModeActive && mover.energyRerollByOpponent > 0 && !state.energyRerollDone && energyRolledDice && energyRolledDice.length > 0) {
+      beginEnergyRerollTask()
+    }
+  }
+
+  // --- REROLL_DICE_ENEMY (online only) ---
+  //
+  // After the mover's throw settles, the side that cast the reroll picks which of the mover's
+  // energy dice get thrown again ("振りなおすエネコロは自分が選ぶ"), then the mover's own
+  // client re-throws just those, and the cost check is redone on the combined result. Hotseat
+  // and solo throw physical dice, so there the effect is only a badge reminding both players.
+  //
+  // The dice actually thrown this turn are captured into the task up front (the same cycling
+  // DiceOverlay's diceForThrow() does), so the re-throw can't drift from what was rolled.
+  function beginEnergyRerollTask() {
+    const moverKey = state.turnPlayer
+    const mover = state.players[moverKey]
+    const isFirstTurn = state.turnCount === 0
+    const energyCount = Math.max(0, (isFirstTurn ? 2 : 3) + (mover.diceMod || 0))
+    const config = mover.energyDice || []
+    const dice = Array.from({ length: energyCount }, (_, i) => config[i % config.length])
+    state.energyRerollTask = {
+      pickerKey: opponentKey(moverKey),
+      rollerKey: moverKey,
+      count: Math.min(mover.energyRerollByOpponent, dice.length),
+      dice,
+      picked: [],
+      stage: 'pick',
+      transforms: null
+    }
+    state.energyRerollDone = true
+    state.phase = "energyReroll"
+  }
+
+  function toggleEnergyRerollPick(index) {
+    const t = state.energyRerollTask
+    if (!t || t.stage !== 'pick') return
+    if (t.picked.includes(index)) t.picked = t.picked.filter(i => i !== index)
+    else if (t.picked.length < t.count) t.picked.push(index)
+  }
+
+  // Picking nothing is allowed — the caster may like the roll as it stands.
+  function confirmEnergyRerollPick() {
+    const t = state.energyRerollTask
+    if (!t || t.stage !== 'pick') return
+    if (t.picked.length === 0) {
+      finishEnergyReroll()
+      return
+    }
+    t.stage = 'throw'
+  }
+
+  // `perDieTypes[i]` is the result for the i-th entry of `picked`.
+  function submitEnergyRerollResult(perDieTypes, transforms) {
+    const t = state.energyRerollTask
+    if (!t || t.stage !== 'throw') return
+    const dice = state.energyRolledDice.map(types => [...types])
+    t.picked.forEach((dieIndex, i) => { dice[dieIndex] = perDieTypes[i] || [] })
+    t.transforms = transforms
+    const flat = dice.flat()
+    const mv = movesRef.value[state.selectedMove]
+    state.energyRolledDice = dice
+    state.energyRolledTypes = flat
+    state.energySuccess = canPayCost(flat, mv.cost)
+    finishEnergyReroll()
+  }
+
+  function finishEnergyReroll() {
+    state.energyRerollTask = null
+    // The main throw's pose no longer matches the result, so the opponent's replay is dropped
+    // rather than shown out of step with the icons beside it.
+    state.diceTransforms = null
+    state.phase = "diceRoll"
+  }
+
+  // --- REROLL_CHARADICE_SELF (online only) ---
+  //
+  // Re-throws just the character die as a real synced throw, replacing this turn's face. The
+  // remaining count is spent here; whatever's left unused lapses when the turn resolves.
+  function rerollCharaDie() {
+    const moverKey = state.turnPlayer
+    const mover = state.players[moverKey]
+    if (!onlineModeActive || !(mover.charaRerolls > 0) || !state.charaDieFace) return
+    mover.charaRerolls--
+    const mv = movesRef.value[state.selectedMove]
+    const orientations = [...new Set((mv.chara || []).flatMap(ce => ce.orientations))]
+    beginCharaThrowTask(moverKey, orientations, 'single', null, 0, face => {
+      state.charaDieFace = face
+      state.phase = "diceRoll"
+    }, 'face')
   }
 
   const effectQueueHooks = {
@@ -242,7 +362,8 @@ export function useBattleState(movesRef) {
     showEneCountPrompt,
     showCharaDiceEnemyManualPrompt,
     showCharaDiceComboEnemyPrompt,
-    showCharaDiceSelectPrompt
+    showCharaDiceSelectPrompt,
+    showSwapChipPrompt
   }
 
   function resolveTurn(result) {
@@ -260,11 +381,17 @@ export function useBattleState(movesRef) {
     mover.diceModBadges = []
     mover.charaDiceBlocked = false
     mover.fixCharaDice = null
+    mover.energyRerollByOpponent = 0
+    mover.charaRerolls = 0
+    mover.movePickedByOpponent = null
+    // A repeat is the same turn carrying on, so a hit from its first cast still counts.
+    if (!state.repeatActive) opp.tookMoveDamage = false
     state.phase = "resolve"
 
     if (result.kind === "fail") {
       opp.incomingDamageMod = 0
       opp.incomingDamageNullify = null
+      opp.incomingDamageNullifyAtMost = null
       proceedToAnimateWithCtx({ moverKey, mover, oppKey, opp, mv, dmgToOpp: 0, dmgToSelf: 0, isMiss: true })
       return
     }
@@ -342,14 +469,16 @@ export function useBattleState(movesRef) {
   // turn's own energy roll (state.energyRolledTypes) — the one already thrown for the move's
   // own cost check — not a new roll. Same shape as the charaDiceSelect 'self' fix: read it
   // straight from the real result instead of asking the player to recount it by hand.
-  function showEneCountPrompt(effectValue, ctx, onPick) {
+  // `eneType` is the counted type when it isn't the move's own (DAMAGE_EXTRA_ENE_<type>).
+  function showEneCountPrompt(effectValue, ctx, onPick, eneType = null) {
+    const countedType = eneType || ctx.mv.type
     if (onlineModeActive && state.energyRolledTypes) {
-      const count = state.energyRolledTypes.filter(ty => ty === ctx.mv.type).length
+      const count = state.energyRolledTypes.filter(ty => ty === countedType).length
       onPick(count)
       return
     }
     const dmgInfo = computeDisplayDamage(ctx.mv, ctx.mover, ctx.opp)
-    state.effectPrompt = { kind: "eneCount", effectValue, mv: ctx.mv, dmgInfo, mover: ctx.mover, opp: ctx.opp, onPick }
+    state.effectPrompt = { kind: "eneCount", effectValue, eneType: countedType, mv: ctx.mv, dmgInfo, mover: ctx.mover, opp: ctx.opp, onPick }
     state.phase = "effectPrompt"
   }
 
@@ -400,6 +529,30 @@ export function useBattleState(movesRef) {
     }
     const dmgInfo = computeDisplayDamage(ctx.mv, ctx.mover, ctx.opp)
     state.effectPrompt = { kind: "charaDiceSelect", orientations, effectValue, target, mv: ctx.mv, dmgInfo, mover: ctx.mover, opp: ctx.opp, onPick }
+    state.phase = "effectPrompt"
+  }
+
+  // SPECIAL_SWAP_CHIP: online only, since that's the one mode holding the dice as data — the
+  // mover re-chips one of their own configured dice (EnergyDiceModal in swap mode) and every
+  // later throw uses the new chips. Hotseat dice are physical, so it's done at the table.
+  function showSwapChipPrompt(effectValue, ctx, onDone) {
+    if (!onlineModeActive || !ctx.mover.energyDice) {
+      onDone()
+      return
+    }
+    state.effectPrompt = {
+      kind: "swapChip",
+      targetKey: ctx.moverKey,
+      mvName: ctx.mv.name,
+      onPick: picked => {
+        if (picked && Number.isInteger(picked.dieIndex) && picked.die) {
+          const dice = [...ctx.mover.energyDice]
+          dice[picked.dieIndex] = picked.die
+          ctx.mover.energyDice = dice
+        }
+        onDone()
+      }
+    }
     state.phase = "effectPrompt"
   }
 
@@ -563,13 +716,14 @@ export function useBattleState(movesRef) {
 
   function proceedToAnimateWithCtx(ctx) {
     const { moverKey, mover, oppKey, opp, mv } = ctx
-    const dmgToOpp = (opp.incomingDamageNullify !== null && opp.incomingDamageNullify !== undefined)
+    const dmgToOpp = applyNullifyAtMost(opp, (opp.incomingDamageNullify !== null && opp.incomingDamageNullify !== undefined)
       ? Math.max(opp.incomingDamageNullify, 0)
-      : Math.max(ctx.dmgToOpp, 0)
+      : Math.max(ctx.dmgToOpp, 0))
     const dmgToSelf = ctx.dmgToSelf
 
     playEffectOn(oppKey, mv.type, dmgToOpp, () => {
       opp.hp = Math.max(opp.hp - dmgToOpp, 0)
+      if (dmgToOpp > 0) opp.tookMoveDamage = true
 
       const finishSelf = () => {
         if (opp.hp <= 0 || mover.hp <= 0) {
@@ -595,6 +749,7 @@ export function useBattleState(movesRef) {
         state.repeatActive = false
         opp.incomingDamageMod = 0
         opp.incomingDamageNullify = null
+        opp.incomingDamageNullifyAtMost = null
         mover.committedLastMoveId = mover.lastMoveId
         mover.committedLastMoveFailed = mover.lastMoveFailed
         mover.committedBannedMoveIds = mover.bannedMoveIds
@@ -655,6 +810,10 @@ export function useBattleState(movesRef) {
     confirmTurnResult,
     submitCharaThrowResult,
     submitEnergyThrowResult,
+    toggleEnergyRerollPick,
+    confirmEnergyRerollPick,
+    submitEnergyRerollResult,
+    rerollCharaDie,
     resetGame
   }
 }

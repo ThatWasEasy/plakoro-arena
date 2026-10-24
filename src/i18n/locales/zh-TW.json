@@ -38,7 +38,8 @@
     "notSelected": "未選擇",
     "incomingDamageEffect": "效果：下次受到的傷害{sign}{value}",
     "guest": "訪客",
-    "level": "Lv.{n}"
+    "level": "Lv.{n}",
+    "incomingDamageNullifyAtMost": "效果：下次受到{value}以下的傷害時不受傷害"
   },
   "select": {
     "pickPokemon": "選擇<br>寶可夢",
@@ -62,12 +63,16 @@
   "energyDice": {
     "title": "設定你的能量骰",
     "hint": "點任一面調整能量，整場對戰都會用這 3 顆骰子擲骰。",
-    "confirm": "完成設定"
+    "confirm": "完成設定",
+    "swapTitle": "更換晶片",
+    "swapHint": "選一顆能量骰，任意更換它的晶片（凸面、凹面固定不能換）"
   },
   "moveSelect": {
     "title": "為{name}選擇4個招式",
     "confirm": "以所選招式確定",
-    "opponentThinking": "對方選擇招式中…"
+    "opponentThinking": "對方選擇招式中…",
+    "pickForOpponent": "{source}：替對手選擇這回合的招式",
+    "opponentPickingForYou": "{source}：對方正在替你選擇招式…"
   },
   "moveCard": {
     "usedLastTurn": "上回合已使用",
@@ -83,7 +88,8 @@
     "moveFail": "招式失敗",
     "throwCharaDie": "丟擲骰子",
     "opponentResolving": "對方判定招式中…",
-    "opponentRolled": "對方的擲骰結果"
+    "opponentRolled": "對方的擲骰結果",
+    "rerollCharaDie": "重擲角色骰（剩{n}次）"
   },
   "effectPrompt": {
     "diceRollLabel": "{n}個",
@@ -100,7 +106,8 @@
     "charaDiceComboPrefix": "讓對手擲{n}次角色骰，每次出現",
     "charaDiceComboSuffix": "就追加{dmg}傷害。選擇成功的次數。",
     "charaDiceSelectSelfTitle": "選擇這次角色骰擲出的向，下回合你的角色骰將固定為此向。",
-    "charaDiceSelectEnemyTitle": "選擇這次角色骰擲出的向，下回合對手的角色骰將固定為此向。"
+    "charaDiceSelectEnemyTitle": "選擇這次角色骰擲出的向，下回合對手的角色骰將固定為此向。",
+    "swapChipSub": "選一顆能量骰更換晶片"
   },
   "turnResult": {
     "title": "本回合結果",
@@ -114,7 +121,11 @@
     "charaProgressRepeat": "已連續成功{count}次，繼續擲到失手為止",
     "throwAgain": "再擲一次",
     "energyYourTurn": "輪到你擲{n}顆能量骰",
-    "energyWaiting": "對方正在擲{n}顆能量骰…"
+    "energyWaiting": "對方正在擲{n}顆能量骰…",
+    "energyRerollPick": "選擇要讓對方重擲的能量骰（最多{n}顆）",
+    "energyRerollPickWaiting": "對方正在選擇要你重擲的能量骰…",
+    "energyRerollConfirm": "讓對方重擲{n}顆",
+    "energyRerollSkip": "不重擲"
   },
   "win": {
     "victorySuffix": "獲勝！",
@@ -308,6 +319,7 @@
       "prevEnemyFailed": "上一個對手回合，對手能量骰失敗",
       "prevSelfFailed": "上一個自己回合，自己能量骰失敗",
       "prevPrereqSucceeded": "上一個自己回合，指定招式成功",
+      "prevSelfUnhurt": "上一個對手回合，自己沒有受到招式傷害",
       "evHint": "期望效益＝（對手扣血 − 自己扣血）的平均，再乘上成功率；回血算加分。不計弱點加成。下方的組成相加就是期望效益（傷害總共為小計，不另外相加）",
       "noteNeedsHp": "填入剩餘 HP 後才會計入",
       "noteNeedsPrev": "依上方前提條件計算",

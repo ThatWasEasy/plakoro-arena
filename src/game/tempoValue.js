@@ -26,10 +26,11 @@
 //     Three passes reach a fixed point.
 //
 // One more thing it does NOT do: average over everybody. See REFERENCE_COUNT.
-import { enumerateRolls } from './energyPayment'
+import { enumerateRolls, parseCost } from './energyPayment'
+import { CHIP_TYPES, FACE_KEYS, faceTypes } from './diceParts'
 import { ASSUMED_ENEMY_LAST_DAMAGE, suggestedBuild } from './suggestedDice'
 import { sustainableValue, DECK_SIZE, NORMAL_DICE } from './turnValue'
-import { moveExpectedValue } from './moveExpectedValue'
+import { moveExpectedValue, nullifyAtMostKey } from './moveExpectedValue'
 
 // The first turn of a game throws 2 dice, which this doesn't model — a denial on turn one is
 // worth more than the figure here, not less.
@@ -51,11 +52,132 @@ const PASSES = 3
 // compared row to row.
 export const REFERENCE_COUNT = 5
 
+// How likely `cost` is to be paid when, after the throw, the opponent may pick up to `n` of
+// the dice and have them thrown again (REROLL_DICE_ENEMY) — and picks whichever ones make the
+// re-throw least likely to still pay. A roll that already fails is left alone: re-throwing it
+// could only help the thrower.
+//
+// It enumerates every per-die outcome and every choice of dice, which is ~27k cost checks per
+// move for three dice, so faces are counted into fixed-length vectors once and the check
+// itself is a few array reads. Memoised on the dice and cost, since passes re-ask it.
+const enemyRerollMemo = new Map()
+export function payableUnderEnemyReroll(dice, cost, n) {
+  if (!cost || cost.length === 0) return 1
+  const memoKey = JSON.stringify([dice, cost, n])
+  if (enemyRerollMemo.has(memoKey)) return enemyRerollMemo.get(memoKey)
+
+  const typeIndex = new Map(CHIP_TYPES.map((type, i) => [type, i]))
+  const width = CHIP_TYPES.length
+  const { specific, colorless } = parseCost(cost)
+  const need = new Array(width).fill(0)
+  let needTotal = 0
+  for (const [type, count] of specific) {
+    // A cost no chip can ever show is never payable.
+    if (!typeIndex.has(type)) {
+      enemyRerollMemo.set(memoKey, 0)
+      return 0
+    }
+    need[typeIndex.get(type)] = count
+    needTotal += count
+  }
+  const faces = dice.map(die => FACE_KEYS.map(key => {
+    const types = faceTypes(die, key)
+    const vec = new Array(width).fill(0)
+    types.forEach(type => { vec[typeIndex.get(type)] += 1 })
+    return { vec, size: types.length }
+  }))
+  const pays = picked => {
+    let size = 0
+    for (let t = 0; t < width; t++) {
+      if (need[t] === 0) continue
+      let have = 0
+      for (let d = 0; d < picked.length; d++) have += picked[d].vec[t]
+      if (have < need[t]) return false
+    }
+    for (let d = 0; d < picked.length; d++) size += picked[d].size
+    return size - needTotal >= colorless
+  }
+
+  const dieCount = dice.length
+  const subsets = []
+  for (let mask = 1; mask < (1 << dieCount); mask++) {
+    const members = []
+    for (let d = 0; d < dieCount; d++) if (mask & (1 << d)) members.push(d)
+    if (members.length <= n) subsets.push(members)
+  }
+
+  // Share of re-throws of `members` that still pay, with every other die held at `roll`.
+  const stillPays = (roll, members) => {
+    const current = roll.map((faceIdx, d) => faces[d][faceIdx])
+    let paying = 0
+    let total = 0
+    const walk = k => {
+      if (k === members.length) {
+        total += 1
+        if (pays(current)) paying += 1
+        return
+      }
+      const d = members[k]
+      for (let f = 0; f < FACE_KEYS.length; f++) {
+        current[d] = faces[d][f]
+        walk(k + 1)
+      }
+      current[d] = faces[d][roll[d]]
+    }
+    walk(0)
+    return paying / total
+  }
+
+  let sum = 0
+  let outcomes = 0
+  const roll = new Array(dieCount).fill(0)
+  const visit = d => {
+    if (d === dieCount) {
+      outcomes += 1
+      if (!pays(roll.map((faceIdx, i) => faces[i][faceIdx]))) return
+      let best = 1
+      subsets.forEach(members => { best = Math.min(best, stillPays(roll, members)) })
+      sum += best
+      return
+    }
+    for (let f = 0; f < FACE_KEYS.length; f++) {
+      roll[d] = f
+      visit(d + 1)
+    }
+  }
+  visit(0)
+  const result = outcomes > 0 ? sum / outcomes : 0
+  enemyRerollMemo.set(memoKey, result)
+  return result
+}
+
+// Every NULLIFY_TAKEN_LE threshold printed in the roster, so the table prices each one.
+function nullifyThresholds(roster) {
+  const out = new Set()
+  roster.forEach(({ moveList }) => moveList.forEach(mv => {
+    if (mv.effectType === 'NULLIFY_TAKEN_LE') out.add(mv.effectValue)
+    mv.chara.forEach(ce => { if (ce.type === 'NULLIFY_TAKEN_LE') out.add(ce.value) })
+  }))
+  return [...out]
+}
+
 // What the owner can sustain, under whatever restriction is being priced. The no-repeat
 // rule applies to them as much as to anyone, so this is their best two alternating.
-function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, nullifyDamage = false, bannedId = null, countDefensiveValue = true } = {}) {
+//
+// The newer restrictions, each keyed the same way:
+//   - `nullifyAtMost`: hits of that size or less are dropped (NULLIFY_TAKEN_LE), read off the
+//     move's own branches so a character-die bonus that clears the bar still lands.
+//   - `enemyReroll`: the opponent re-throws up to that many of the owner's dice after seeing
+//     them (REROLL_DICE_ENEMY). The move's value is scaled by how much of its payability
+//     survives — linear in the success rate, which every effect but a repeat already is.
+//   - `charaRerolls`: the owner may re-throw their own character die (REROLL_CHARADICE_SELF).
+//   - `forcedWorst`: the opponent picks the owner's move (SPECIAL_PICK_ENEMY_WAZA), and picks
+//     the least of the four. One turn, not a rotation, so it's the worst score rather than a
+//     sustainable pair.
+function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, nullifyDamage = false, bannedId = null, countDefensiveValue = true, nullifyAtMost = null, enemyReroll = 0, charaRerolls = 0, forcedWorst = false } = {}) {
   if (dieCount <= 0) return 0
-  const rolls = enumerateRolls(dice.slice(0, dieCount))
+  const thrown = dice.slice(0, dieCount)
+  const rolls = enumerateRolls(thrown)
   const scores = []
   deck.forEach(mv => {
     if (bannedId !== null && mv.id === bannedId) return
@@ -65,12 +187,22 @@ function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceI
       charaDiceInPlay,
       tempoValues: table,
       countDefensiveValue,
-      enemyLastDamage: ASSUMED_ENEMY_LAST_DAMAGE
+      enemyLastDamage: ASSUMED_ENEMY_LAST_DAMAGE,
+      charaRerolls
     })
     // Nullification stops the damage reaching its target; whatever the move does to its own
     // caster, and whatever tempo it buys, still happens.
-    scores.push(nullifyDamage ? result.ev - result.evDamage : result.ev)
+    let score = nullifyDamage ? result.ev - result.evDamage : result.ev
+    if (nullifyAtMost !== null) {
+      const dropped = result.branches.reduce((sum, b) => sum + (b.damage <= nullifyAtMost ? b.probability * b.damage : 0), 0)
+      score -= result.pSuccess * dropped
+    }
+    if (enemyReroll > 0 && result.pSuccess > 0) {
+      score *= payableUnderEnemyReroll(thrown, mv.cost, enemyReroll) / result.pSuccess
+    }
+    scores.push(score)
   })
+  if (forcedWorst) return scores.length > 0 ? Math.min(...scores) : 0
   return sustainableValue(scores)
 }
 
@@ -104,6 +236,7 @@ function referenceMean(rows, key) {
 
 function tableFromPass(roster, previous, countDefensiveValue) {
   const rows = []
+  const thresholds = nullifyThresholds(roster)
   roster.forEach(({ dice, moveList }) => {
     const rolls = enumerateRolls(dice.slice(0, NORMAL_DICE))
     const scored = moveList
@@ -127,8 +260,14 @@ function tableFromPass(roster, previous, countDefensiveValue) {
       denyDice2AndChara: base - at({ dieCount: NORMAL_DICE - 2, charaDiceInPlay: false }),
       nullifyDamage: base - at({ nullifyDamage: true }),
       bindMove: base - at({ bannedId: topId }),
+      pickEnemyMove: base - at({ forcedWorst: true }),
+      rerollEnemyDice1: base - at({ enemyReroll: 1 }),
+      rerollEnemyDice2: base - at({ enemyReroll: 2 }),
       gainDice1: at({ dieCount: NORMAL_DICE + 1 }) - base,
-      gainDice2: at({ dieCount: MAX_DICE }) - base
+      gainDice2: at({ dieCount: MAX_DICE }) - base,
+      gainCharaReroll1: at({ charaRerolls: 1 }) - base,
+      gainCharaReroll2: at({ charaRerolls: 2 }) - base,
+      ...Object.fromEntries(thresholds.map(limit => [nullifyAtMostKey(limit), base - at({ nullifyAtMost: limit })]))
     })
   })
 

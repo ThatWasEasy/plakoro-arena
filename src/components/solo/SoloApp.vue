@@ -37,7 +37,7 @@ onUnmounted(() => {
   <SoloVictory v-else-if="state.phase === 'victory'" />
   <template v-else>
     <SoloBoard />
-    <SoloMoveSelect v-if="state.phase === 'moveSelect' && state.turn === 'player'" />
+    <SoloMoveSelect v-if="state.phase === 'moveSelect' && (state.turn === 'player' || state.ai.movePickedByOpponent)" />
     <SoloAiSkip v-if="state.phase === 'aiSkip'" />
     <SoloDiceSuccess v-if="state.phase === 'diceSuccess'" />
     <SoloEffectPrompt v-if="state.phase === 'effectPrompt'" />

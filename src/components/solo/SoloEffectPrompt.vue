@@ -99,7 +99,7 @@ function pickBindMove(mid) {
     </template>
 
     <template v-else-if="ep.kind === 'eneCount'">
-      <div class="overlay-title">{{ t('effectPrompt.eneCountTitle') }}</div>
+      <div class="overlay-title">{{ t('effectPrompt.eneCountTitle') }}<img v-if="ep.eneType" :src="asset(`image/ICON/${ep.eneType}.png`)" :alt="ep.eneType" style="height:1em; width:1em; object-fit:contain; vertical-align:-0.15em; margin-left:0.25rem;"></div>
       <div style="width:100%; max-width:18.75rem; margin:0.625rem auto 0;">
         <MoveCard :mv="ep.mv" :dmg-info="ep.dmgInfo" :owner="ep.mover" :opponent="ep.opp" :clickable="false" style="min-height:10.75rem;" />
       </div>

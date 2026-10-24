@@ -50,6 +50,24 @@
     },
     "STC11-001": {
       "name": "Dragonite"
+    },
+    "EBC02-001": {
+      "name": "Greninja"
+    },
+    "EBC02-002": {
+      "name": "Tinkatink"
+    },
+    "EBC02-003": {
+      "name": "Sableye"
+    },
+    "EBC02-004": {
+      "name": "Aggron"
+    },
+    "EBC02-005": {
+      "name": "Rayquaza"
+    },
+    "EBC02-006": {
+      "name": "Chansey"
     }
   },
   "waza": {
@@ -648,6 +666,258 @@
     "STW11-007": {
       "name": "Extreme Speed",
       "chara_effect1": "Adds 40 damage."
+    },
+    "EBW02-001": {
+      "name": "Waterfall",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-002": {
+      "name": "Shapeshift Slash",
+      "chara_effect1": "Choose 1 of your energy dice and swap as many of its custom chips as you like. (Use custom chips you own.)"
+    },
+    "EBW02-003": {
+      "name": "Water Shuriken",
+      "effect": "This move rolls the character die a total of 3 times.",
+      "chara_effect1": "Each time the character die succeeds on this move, adds 20 damage."
+    },
+    "EBW02-004": {
+      "name": "Shadow Sneak",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-005": {
+      "name": "Night Slash",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-006": {
+      "name": "Water Gun",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-007": {
+      "name": "Mist Slash",
+      "chara_effect1": "Adds 40 damage."
+    },
+    "EBW02-008": {
+      "name": "Clone Technique",
+      "effect": "This move rolls the character die a total of 2 times.",
+      "chara_effect1": "Each time the character die succeeds on this move, adds 40 damage."
+    },
+    "EBW02-009": {
+      "name": "Trailblaze",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-010": {
+      "name": "Low Kick",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-011": {
+      "name": "Beat",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-012": {
+      "name": "Fairy Wind",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-013": {
+      "name": "Hammer Strike",
+      "chara_effect1": "Adds 60 damage.",
+      "chara_effect2": "On your next turn, roll 2 fewer energy dice."
+    },
+    "EBW02-014": {
+      "name": "Play Rough",
+      "effect": "On the opponent's next turn, they roll 1 fewer energy die.",
+      "chara_effect1": "Adds 40 damage."
+    },
+    "EBW02-015": {
+      "name": "Metal Claw",
+      "chara_effect1": "Adds 40 damage."
+    },
+    "EBW02-016": {
+      "name": "Smack",
+      "chara_effect1": "Adds 10 damage."
+    },
+    "EBW02-017": {
+      "name": "Draining Kiss",
+      "effect": "Heals 10 HP for this Pokémon.",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-018": {
+      "name": "Wail",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-019": {
+      "name": "Wild Stomp",
+      "chara_effect1": "Adds 50 damage.",
+      "chara_effect2": "Also deals 30 damage to this Pokémon."
+    },
+    "EBW02-020": {
+      "name": "Wonder Impact",
+      "chara_effect1": "Adds 60 damage."
+    },
+    "EBW02-021": {
+      "name": "Claw Scratch",
+      "chara_effect1": "Adds 10 damage."
+    },
+    "EBW02-022": {
+      "name": "Feint Attack",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-023": {
+      "name": "Dig Up",
+      "chara_effect1": "On the opponent's next move, choose 1 of the energy dice they rolled and make them reroll it. (You choose which energy die is rerolled.)"
+    },
+    "EBW02-024": {
+      "name": "Incite",
+      "chara_effect1": "On the opponent's next turn, you choose the move they use."
+    },
+    "EBW02-025": {
+      "name": "Icy Wind",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-026": {
+      "name": "Dark Claw",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-027": {
+      "name": "Trip",
+      "chara_effect1": "On the opponent's next turn, their character die is fixed to Backward."
+    },
+    "EBW02-028": {
+      "name": "Dark Pulse",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-029": {
+      "name": "Jewel Flash",
+      "chara_effect1": "On the opponent's next move, choose 2 of the energy dice they rolled and make them reroll them. (You choose which energy dice are rerolled.)"
+    },
+    "EBW02-030": {
+      "name": "Psybeam",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-031": {
+      "name": "Metal Claw",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-032": {
+      "name": "Steel Headbutt",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-033": {
+      "name": "Tyrant Shield",
+      "chara_effect1": "On the opponent's next turn, if the damage this Pokémon would take is 40 or less, it takes none of that damage."
+    },
+    "EBW02-034": {
+      "name": "Onslaught",
+      "chara_effect1": "Adds 40 damage.",
+      "chara_effect2": "Also deals 40 damage to this Pokémon."
+    },
+    "EBW02-035": {
+      "name": "Rock Tomb",
+      "chara_effect1": "On the opponent's next turn, they roll 1 fewer energy die."
+    },
+    "EBW02-036": {
+      "name": "Collide",
+      "chara_effect1": "Adds 10 damage."
+    },
+    "EBW02-037": {
+      "name": "Steel Body",
+      "chara_effect1": "On the opponent's next turn, if the damage this Pokémon would take is 30 or less, it takes none of that damage."
+    },
+    "EBW02-038": {
+      "name": "Powerful Steel",
+      "chara_effect1": "If this Pokémon took no move damage on the opponent's last turn, adds 40 damage."
+    },
+    "EBW02-039": {
+      "name": "Iron Head",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-040": {
+      "name": "Ice Punch",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-041": {
+      "name": "Slash",
+      "chara_effect1": "Adds 10 damage."
+    },
+    "EBW02-042": {
+      "name": "Dragon Pulse",
+      "chara_effect1": "Adds 30 damage.",
+      "chara_effect2": "On your next turn, roll 2 fewer energy dice."
+    },
+    "EBW02-043": {
+      "name": "Breaking Swipe",
+      "chara_effect1": "On the opponent's next turn, they roll 1 fewer energy die."
+    },
+    "EBW02-044": {
+      "name": "Outrage Rampage",
+      "chara_effect1": "Adds 60 damage."
+    },
+    "EBW02-045": {
+      "name": "Dragon Flame",
+      "chara_effect1": "Adds 30 damage.",
+      "chara_effect2": "Also deals 30 damage to this Pokémon."
+    },
+    "EBW02-046": {
+      "name": "Twister",
+      "chara_effect1": "Adds 10 damage."
+    },
+    "EBW02-047": {
+      "name": "Dragon Claw",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-048": {
+      "name": "Dragon Tail",
+      "chara_effect1": "Adds 20 damage."
+    },
+    "EBW02-049": {
+      "name": "Dragon Burst",
+      "chara_effect1": "Adds damage equal to 20 × the number of Lightning energy rolled on the energy dice."
+    },
+    "EBW02-050": {
+      "name": "Thunder",
+      "chara_effect1": "Adds 60 damage."
+    },
+    "EBW02-051": {
+      "name": "Pound",
+      "chara_effect1": "Adds 40 damage."
+    },
+    "EBW02-052": {
+      "name": "Chance Tackle",
+      "effect": "On your next turn, you may reroll the character die once.",
+      "chara_effect1": "You may reroll it 2 times instead of 1."
+    },
+    "EBW02-053": {
+      "name": "Roly-Poly Attack",
+      "chara_effect1": "Adds 50 damage."
+    },
+    "EBW02-054": {
+      "name": "Drain Slap",
+      "chara_effect1": "Heals 50 HP for this Pokémon."
+    },
+    "EBW02-055": {
+      "name": "Shadow Ball",
+      "chara_effect1": "Adds 30 damage."
+    },
+    "EBW02-056": {
+      "name": "Palm Slap",
+      "chara_effect1": "Adds 40 damage."
+    },
+    "EBW02-057": {
+      "name": "Soft-Boiled",
+      "effect": "Heals 20 HP for this Pokémon.",
+      "chara_effect1": "Heals all of this Pokémon's HP."
+    },
+    "EBW02-058": {
+      "name": "Lucky Punch",
+      "chara_effect1": "On your next turn, you may reroll the character die once."
+    },
+    "EBW02-059": {
+      "name": "Ram",
+      "chara_effect1": "Adds 60 damage."
+    },
+    "EBW02-060": {
+      "name": "Flamethrower",
+      "chara_effect1": "Adds 30 damage.",
+      "chara_effect2": "On your next turn, roll 1 fewer energy die."
     }
   }
 }

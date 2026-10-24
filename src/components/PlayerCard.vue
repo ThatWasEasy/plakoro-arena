@@ -33,9 +33,18 @@ const charPicSrc = computed(() => {
 })
 
 const incomingDamageText = computed(() => {
-  if (!showAsSelected.value || !p.value.incomingDamageMod) return ''
-  const sign = p.value.incomingDamageMod > 0 ? '+' : ''
-  return t('player.incomingDamageEffect', { sign, value: p.value.incomingDamageMod })
+  if (!showAsSelected.value) return ''
+  const parts = []
+  if (p.value.incomingDamageMod) {
+    const sign = p.value.incomingDamageMod > 0 ? '+' : ''
+    parts.push(t('player.incomingDamageEffect', { sign, value: p.value.incomingDamageMod }))
+  }
+  // NULLIFY_TAKEN_LE never shows up in the damage figure on the attacker's cards (see
+  // applyNullifyAtMost), so this line is the only place it's visible before the hit lands.
+  if (p.value.incomingDamageNullifyAtMost !== null && p.value.incomingDamageNullifyAtMost !== undefined) {
+    parts.push(t('player.incomingDamageNullifyAtMost', { value: p.value.incomingDamageNullifyAtMost }))
+  }
+  return parts.join(' / ')
 })
 
 function onTap() {

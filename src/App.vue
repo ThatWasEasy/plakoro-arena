@@ -16,6 +16,7 @@ import DiceOverlay from './components/DiceOverlay.vue'
 import EffectPromptOverlay from './components/EffectPromptOverlay.vue'
 import TurnResultOverlay from './components/TurnResultOverlay.vue'
 import ExtraRollOverlay from './components/ExtraRollOverlay.vue'
+import EnergyRerollOverlay from './components/EnergyRerollOverlay.vue'
 import WinScreen from './components/WinScreen.vue'
 import Modal from './components/Modal.vue'
 import TurnCutIn from './components/TurnCutIn.vue'
@@ -157,6 +158,7 @@ onBeforeUnmount(uninstallButtonSfx)
         />
         <EffectPromptOverlay v-if="state.phase === 'effectPrompt'" />
         <ExtraRollOverlay v-if="state.phase === 'charaThrowTask' || state.phase === 'energyThrowTask'" />
+        <EnergyRerollOverlay v-if="state.phase === 'energyReroll'" />
         <TurnResultOverlay v-if="state.phase === 'turnResultConfirm'" />
         <WinScreen v-if="state.phase === 'win'" />
         <Modal v-if="activeModalKey" :player-key="activeModalKey" />

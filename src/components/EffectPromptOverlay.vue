@@ -2,6 +2,7 @@
 import { computed, inject, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MoveCard from './MoveCard.vue'
+import EnergyDiceModal from './EnergyDiceModal.vue'
 import { asset } from '../data/assetPath'
 
 const battle = inject('battle')
@@ -18,6 +19,11 @@ const isBindTarget = computed(() => ep.value.kind !== 'bindWaza' || !online.myKe
 
 const diceCountLabel = computed(() => t('effectPrompt.diceRollLabel', { n: ep.value.max === 6 ? 3 : ep.value.max === 4 ? 2 : 1 }))
 const diceSub = computed(() => ep.value.max === 2 ? t('effectPrompt.diceSubSingle') : t('effectPrompt.diceSubMulti'))
+
+// swapChip (へんげぎり, online only): the mover re-chips one of their own dice; the other side
+// just waits. Closing the editor without changing anything keeps the dice as they were.
+const isSwapTarget = computed(() => ep.value.kind === 'swapChip' && (!online.myKey.value || online.myKey.value === ep.value.targetKey))
+const swapDice = computed(() => ep.value.kind === 'swapChip' ? state.players[ep.value.targetKey].energyDice : null)
 
 const target = computed(() => ep.value.kind === 'bindWaza' ? state.players[ep.value.targetKey] : null)
 const targetOpp = computed(() => target.value ? state.players[battle.opponentKey(ep.value.targetKey)] : null)
@@ -99,8 +105,14 @@ function pickBindMove(mid) {
       </div>
     </template>
 
+    <template v-else-if="ep.kind === 'swapChip'">
+      <div class="overlay-title">{{ ep.mvName }}</div>
+      <div class="overlay-sub">{{ isSwapTarget ? t('effectPrompt.swapChipSub') : t('turnResult.waiting') }}</div>
+      <EnergyDiceModal v-if="isSwapTarget" :initial-dice="swapDice" swap-one-die @close="submit(null)" @confirm="submit" />
+    </template>
+
     <template v-else-if="ep.kind === 'eneCount'">
-      <div class="overlay-title">{{ t('effectPrompt.eneCountTitle') }}</div>
+      <div class="overlay-title">{{ t('effectPrompt.eneCountTitle') }}<img v-if="ep.eneType" :src="asset(`image/ICON/${ep.eneType}.png`)" :alt="ep.eneType" style="height:1em; width:1em; object-fit:contain; vertical-align:-0.15em; margin-left:0.25rem;"></div>
       <div style="width:100%; max-width:18.75rem; margin:0.625rem auto 0;">
         <MoveCard :mv="ep.mv" :dmg-info="ep.dmgInfo" :owner="ep.mover" :opponent="ep.opp" :clickable="false" style="min-height:10.75rem;" />
       </div>
