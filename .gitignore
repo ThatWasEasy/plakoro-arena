@@ -20,3 +20,11 @@
 # Notes that shouldn't ride along in git history at all (PINs, secrets, anything else sensitive
 # enough that even a private repo is the wrong place for it) — backed up manually instead.
 /backup
+
+# Working files and source material that must never ride along in a public repo: scanned card
+# sheets, conversion scratch, and — the reason this is not optional — the 秘笈手冊 source. That
+# handbook is a product sold per-chapter; anything committed here is published to GitHub Pages
+# and readable by anyone. Paid content reaches players through the API's player_unlocks check,
+# never through the frontend bundle.
+/temp
+/handbook-build
