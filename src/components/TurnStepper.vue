@@ -71,24 +71,31 @@ const activeMods = computed(() => {
 </template>
 
 <style scoped>
-/* Pinned to the foot of the stage, out of the way of the boards and overlays above it. */
+/* A band in the column, not a thing lying on top of it.
+ *
+ * It used to be `position:absolute; bottom:0` with `flex-wrap:wrap`, which is two mistakes
+ * compounding: it took no share of the stage's height, so it covered whatever was beneath it,
+ * and wrapping let it grow upward without limit — a long trainer name plus two modifier chips
+ * was enough to put a second line of bar across the player cards.
+ *
+ * Now it declares a height and holds it. Nothing inside wraps; anything too long truncates,
+ * because a bar that reports the turn is worth less than the board it would otherwise hide. */
 .ts {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 60;
+  flex: 0 0 auto;
+  height: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.625rem;
-  flex-wrap: wrap;
-  padding: 0.1875rem 0.5rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  padding: 0 0.5rem;
   background: rgba(31, 31, 29, 0.88);
   pointer-events: none;
 }
 
-.ts-track { display: flex; align-items: center; gap: 0.25rem; }
+/* The step row is the point of the bar, so it never shrinks. */
+.ts-track { display: flex; align-items: center; gap: 0.25rem; flex: 0 0 auto; }
 .ts-step {
   font-size: 0.5rem;
   font-weight: 800;
@@ -107,8 +114,10 @@ const activeMods = computed(() => {
 }
 .ts-sep { width: 0.5rem; height: 0.0625rem; background: rgba(255, 255, 255, 0.28); }
 
-.ts-who { display: flex; align-items: center; gap: 0.3125rem; min-width: 0; }
+/* Everything here can be cut: the name ellipsises, the chips drop off the end. */
+.ts-who { display: flex; align-items: center; gap: 0.3125rem; min-width: 0; flex: 0 1 auto; overflow: hidden; }
 .ts-badge {
+  flex: none;
   font-size: 0.5rem;
   font-weight: 900;
   padding: 0.0625rem 0.375rem;
@@ -120,6 +129,8 @@ const activeMods = computed(() => {
 /* The one thing worth a colour: whether the app is waiting on you. */
 .ts-badge.mine { background: #AEFF3E; color: #1F1F1D; }
 .ts-actor {
+  flex: 0 1 auto;
+  max-width: 6rem;
   font-size: 0.5rem;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.85);
@@ -128,6 +139,7 @@ const activeMods = computed(() => {
   white-space: nowrap;
 }
 .ts-mod {
+  flex: none;
   font-size: 0.4375rem;
   font-weight: 700;
   padding: 0.0625rem 0.3125rem;
