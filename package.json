@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "fetch-data": "node scripts/fetch-data.mjs",
     "fetch-product-images": "node scripts/fetch-product-images.mjs",
-    "make-emblem-tile": "python3 scripts/make-emblem-tile.py"
+    "make-emblem-tile": "python3 scripts/make-emblem-tile.py",
+    "build-handbook": "python3 scripts/build-handbook.py"
   },
   "dependencies": {
     "cannon-es": "^0.20.0",

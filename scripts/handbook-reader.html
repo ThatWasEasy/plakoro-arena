@@ -1,0 +1,192 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Plakoro 秘笈手冊 — 校稿用</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  A local proof copy, produced by scripts/build-handbook.py.
+
+  Not the product and not a preview of it: this exists so the authors can read the converted
+  text at a sane line length and catch what the conversion got wrong, before any of it is
+  wired to the shop. It lives in handbook-build/, which is gitignored — the handbook is sold
+  per chapter, and this repo is public.
+-->
+<style>
+  :root {
+    --ink: #1F1F1D;
+    --sub: #6B6A63;
+    --line: #DFDDD4;
+    --bg: #FAF9F4;
+    --card: #FFFFFF;
+    --accent: #3C6E47;
+    --warn: #B4531F;
+    --andy: #2F5E8C;
+    --shawn: #7A3E86;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.75 "Hiragino Sans", "Noto Sans TC", "PingFang TC", system-ui, sans-serif;
+    display: grid; grid-template-columns: 17rem 1fr; min-height: 100vh;
+  }
+  /* --- table of contents --- */
+  nav {
+    border-right: 1px solid var(--line); background: var(--card);
+    position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 1rem 0.75rem 3rem;
+  }
+  .brand { font-weight: 800; font-size: 0.95rem; padding: 0 0.5rem 0.25rem; }
+  .brand small { display: block; font-weight: 600; color: var(--warn); font-size: 0.7rem; }
+  #q {
+    width: 100%; margin: 0.75rem 0; padding: 0.5rem 0.625rem; font: inherit; font-size: 0.85rem;
+    border: 1px solid var(--line); border-radius: 0.4rem; background: var(--bg);
+  }
+  .grp {
+    font-size: 0.7rem; font-weight: 800; letter-spacing: .08em; color: var(--sub);
+    padding: 0.9rem 0.5rem 0.3rem; text-transform: uppercase;
+  }
+  nav a {
+    display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0.5rem; border-radius: 0.3rem; text-decoration: none; color: var(--ink);
+    font-size: 0.875rem;
+  }
+  nav a:hover { background: var(--bg); }
+  nav a.on { background: var(--ink); color: #fff; }
+  nav a .n { font-size: 0.7rem; color: var(--sub); font-variant-numeric: tabular-nums; }
+  nav a.on .n { color: rgba(255,255,255,.65); }
+  /* --- content --- */
+  main { padding: 2.5rem 2rem 6rem; max-width: 50rem; }
+  h1.unit { font-size: 1.6rem; margin: 0 0 0.25rem; text-wrap: balance; }
+  .meta { color: var(--sub); font-size: 0.8rem; margin-bottom: 2rem; }
+  h2, h3, h4 { text-wrap: balance; line-height: 1.4; }
+  h2 { font-size: 1.2rem; margin: 2.2rem 0 0.6rem; padding-bottom: 0.3rem; border-bottom: 2px solid var(--line); }
+  h3 { font-size: 1.02rem; margin: 1.6rem 0 0.4rem; }
+  h4 { font-size: 0.92rem; margin: 1.2rem 0 0.3rem; color: var(--accent); }
+  p { margin: 0.5rem 0; }
+  figure { margin: 1.25rem 0; }
+  figure img { max-width: 100%; border: 1px solid var(--line); border-radius: 0.4rem; display: block; }
+  .tablewrap { overflow-x: auto; margin: 1rem 0; }
+  table { border-collapse: collapse; font-size: 0.85rem; min-width: 100%; }
+  /* Cells hold several paragraphs joined by newlines — the authors write whole reviews
+     inside a cell, so the breaks have to survive. */
+  td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; vertical-align: top;
+       white-space: pre-line; max-width: 22rem; }
+  tr:first-child td { background: var(--bg); font-weight: 700; }
+  /* An aside is a named person talking, so it is set like a quote with the name attached. */
+  .aside {
+    margin: 0.6rem 0; padding: 0.5rem 0.8rem; border-left: 3px solid var(--line);
+    background: var(--card); border-radius: 0 0.3rem 0.3rem 0;
+  }
+  .by { font-weight: 800; font-size: 0.75rem; margin-right: 0.4rem; }
+  .by.Andy { color: var(--andy); } .by.Shawn { color: var(--shawn); }
+  .rating { display: flex; align-items: baseline; gap: 0.5rem; margin: 0.6rem 0; flex-wrap: wrap; }
+  .stars { color: #D9A400; letter-spacing: 0.08em; font-size: 0.95rem; }
+  .rating .cmt { flex: 1 1 18rem; font-size: 0.9rem; }
+  .stat {
+    display: inline-block; margin: 0.15rem 0.3rem 0.15rem 0; padding: 0.1rem 0.5rem;
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    font-size: 0.78rem; font-variant-numeric: tabular-nums;
+  }
+  mark { background: #FFE89A; }
+  @media (max-width: 48rem) {
+    body { grid-template-columns: 1fr; }
+    nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    main { padding: 1.5rem 1rem 4rem; }
+  }
+</style>
+<nav>
+  <div class="brand">Plakoro 秘笈手冊<small>校稿用本機版 · 請勿散佈</small></div>
+  <input id="q" type="search" placeholder="搜尋全書…" autocomplete="off">
+  <div id="toc"></div>
+</nav>
+<main id="view"><p>載入中…</p></main>
+<script>
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+
+function renderBlock(b) {
+  switch (b.type) {
+    case 'heading': {
+      const lv = Math.min(Math.max(b.level, 2), 4)
+      return `<h${lv}>${esc(b.text)}</h${lv}>`
+    }
+    case 'p': return `<p>${esc(b.text)}</p>`
+    case 'img': return `<figure><img loading="lazy" src="images/${esc(b.src)}" alt=""></figure>`
+    case 'table':
+      return `<div class="tablewrap"><table>${b.rows.map(r =>
+        `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`
+    case 'aside':
+      return `<div class="aside">${b.by ? `<span class="by ${esc(b.by)}">${esc(b.by)}</span>` : ''}${esc(b.text)}</div>`
+    case 'rating':
+      return `<div class="rating">${b.by ? `<span class="by ${esc(b.by)}">${esc(b.by)}</span>` : ''}`
+        + `<span class="stars">${'★'.repeat(b.filled)}${'☆'.repeat(b.outOf - b.filled)}</span>`
+        + (b.comment ? `<span class="cmt">${esc(b.comment)}</span>` : '') + `</div>`
+    case 'stat':
+      return `<span class="stat">${esc(b.kind === 'odds' ? b.values.join(' / ') : b.text)}</span>`
+    default: return ''
+  }
+}
+
+let doc = null, current = null
+
+function show(id) {
+  const u = doc.units.find(x => x.id === id)
+  if (!u) return
+  current = id
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.id === id))
+  document.getElementById('view').innerHTML =
+    `<h1 class="unit">${esc(u.title)}</h1><div class="meta">${esc(u.id)}`
+    + (u.group ? ` · ${esc(u.group)}` : '') + ` · ${u.words.toLocaleString()} 字 · ${u.images} 張圖</div>`
+    + u.blocks.map(renderBlock).join('')
+  document.getElementById('view').scrollIntoView()
+  highlight(document.getElementById('q').value)
+}
+
+function buildToc() {
+  const groups = new Map()
+  for (const u of doc.units) {
+    const g = u.group || '　'
+    if (!groups.has(g)) groups.set(g, [])
+    groups.get(g).push(u)
+  }
+  document.getElementById('toc').innerHTML = [...groups].map(([g, us]) =>
+    (g.trim() ? `<div class="grp">${esc(g)}</div>` : '')
+    + us.map(u => `<a href="#${esc(u.id)}" data-id="${esc(u.id)}">`
+        + `<span>${esc(u.title)}</span><span class="n">${u.words.toLocaleString()}</span></a>`).join('')
+  ).join('')
+  document.querySelectorAll('nav a').forEach(a =>
+    a.addEventListener('click', e => { e.preventDefault(); show(a.dataset.id) }))
+}
+
+// Search marks hits in the open unit and narrows the contents list to units that contain the
+// term, so a term that appears in one character's section is findable without opening 22 pages.
+function highlight(term) {
+  if (!term) { document.querySelectorAll('mark').forEach(m => m.replaceWith(m.textContent)); return }
+  const re = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+  const walk = document.createTreeWalker(document.getElementById('view'), NodeFilter.SHOW_TEXT)
+  const hits = []
+  while (walk.nextNode()) if (re.test(walk.currentNode.nodeValue)) hits.push(walk.currentNode)
+  for (const n of hits) {
+    const span = document.createElement('span')
+    span.innerHTML = esc(n.nodeValue).replace(re, m => `<mark>${m}</mark>`)
+    n.replaceWith(span)
+  }
+}
+
+document.getElementById('q').addEventListener('input', e => {
+  const t = e.target.value.trim().toLowerCase()
+  document.querySelectorAll('nav a').forEach(a => {
+    const u = doc.units.find(x => x.id === a.dataset.id)
+    const text = u.blocks.map(b => b.text || b.comment || '').join('').toLowerCase()
+    a.style.display = !t || u.title.toLowerCase().includes(t) || text.includes(t) ? '' : 'none'
+  })
+  if (current) show(current)
+})
+
+fetch('handbook.json').then(r => r.json()).then(d => {
+  doc = d
+  buildToc()
+  show(location.hash.slice(1) || d.units[0].id)
+}).catch(e => {
+  document.getElementById('view').innerHTML =
+    `<p>讀不到 handbook.json。請在 handbook-build/ 裡啟動伺服器：</p>`
+    + `<pre>cd handbook-build &amp;&amp; python3 -m http.server 4800</pre><p>${esc(e.message)}</p>`
+})
+</script>
