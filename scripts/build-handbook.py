@@ -26,6 +26,7 @@ content reaches players through the API's player_unlocks check and nowhere else.
 """
 import argparse
 import base64
+import hashlib
 import json
 import pathlib
 import re
@@ -212,7 +213,15 @@ def extract_images(md, out_dir, report):
         except Exception as e:
             report.append(('error', f'{name} 的 base64 解不開：{e}'))
             continue
-        filename = f'{name}.{"jpg" if ext == "jpeg" else ext}'
+        # Named by content, not by the export's `imageN` label.
+        #
+        # Those labels are per-export: switching source from the HTML export to the Markdown
+        # one renumbered every picture, so `image29.png` kept its name while becoming a
+        # completely different image — and browsers went on serving the cached old one. The
+        # page then showed one character's diagram under another's heading, with nothing in
+        # the build output to suggest anything was wrong.
+        digest = hashlib.sha1(data).hexdigest()[:10]
+        filename = f'{digest}.{"jpg" if ext == "jpeg" else ext}'
         (dest / filename).write_bytes(data)
         found[name] = filename
     refs = set(IMAGE_REF.findall(md))
@@ -322,6 +331,23 @@ def main():
     for u in doc['units']:
         print(f"  {u['id']:20}{u['kind']:<10}{u['words']:>8,}{u['images']:>4}  {u['title']}"
               + (f"  [{u['group']}]" if u.get('group') else ''))
+
+    # Several sections pointing at one picture. Reported, not judged: it is legitimate when a
+    # diagram really is shared, and a leftover when a section was copied from the template and
+    # its own artwork never dropped in. Either way nothing on the page looks wrong — every
+    # section has an image, it is just the same image — so proofreading will not catch it.
+    where = {}
+    for u in doc['units']:
+        for b in u['blocks']:
+            srcs = ([b['src']] if b['type'] == 'img' else
+                    [s for r in b.get('rows', []) for c in r for s in c.get('imgs', [])])
+            for src in srcs:
+                where.setdefault(src, []).append(u['title'])
+    for src, titles in where.items():
+        uniq = sorted(set(titles))
+        if len(uniq) > 1:
+            report.append(('warn', f'{src} 同時出現在 {len(uniq)} 個段落：{"、".join(uniq)}'
+                                   ' —— 若非刻意共用，就是複製後忘了換'))
 
     chars = [u for u in doc['units'] if u['kind'] == CHARACTER]
     if chars:
