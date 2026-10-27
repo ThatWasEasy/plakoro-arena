@@ -22,7 +22,15 @@ Output goes to `handbook-build/`, which is gitignored on purpose. This repo is p
 build is served as static files; a handbook committed here is a handbook given away. Paid
 content reaches players through the API's player_unlocks check and nowhere else.
 
-    npm run build-handbook -- --md "temp/Plakoro 秘笈手冊.md"
+    npm run build-handbook -- --md "temp/Plakoro 秘笈手冊.md" \\
+                             --export "temp/Plakoro 秘笈手冊"
+
+The Markdown export's own images are downscaled to roughly a quarter of their real size (a
+306x260 copy of a 1200x1017 diagram), which is too soft to read a radar chart off. So `--export`
+points at the HTML export beside it, which carries the originals, and each small image is
+matched to its full-size twin **by content** rather than by position — the two exports number
+their images differently, and guessing from order is what put one character's diagram under
+another's heading.
 """
 import argparse
 import base64
@@ -202,6 +210,90 @@ def parse(md, images):
     return blocks
 
 
+def fingerprint(img, n=16):
+    """Average hash: the same picture at any size reduces to the same bits.
+
+    Position cannot be trusted here — the Markdown and HTML exports number their images
+    independently — so the only safe key is what the picture actually looks like.
+    """
+    grey = img.convert('L').resize((n, n))
+    pixels = list(grey.getdata())
+    mean = sum(pixels) / len(pixels)
+    return [p > mean for p in pixels]
+
+
+def hamming(a, b):
+    return sum(1 for x, y in zip(a, b) if x != y)
+
+
+# A true match scores 0 against a next-best of 74, so these are generous.
+MATCH_MAX = 12
+MATCH_MARGIN = 20
+# The book contains deliberate near-duplicates — six 71x73 icons, and a run of dice diagrams
+# that differ only in which face is highlighted. At 16x16 those collapse onto each other, so
+# the shortlist is re-ranked at 32x32 before the margin is judged; otherwise a perfect match
+# gets rejected for being too close to its own sibling.
+FINE_SHORTLIST = 4
+
+
+def upgrade_images(found, export_dir, out_dir, report):
+    """Replace each downscaled image with the full-resolution original from the HTML export.
+
+    A match has to be both close and clearly better than the runner-up. When it is not, the
+    small copy is kept: a soft but correct diagram beats a sharp one belonging to someone else.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        report.append(('warn', '沒有 Pillow，圖片維持 base64 的低解析度。'
+                               '安裝：python3 -m pip install --user pillow'))
+        return found
+
+    originals = []
+    for f in sorted(pathlib.Path(export_dir, 'images').iterdir()):
+        try:
+            with Image.open(f) as im:
+                originals.append((fingerprint(im), f, im.size))
+        except Exception:
+            continue
+    if not originals:
+        report.append(('warn', f'{export_dir} 裡沒有可用的原圖，維持低解析度'))
+        return found
+
+    dest = out_dir / 'images'
+    upgraded, gained = {}, 0
+    for ref, name in found.items():
+        small = dest / name
+        with Image.open(small) as im:
+            small_size, fp = im.size, fingerprint(im)
+        ranked = sorted((hamming(fp, ofp), f, size) for ofp, f, size in originals)
+        shortlist = ranked[:FINE_SHORTLIST]
+        if len(shortlist) > 1 and shortlist[0][0] == shortlist[1][0]:
+            with Image.open(small) as im:
+                fine = fingerprint(im, 32)
+            rescored = []
+            for _, f, size in shortlist:
+                with Image.open(f) as im:
+                    rescored.append((hamming(fine, fingerprint(im, 32)), f, size))
+            shortlist = sorted(rescored)
+        best, runner = shortlist[0], (shortlist[1] if len(shortlist) > 1 else None)
+        if best[0] > MATCH_MAX or (runner and runner[0] - best[0] < MATCH_MARGIN):
+            report.append(('warn', f'{name} 找不到足夠明確的原圖（最佳距離 {best[0]}）'
+                                   '，維持低解析度'))
+            upgraded[ref] = name
+            continue
+        data = best[1].read_bytes()
+        new_name = f'{hashlib.sha1(data).hexdigest()[:10]}{best[1].suffix.lower()}'
+        (dest / new_name).write_bytes(data)
+        small.unlink(missing_ok=True)
+        upgraded[ref] = new_name
+        if best[2][0] > small_size[0]:
+            gained += 1
+    if gained:
+        report.append(('info', f'{gained} 張圖換成原始解析度'))
+    return upgraded
+
+
 def extract_images(md, out_dir, report):
     """Writes each base64 definition out as a real file, keyed by its reference name."""
     dest = out_dir / 'images'
@@ -292,6 +384,8 @@ def block_text(b):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--md', default='temp/Plakoro 秘笈手冊.md', help='Google Docs 的 Markdown 匯出')
+    ap.add_argument('--export', default='temp/Plakoro 秘笈手冊',
+                    help='HTML 匯出資料夾，只拿它的原始解析度圖片')
     ap.add_argument('--out', default='handbook-build')
     args = ap.parse_args()
 
@@ -304,6 +398,10 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     report = []
     images = extract_images(md, out, report)
+    if pathlib.Path(args.export, 'images').is_dir():
+        images = upgrade_images(images, args.export, out, report)
+    else:
+        report.append(('warn', f'找不到 {args.export}/images，圖片維持 base64 的低解析度'))
     units = split_units(parse(md, images), report)
 
     doc = {
@@ -364,7 +462,8 @@ def main():
     if report:
         print('\n--- 需要你確認 ---')
         for level, msg in report:
-            mark = '❌' if level == 'error' else '⚠️ ' if level == 'warn' else '·'
+            mark = ('❌' if level == 'error' else '⚠️ ' if level == 'warn'
+                    else '✅' if level == 'info' else '·')
             print(f'  {mark} {msg}')
 
 

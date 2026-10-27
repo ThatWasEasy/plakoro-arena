@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+"""Split the 秘笈手冊 PDF into the units that are sold separately.
+
+Why the PDF rather than the structured conversion: the book is built out of tables and
+diagrams laid out on a page, and every conversion route lost something — images matched to the
+wrong paragraph, cells parsed empty, in-cell line breaks eaten so three expected values read as
+one number. A PDF is what the authors see. The cost is real and worth stating: no search across
+chapters, and fixed-layout pages are harder to read on a phone.
+
+Chapter boundaries come from the PDF's own outline, which Google Docs writes from the heading
+styles — not from guessing at page numbers.
+
+Each unit becomes its own file, and that is the whole point of the design: there is never a
+file, and never an endpoint, that hands over the entire book. A player's entitlement is checked
+per unit (`player_unlocks.kind = 'handbook'`, `asset` = the unit id used here), and only those
+bytes are served.
+
+Page numbers restart at 1 in every unit. The source carries no printed page numbers, so this
+needs nothing stamped — a reader simply sees "page 3 of 7" within the chapter they bought.
+
+    python3 scripts/split-handbook-pdf.py --pdf "temp/Plakoro 秘笈手冊.pdf"
+"""
+import argparse
+import json
+import logging
+import pathlib
+import re
+import sys
+import unicodedata
+import warnings
+
+logging.disable(logging.CRITICAL)
+warnings.filterwarnings('ignore')
+
+try:
+    from pypdf import PdfReader, PdfWriter
+except ImportError:
+    sys.exit('需要 pypdf：python3 -m pip install --user pypdf')
+
+REPORT = []
+
+CH3_PREFIX = '三、'
+CHAPTER = re.compile(r'^[一二三四五六七八九十]+、')
+SET_HEADER = re.compile(r'^(啟程套組|探險盒\s*\d+|.*套組)\s*$')
+CHARACTER = re.compile(r'^\s*(\d+)\.\s*(.+?)\s*[（(]\s*([A-Za-z]{3}\d{2}(?:-\d{3})?)\s*[)）]\s*$')
+TEMPLATE = re.compile(r'^\s*X\.\s')
+
+
+def outline_entries(reader):
+    """Every bookmark as (depth, page index, title), in reading order.
+
+    Google Docs emits a bookmark for each heading, including empty ones left behind by blank
+    paragraphs; those are dropped here because a nameless boundary cannot start a chapter.
+    """
+    out = []
+
+    def walk(items, depth=0):
+        for it in items:
+            if isinstance(it, list):
+                walk(it, depth + 1)
+                continue
+            title = str(getattr(it, 'title', '') or '').strip()
+            if not title:
+                continue
+            try:
+                page = reader.get_destination_page_number(it)
+            except Exception:
+                continue
+            out.append((depth, page, title))
+
+    walk(reader.outline)
+    return out
+
+
+def page_text(reader, i, _cache={}):
+    """Normalised text of a page.
+
+    NFKC because this PDF renders many CJK characters as Kangxi radicals — 子 comes back as
+    ⼦, 火 as ⽕ — so a naive string compare against the outline's titles fails on half the
+    book while the content is perfectly fine.
+    """
+    key = (id(reader), i)
+    if key not in _cache:
+        try:
+            raw = reader.pages[i].extract_text() or ''
+        except Exception:
+            raw = ''
+        _cache[key] = unicodedata.normalize('NFKC', re.sub(r'\s+', '', raw))
+    return _cache[key]
+
+
+# How far a bookmark is allowed to be wrong before we give up and trust it anyway.
+BOOKMARK_DRIFT = 3
+# How much text may sit above a heading before its page counts as shared with the section
+# before it. A heading that genuinely opens a page has almost nothing in front of it.
+SHARED_PAGE_CHARS = 40
+
+
+def true_start(reader, page, code, total):
+    """Where a character's section really begins.
+
+    The outline is written from the heading styles and is usually exact, but not always: 大岩蛇
+    is bookmarked one page before its heading, so splitting on the bookmark alone opened that
+    chapter on the previous character's match-up table. The card code in the heading —
+    "(EBC01-005)" — is unambiguous, so the page carrying it is the real boundary.
+    """
+    needle = unicodedata.normalize('NFKC', code)
+    for delta in range(0, BOOKMARK_DRIFT + 1):
+        for cand in ({page + delta, page - delta} if delta else {page}):
+            if 0 <= cand < total and needle in page_text(reader, cand):
+                return cand, delta != 0
+    return page, False
+
+
+def plan(reader):
+    """Work out which pages belong to which sellable unit.
+
+    A character owns every page from its own heading up to whatever starts next, so the ranges
+    are derived from neighbours rather than from a length nobody wrote down. Set headers
+    ("探險盒 01") share a page with the first character under them and own nothing themselves —
+    they are recorded as a group label, because bundles are priced in the shop and a regroup
+    should be a pricing change, not a re-split.
+    """
+    entries = outline_entries(reader)
+    total = len(reader.pages)
+
+    marks, in_ch3, group = [], False, None
+    for _, page, title in entries:
+        if CHAPTER.match(title):
+            in_ch3 = title.startswith(CH3_PREFIX)
+            continue
+        if not in_ch3:
+            continue
+        if TEMPLATE.match(title):
+            marks.append({'kind': 'template', 'page': page, 'title': title})
+            continue
+        m = CHARACTER.match(title)
+        if m:
+            _, name, code = m.groups()
+            marks.append({'kind': 'character', 'page': page, 'title': name,
+                          'id': f'chara.{code.upper()}', 'code': code.upper(), 'group': group})
+            continue
+        if SET_HEADER.match(title):
+            group = title.strip()
+
+    # Deduplicate: Google repeats a bookmark when a heading is split across runs.
+    seen, ordered = set(), []
+    for m in marks:
+        key = (m['kind'], m.get('id'), m['page'])
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(m)
+    ordered.sort(key=lambda m: m['page'])
+
+    # Correct each boundary against the page that actually carries the heading, before the
+    # ranges are derived from neighbours — otherwise one bad bookmark shifts two units.
+    for m in ordered:
+        if m['kind'] == 'character':
+            fixed, moved = true_start(reader, m['page'], m['code'], total)
+            if moved:
+                m['drift'] = fixed - m['page']
+            m['page'] = fixed
+    ordered.sort(key=lambda m: m['page'])
+
+    for i, m in enumerate(ordered):
+        nxt = ordered[i + 1]['page'] if i + 1 < len(ordered) else None
+        m['end'] = (nxt if nxt is not None else _after_chapter_three(entries, total)) - 1
+
+    # A page is the smallest thing that can be split, so a section starting halfway down one
+    # carries the tail of its neighbour with it. Nothing can fix that here — the page belongs
+    # to the later unit so that chapter is at least complete — but one page break in the Doc
+    # fixes it at source, which is why this is reported rather than papered over.
+    for m in ordered:
+        if m['kind'] != 'character':
+            continue
+        text = page_text(reader, m['page'])
+        at = text.find(unicodedata.normalize('NFKC', m['code']))
+        if at > SHARED_PAGE_CHARS:
+            REPORT.append(('warn',
+                           f"{m['id']}（{m['title']}）的標題在第 {m['page'] + 1} 頁的中段，"
+                           '該頁上半屬於前一個角色 —— 請在 Google Docs 的這個標題前插入分頁符'))
+
+    for m in ordered:
+        if m.get('drift'):
+            REPORT.append(('warn', f"{m.get('id', m['title'])} 的書籤偏了 {m['drift']:+d} 頁，"
+                                   '已依標題所在頁修正'))
+
+    units, claimed = [], set()
+    for m in ordered:
+        if m['kind'] == 'template':
+            claimed.update(range(m['page'], m['end'] + 1))
+            continue
+        pages = list(range(m['page'], m['end'] + 1))
+        claimed.update(pages)
+        units.append({'id': m['id'], 'kind': 'character', 'title': m['title'],
+                      'group': m['group'], 'cardCode': m['code'], 'pages': pages})
+
+    # Everything chapter three did not claim is the base book: the opening chapters and the
+    # ones that follow. Non-contiguous on purpose — a buyer of the base should get both halves.
+    base_pages = [p for p in range(total) if p not in claimed]
+    units.insert(0, {'id': 'base', 'kind': 'base', 'title': '本體',
+                     'group': None, 'pages': base_pages})
+    return units
+
+
+def _after_chapter_three(entries, total):
+    """The first page of whatever chapter follows chapter three."""
+    seen_ch3 = False
+    for _, page, title in entries:
+        if CHAPTER.match(title):
+            if seen_ch3:
+                return page
+            if title.startswith(CH3_PREFIX):
+                seen_ch3 = True
+    return total
+
+
+def write_unit(reader, unit, out_dir):
+    """One unit, one file, carrying nothing that refers to the rest of the book.
+
+    The outline and the link annotations both address the whole document, so copied into a
+    seven-page extract they point at pages that are not there — and, worse, name chapters the
+    reader has not bought. Both are dropped; navigation is the app's job.
+    """
+    writer = PdfWriter()
+    for p in unit['pages']:
+        page = reader.pages[p]
+        if '/Annots' in page:
+            del page['/Annots']
+        writer.add_page(page)
+    path = out_dir / f"{unit['id']}.pdf"
+    with path.open('wb') as f:
+        writer.write(f)
+    return path
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--pdf', default='temp/Plakoro 秘笈手冊.pdf')
+    ap.add_argument('--out', default='handbook-build/pdf')
+    args = ap.parse_args()
+
+    src = pathlib.Path(args.pdf)
+    if not src.is_file():
+        sys.exit(f'找不到檔案：{src}')
+    reader = PdfReader(str(src))
+    out = pathlib.Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    for old in out.glob('*.pdf'):
+        old.unlink()
+
+    units = plan(reader)
+    manifest, report = [], list(REPORT)
+    for u in units:
+        if not u['pages']:
+            report.append(('warn', f"{u['id']} 沒有任何頁面，略過"))
+            continue
+        path = write_unit(reader, u, out)
+        manifest.append({k: v for k, v in u.items() if k != 'pages'}
+                        | {'pages': len(u['pages']), 'file': path.name,
+                           'bytes': path.stat().st_size})
+
+    (out / 'manifest.json').write_text(
+        json.dumps({'source': str(src), 'sourcePages': len(reader.pages), 'units': manifest},
+                   ensure_ascii=False, indent=2), encoding='utf-8')
+
+    shelf = pathlib.Path(__file__).with_name('handbook-shelf.html')
+    if shelf.exists():
+        import shutil
+        shutil.copy2(shelf, out / 'shelf.html')
+
+    print(f'來源：{src}（{len(reader.pages)} 頁）')
+    print(f'輸出：{out}  （{len(manifest)} 個單位）\n')
+    print(f"{'unit id':22}{'頁數':>5}{'大小':>10}  標題")
+    for m in manifest:
+        print(f"  {m['id']:20}{m['pages']:>5}{m['bytes']/1024:>9.0f}K  {m['title']}"
+              + (f"  [{m['group']}]" if m.get('group') else ''))
+
+    covered = sum(m['pages'] for m in manifest)
+    print(f"\n涵蓋 {covered}/{len(reader.pages)} 頁"
+          f"（差額是「X. 範本」，刻意排除）")
+    print(f'書架：cd {out} && python3 -m http.server 4801'
+          '   → http://localhost:4801/shelf.html')
+    for level, msg in report:
+        print(f'  {"⚠️ " if level == "warn" else "·"} {msg}')
+
+
+if __name__ == '__main__':
+    main()
