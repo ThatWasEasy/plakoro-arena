@@ -161,7 +161,8 @@
     "line": "官方 Line",
     "lineJoin": "加入 Line",
     "online": "線上對戰",
-    "comingSoon": "即將上線"
+    "comingSoon": "即將上線",
+    "handbook": "秘笈手冊"
   },
   "admin": {
     "switchTitle": "帳號管理",
@@ -822,5 +823,18 @@
     },
     "yourTurn": "輪到你",
     "theirTurn": "等待對手"
+  },
+  "handbook": {
+    "title": "秘笈手冊",
+    "loading": "載入中…",
+    "loadingMore": "繼續載入…",
+    "locked": "這一章還沒有解鎖。",
+    "loadFailed": "這一章讀取失敗，請稍後再試。",
+    "manifestFailed": "讀不到手冊清單，請稍後再試。",
+    "empty": "目前沒有可閱讀的章節。",
+    "pages": "{n} 頁",
+    "ownedCount": "已解鎖 {n} / {total} 章",
+    "prototypeNote": "原型：權限尚未接上伺服器，持有狀態為模擬值。",
+    "unlockAll": "全部解鎖"
   }
 }

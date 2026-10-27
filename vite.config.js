@@ -19,7 +19,24 @@ export default defineConfig({
     // `true`, so an arbitrary host still can't reach the dev server.
     allowedHosts: ['.ngrok-free.app', '.ngrok.io', '.trycloudflare.com', '.loca.lt'],
     // Serves on the LAN too, so a phone on the same wifi can skip the tunnel entirely.
-    host: true
+    host: true,
+    proxy: {
+      // The handbook prototype, served from `npm run split-handbook`'s output:
+      //     cd handbook-build/pdf && python3 -m http.server 4801
+      //
+      // Proxied rather than fetched directly so the prototype uses the same URL shape the
+      // real thing will — `/api/handbook/...`, same origin, no CORS — which means going live
+      // is deleting this block, not rewriting the client.
+      //
+      // Dev only. The chapters are a paid product and never belong in this repo or its build.
+      '/api/handbook': {
+        target: 'http://localhost:4801',
+        changeOrigin: true,
+        rewrite: p => (p === '/api/handbook'
+          ? '/manifest.json'
+          : p.replace(/^\/api\/handbook\//, '/') + '.pdf')
+      }
+    }
   },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)

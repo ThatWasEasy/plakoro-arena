@@ -38,6 +38,9 @@ const MODES = [
   // sources need a login to snapshot, so the figures would go stale without anyone noticing.
   { key: 'priceLog', enabled: false },
   { key: 'tierList' },
+  // Paid content, so the card is always shown and the chapters behind it are not: what a
+  // player owns is checked when a chapter is opened, never by hiding the shelf.
+  { key: 'handbook' },
   { key: 'typeChart' },
   // A link out, not a mode. `url` is what tells the menu to render an anchor instead of a
   // button — the card looks the same either way, but one changes screen and one leaves.

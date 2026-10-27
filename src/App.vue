@@ -20,6 +20,7 @@ import WinScreen from './components/WinScreen.vue'
 import Modal from './components/Modal.vue'
 import TurnCutIn from './components/TurnCutIn.vue'
 import TurnStepper from './components/TurnStepper.vue'
+import HandbookApp from './components/handbook/HandbookApp.vue'
 import { DICE_PHASES, IN_TURN_PHASES, RESOLVING_PHASES } from './game/turnSteps'
 import GlobalTopBar from './components/GlobalTopBar.vue'
 import MusicPlayer from './components/MusicPlayer.vue'
@@ -198,6 +199,7 @@ onBeforeUnmount(uninstallButtonSfx)
       />
 
       <TypeChartApp v-else-if="mode === 'typeChart'" @back="leaveMode()" />
+      <HandbookApp v-else-if="mode === 'handbook'" @back="leaveMode()" />
 
       <TierMakerApp v-else-if="mode === 'tierMaker'" @back="leaveMode()" />
 

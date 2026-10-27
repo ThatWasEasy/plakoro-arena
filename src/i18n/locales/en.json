@@ -161,7 +161,8 @@
     "line": "Official Line",
     "lineJoin": "Join Line",
     "online": "Online Battle",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "handbook": "Handbook"
   },
   "admin": {
     "switchTitle": "Account Admin",
@@ -823,5 +824,18 @@
     },
     "yourTurn": "Your turn",
     "theirTurn": "Opponent"
+  },
+  "handbook": {
+    "title": "Strategy Handbook",
+    "loading": "Loading…",
+    "loadingMore": "Loading more…",
+    "locked": "This chapter is not unlocked yet.",
+    "loadFailed": "Could not load this chapter.",
+    "manifestFailed": "Could not load the handbook list.",
+    "empty": "No chapters available.",
+    "pages": "{n} pages",
+    "ownedCount": "{n} of {total} chapters unlocked",
+    "prototypeNote": "Prototype: entitlements are simulated, not yet served.",
+    "unlockAll": "Unlock all"
   }
 }
