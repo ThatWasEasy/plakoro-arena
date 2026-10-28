@@ -45,6 +45,19 @@ const byName = computed(() => {
   return m
 })
 
+// "一、PLAKORO 基礎規則" carries its own numbering, which is right in a printed contents list
+// and wrong beside a seal showing the same character twice.
+function numeral(u) {
+  if (u.kind !== 'chapter') return ''
+  const n = u.title.charAt(0)
+  // The front matter is titled 序 with no numbering to strip, so the seal would repeat the
+  // title back at itself. It gets a printer's ornament instead.
+  return u.title === label(u) ? '❧' : n
+}
+function label(u) {
+  return u.kind === 'chapter' ? u.title.replace(/^[^、]+、\s*/, '') : u.title
+}
+
 function art(u) {
   const c = byName.value.get(u.title)
   return c?.imageUrl || null
@@ -131,10 +144,14 @@ onBeforeUnmount(() => {
             <ul v-if="sec.kind === 'list'" class="hb-toc">
               <li v-for="u in sec.items" :key="u.id">
                 <button class="hb-entry" :class="{ locked: !owns(u) }" :disabled="!owns(u)" @click="enter(u)">
-                  <span class="hb-entry-title">{{ u.title }}</span>
+                  <span class="hb-seal">{{ numeral(u) }}</span>
+                  <span class="hb-entry-title">{{ label(u) }}</span>
                   <span class="hb-leader" aria-hidden="true"></span>
                   <span v-if="!owns(u)" class="hb-entry-lock">{{ t('handbook.lockedShort') }}</span>
                   <span class="hb-entry-pages">{{ t('handbook.pages', { n: u.pages }) }}</span>
+                  <!-- The one thing that says "this opens". An engraver's fist rather than a
+                       chevron: the row has to look pressable without looking like a web link. -->
+                  <span v-if="owns(u)" class="hb-go" aria-hidden="true">❯</span>
                 </button>
               </li>
             </ul>
@@ -260,20 +277,47 @@ section:first-child .hb-group { margin-top: 6px; }
 
 /* --- chapters, set as a contents list --- */
 .hb-toc { list-style: none; margin: 0; padding: 0; }
+/* An unlocked chapter is a slip of paper sitting on the sheet; a locked one is just a line of
+   the contents list. Before this they looked identical and nothing said the row could be
+   pressed — the leader dots and page number read as print, which is exactly what they are. */
 .hb-entry {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 11px 2px;
-  border: 0;
-  border-bottom: 1px solid rgba(195, 167, 127, 0.45);
+  padding: 11px 12px 11px 10px;
+  border: 1px solid transparent;
   background: none;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: transform .1s ease, background-color .1s ease;
 }
+.hb-toc li + li { margin-top: 6px; }
+.hb-entry:not(.locked) {
+  border-color: rgba(150, 118, 74, 0.45);
+  background: rgba(255, 252, 243, 0.55);
+  box-shadow: 1px 1px 0 rgba(120, 90, 50, 0.16);
+}
+.hb-entry:not(.locked):active { transform: translate(1px, 1px); box-shadow: none; }
+.hb-entry.locked { border-bottom-color: rgba(195, 167, 127, 0.45); }
+
+/* A ruled square carrying the chapter's own numeral — it gives the row an object to press and
+   replaces the numbering that used to be repeated inside the title. */
+.hb-seal {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rule);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.hb-entry:not(.locked) .hb-seal { color: var(--ink); border-color: rgba(120, 90, 50, 0.6); }
+.hb-go { flex: none; font-size: 11px; color: var(--ink-soft); }
 .hb-entry-title { font-size: 16px; font-weight: 700; }
 /* Leader dots, the way a printed contents page joins a title to its page number. */
 .hb-leader {
@@ -286,6 +330,7 @@ section:first-child .hb-group { margin-top: 6px; }
   background-repeat: repeat-x;
 }
 .hb-entry-pages { flex: none; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.hb-leader { align-self: flex-end; margin-bottom: 5px; }
 .hb-entry-lock {
   flex: none;
   padding: 1px 7px;
@@ -301,6 +346,7 @@ section:first-child .hb-group { margin-top: 6px; }
 /* --- characters, set as plates --- */
 .hb-plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 16px 12px; }
 .hb-plate {
+  transition: transform .1s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -327,6 +373,8 @@ section:first-child .hb-group { margin-top: 6px; }
     linear-gradient(0deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55)),
     var(--tint, #D9C7A3);
 }
+.hb-plate:not(.locked):active { transform: translateY(1px) scale(.985); }
+.hb-plate:not(.locked) .hb-frame { box-shadow: 1px 1px 0 rgba(120, 90, 50, 0.18); }
 .hb-frame img { width: 100%; height: 100%; object-fit: contain; display: block; mix-blend-mode: multiply; }
 .hb-plate-name { font-size: 13px; font-weight: 700; line-height: 1.25; text-align: center; }
 .hb-plate-pages {
