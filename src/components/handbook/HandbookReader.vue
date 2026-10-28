@@ -76,11 +76,54 @@ let cancelled = false
 // same ceiling the image export ran into.
 const MAX_CANVAS_WIDTH = 1600
 
-// Faint enough to read straight through, dark enough to still be legible in a photo of a
-// screen. This is close to the floor: much below 0.03 and a phone camera's noise swallows it,
-// which would leave the mark costing contrast while no longer identifying anyone.
-const MARK_ALPHA = 0.038
+// How the mark is inked.
+//
+// It used to be flat black at 0.038 alpha, which read fine on a white page and vanished the
+// moment the book grew an aged-paper background: measured, the stamp moves luminance by about
+// 8/255 while the paper's own texture has a standard deviation of 45. The signal sat an order
+// of magnitude under the noise.
+//
+// So it is no longer a grey veil over the page but brown ink multiplied into it — a stain
+// rather than an overlay, which shifts hue as well as luminance and therefore reads against a
+// textured ground at a far lower strength than flat black would need.
+const MARK_INK = '#4A2E12'
 const MARK_ANGLE = -Math.PI / 6
+// Floor for flat white paper, where almost nothing is needed, and ceiling so a busy page can
+// never turn the mark into something that competes with the text.
+const MARK_ALPHA_MIN = 0.05
+const MARK_ALPHA_MAX = 0.13
+
+/**
+ * How strongly this particular page has to be stamped.
+ *
+ * Tied to the page's own texture rather than fixed, because the right amount differs by an
+ * order of magnitude between a white page and a parchment one — and the book has both. Tuning
+ * a constant by eye would be tuning it for whichever page happened to be open.
+ */
+function inkStrength(ctx, width, height) {
+  const step = Math.max(1, Math.floor(width / 120))
+  let n = 0, sum = 0, sumSq = 0
+  try {
+    const { data } = ctx.getImageData(0, 0, width, height)
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const i = (y * width + x) * 4
+        const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+        sum += l
+        sumSq += l * l
+        n++
+      }
+    }
+  } catch (e) {
+    // A tainted canvas cannot be read back. Fall back to the middle of the range rather than
+    // leaving the page unmarked.
+    return (MARK_ALPHA_MIN + MARK_ALPHA_MAX) / 2
+  }
+  if (!n) return MARK_ALPHA_MIN
+  const mean = sum / n
+  const sd = Math.sqrt(Math.max(0, sumSq / n - mean * mean))
+  return Math.min(MARK_ALPHA_MAX, Math.max(MARK_ALPHA_MIN, 0.045 + sd / 255 * 0.3))
+}
 
 /**
  * Burn the reader's code across the page.
@@ -92,9 +135,10 @@ const MARK_ANGLE = -Math.PI / 6
 function stamp(ctx, width, height, text) {
   if (!text) return
   ctx.save()
-  ctx.globalAlpha = MARK_ALPHA
-  ctx.fillStyle = '#000'
-  ctx.font = `700 ${Math.round(width * 0.038)}px "Hiragino Sans", system-ui, sans-serif`
+  ctx.globalCompositeOperation = 'multiply'
+  ctx.globalAlpha = inkStrength(ctx, width, height)
+  ctx.fillStyle = MARK_INK
+  ctx.font = `700 ${Math.round(width * 0.04)}px "Hiragino Sans", system-ui, sans-serif`
   ctx.textBaseline = 'middle'
   ctx.rotate(MARK_ANGLE)
   const stepX = ctx.measureText(text).width * 1.75
