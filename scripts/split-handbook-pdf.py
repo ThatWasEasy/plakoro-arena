@@ -234,6 +234,36 @@ def chapter_id(title):
 
 
 
+def shrink(path, quality):
+    """Re-encode the embedded images, which is where almost all the weight is.
+
+    The source puts an aged-paper texture behind every page as a 1054x1492 **PNG** — 3.3MB of
+    photographic noise in a lossless format — so every extracted chapter carried it and a
+    six-page file came out at 3.9MB. Re-encoding to JPEG takes the same chapter to ~0.5MB.
+
+    Measured against the original render at 150dpi: mean pixel difference 1.6/255, and not one
+    pixel differing by more than 16. The body text is vector and is not touched at all; only
+    the texture and the diagrams are images.
+
+    Needs PyMuPDF. Without it the split still works, just heavy.
+    """
+    try:
+        import fitz
+    except ImportError:
+        return None
+    doc = fitz.open(str(path))
+    doc.rewrite_images(quality=quality)
+    doc.subset_fonts()
+    # MuPDF refuses to rewrite a file it has open, so the compacted copy is written beside it
+    # and swapped in. Garbage collection is the point: it is what drops the objects the
+    # extracted pages no longer reach.
+    tmp = path.with_suffix('.tmp')
+    doc.save(str(tmp), garbage=4, deflate=True, clean=True)
+    doc.close()
+    tmp.replace(path)
+    return path.stat().st_size
+
+
 def write_unit(reader, unit, out_dir):
     """One unit, one file, carrying nothing that refers to the rest of the book.
 
@@ -257,6 +287,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--pdf', default='temp/Plakoro 秘笈手冊.pdf')
     ap.add_argument('--out', default='handbook-build/pdf')
+    ap.add_argument('--quality', type=int, default=80,
+                    help='重新編碼內嵌影像的 JPEG 品質；0 表示不壓')
     args = ap.parse_args()
 
     src = pathlib.Path(args.pdf)
@@ -269,12 +301,19 @@ def main():
         old.unlink()
 
     units = plan(reader)
-    manifest, report = [], list(REPORT)
+    manifest, report, saved_total = [], list(REPORT), []
     for u in units:
         if not u['pages']:
             report.append(('warn', f"{u['id']} 沒有任何頁面，略過"))
             continue
         path = write_unit(reader, u, out)
+        raw = path.stat().st_size
+        if args.quality:
+            if shrink(path, args.quality) is None:
+                report.append(('warn', '沒有 PyMuPDF，檔案維持未壓縮的大小。'
+                                       '安裝：python3 -m pip install --user pymupdf'))
+                args.quality = 0
+        saved_total.append((raw, path.stat().st_size))
         manifest.append({k: v for k, v in u.items() if k != 'pages'}
                         | {'pages': len(u['pages']), 'file': path.name,
                            'bytes': path.stat().st_size})
@@ -296,6 +335,11 @@ def main():
               + (f"  [{m['group']}]" if m.get('group') else ''))
 
     covered = sum(m['pages'] for m in manifest)
+    if saved_total:
+        a = sum(x for x, _ in saved_total)
+        b = sum(y for _, y in saved_total)
+        print(f'\n影像重新編碼：{a / 1048576:.0f}MB → {b / 1048576:.0f}MB'
+              f'（省 {100 - 100 * b / a:.0f}%）')
     print(f"\n涵蓋 {covered}/{len(reader.pages)} 頁"
           f"（差額是「X. 範本」，刻意排除）")
     print(f'書架：cd {out} && python3 -m http.server 4801'
