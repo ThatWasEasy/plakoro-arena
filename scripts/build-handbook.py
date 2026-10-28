@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
-"""Turn the 秘笈手冊 into structured content the app can render and sell.
+"""Turn the 秘笈手冊 into structured content.
+
+NOT the route the product takes. The handbook ships as PDF — see split-handbook-pdf.py.
+
+Kept because the parsing is sound and a text index may be wanted one day, but do not reach for
+it to render chapters. Google's exports describe this book unreliably, and every failure mode
+is silent: a picture lands under the wrong heading, a table parses empty, a cell's line breaks
+vanish so three expected values read as one number, and the page still looks perfectly normal.
+Three separate bugs of exactly that shape were found and fixed here, and the authors report a
+fourth — images coming out of Docs in the wrong place — that no amount of parsing can repair.
+
+A PDF is rendered by Google itself, so the layout is what the authors approved. For something
+sold per chapter, a route whose errors are visible beats one whose errors are not.
 
 The source is the Google Docs **Markdown** export, and that choice is why this script is short.
 The HTML export describes the same book far worse:

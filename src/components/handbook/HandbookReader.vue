@@ -22,13 +22,46 @@ import { fetchUnit } from '../../data/handbookSource'
 
 const props = defineProps({
   unit: { type: Object, required: true },
-  // Stamped faintly across every page. Not a lock — a reader can still photograph the
-  // screen — but it makes a leaked screenshot say who leaked it, which is the part that
-  // actually changes behaviour.
+  // Tiled faintly across every page. Not a lock — a reader can still photograph the screen —
+  // but it makes a leaked copy say who leaked it, which is the part that actually changes
+  // behaviour. Tiled and diagonal rather than tucked in a corner, because a corner mark is
+  // removed by cropping or by trimming the margin off a printout.
   watermark: { type: String, default: '' }
 })
 const emit = defineEmits(['close'])
 const { t } = useI18n()
+
+// Zoom is applied as display width, not by re-rendering: pages are rasterised once at
+// MAX_CANVAS_WIDTH, which is wider than any phone, so enlarging up to that ceiling only uses
+// detail the canvas already holds. Re-rendering 31 pages on every tap of + would be the
+// obvious implementation and a much worse one.
+const ZOOM_STEPS = [0.8, 1, 1.25, 1.5, 2, 2.5]
+const ZOOM_KEY = 'plakoro_handbook_zoom_v1'
+
+function loadZoom() {
+  try {
+    const n = Number(localStorage.getItem(ZOOM_KEY))
+    return ZOOM_STEPS.includes(n) ? n : 1
+  } catch (e) {
+    return 1
+  }
+}
+
+const zoom = ref(loadZoom())
+
+function stepZoom(dir) {
+  const i = ZOOM_STEPS.indexOf(zoom.value)
+  const next = ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, i + dir))]
+  zoom.value = next
+  try {
+    localStorage.setItem(ZOOM_KEY, String(next))
+  } catch (e) {
+    // A reading preference that does not survive a reload is not worth failing over.
+  }
+}
+
+const canZoomOut = computed(() => zoom.value > ZOOM_STEPS[0])
+const canZoomIn = computed(() => zoom.value < ZOOM_STEPS[ZOOM_STEPS.length - 1])
 
 const pages = shallowRef([])
 const loading = ref(true)
@@ -42,6 +75,40 @@ let cancelled = false
 // Capped because a canvas that large is slow to paint and, on iOS, can fail outright — the
 // same ceiling the image export ran into.
 const MAX_CANVAS_WIDTH = 1600
+
+// Faint enough to read straight through, dark enough to still be legible in a photo of a
+// screen. This is close to the floor: much below 0.03 and a phone camera's noise swallows it,
+// which would leave the mark costing contrast while no longer identifying anyone.
+const MARK_ALPHA = 0.038
+const MARK_ANGLE = -Math.PI / 6
+
+/**
+ * Burn the reader's code across the page.
+ *
+ * Drawn into the canvas rather than laid over it in the DOM: an overlay is one devtools click
+ * from gone, and "save image" would write out a clean copy. Once it is in the pixels, every
+ * route the page can leave by carries it.
+ */
+function stamp(ctx, width, height, text) {
+  if (!text) return
+  ctx.save()
+  ctx.globalAlpha = MARK_ALPHA
+  ctx.fillStyle = '#000'
+  ctx.font = `700 ${Math.round(width * 0.038)}px "Hiragino Sans", system-ui, sans-serif`
+  ctx.textBaseline = 'middle'
+  ctx.rotate(MARK_ANGLE)
+  const stepX = ctx.measureText(text).width * 1.75
+  const stepY = width * 0.115
+  // Rotating moves the page out from under the origin, so the grid is drawn over a box big
+  // enough to still cover every corner afterwards.
+  for (let y = -width; y < height + width; y += stepY) {
+    const offset = (Math.round(y / stepY) % 2) * (stepX / 2)
+    for (let x = -height; x < width + height; x += stepX) {
+      ctx.fillText(text, x + offset, y)
+    }
+  }
+  ctx.restore()
+}
 
 async function render() {
   loading.value = true
@@ -68,7 +135,9 @@ async function render() {
       const canvas = document.createElement('canvas')
       canvas.width = Math.floor(viewport.width)
       canvas.height = Math.floor(viewport.height)
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+      const ctx = canvas.getContext('2d')
+      await page.render({ canvasContext: ctx, viewport }).promise
+      stamp(ctx, canvas.width, canvas.height, props.watermark)
       out.push({ n, url: canvas.toDataURL('image/jpeg', 0.86), ratio: viewport.height / viewport.width })
       pages.value = [...out]
     }
@@ -115,16 +184,26 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
       <header class="hr-bar">
         <button class="hr-close" :aria-label="t('common.back')" @click="emit('close')">✕</button>
         <div class="hr-title">{{ unit.title }}</div>
+        <div class="hr-zoom">
+          <button :disabled="!canZoomOut" :aria-label="t('handbook.zoomOut')" @click="stepZoom(-1)">−</button>
+          <span class="hr-zoom-val">{{ Math.round(zoom * 100) }}%</span>
+          <button :disabled="!canZoomIn" :aria-label="t('handbook.zoomIn')" @click="stepZoom(1)">＋</button>
+        </div>
         <div class="hr-count">{{ pages.length ? `${currentPage} / ${total}` : '' }}</div>
       </header>
 
       <div v-if="loading && !pages.length" class="hr-state">{{ t('handbook.loading') }}</div>
       <div v-else-if="error" class="hr-state">{{ error }}</div>
 
-      <div v-else ref="scrollerRef" class="hr-scroll" @scroll.passive="onScroll">
+      <div
+        v-else
+        ref="scrollerRef"
+        class="hr-scroll"
+        :style="{ '--z': zoom }"
+        @scroll.passive="onScroll"
+      >
         <div v-for="p in pages" :key="p.n" class="hr-page">
           <img :src="p.url" :alt="`${unit.title} ${p.n}`" draggable="false">
-          <span v-if="watermark" class="hr-mark">{{ watermark }}</span>
         </div>
         <div v-if="loading" class="hr-more">{{ t('handbook.loadingMore') }}</div>
       </div>
@@ -167,23 +246,40 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
   font-size: 16px;
   cursor: pointer;
 }
-.hr-title { flex: 1; font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hr-title { flex: 1; font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hr-zoom { flex: none; display: flex; align-items: center; gap: 2px; }
+.hr-zoom button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.hr-zoom button:disabled { opacity: .35; cursor: default; }
+.hr-zoom-val {
+  min-width: 42px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  font-variant-numeric: tabular-nums;
+}
 .hr-count { flex: none; font-size: 12px; color: rgba(255, 255, 255, 0.7); font-variant-numeric: tabular-nums; }
 
-.hr-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
-.hr-page { position: relative; margin: 0 auto 10px; max-width: 900px; }
-.hr-page img { display: block; width: 100%; height: auto; }
-/* Faint enough to read through, legible enough to survive a screenshot. */
-.hr-mark {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: rgba(0, 0, 0, 0.26);
-  pointer-events: none;
+/* Horizontal scrolling appears only once zoomed past the frame. */
+.hr-scroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
+/* Both dimensions scale, or the comfortable-reading cap silently wins and the + button does
+   nothing on a wide screen — which is exactly what it did the first time. */
+.hr-page {
+  position: relative;
+  margin: 0 auto 10px;
+  width: calc(100% * var(--z, 1));
+  max-width: calc(900px * var(--z, 1));
 }
+.hr-page img { display: block; width: 100%; height: auto; }
 .hr-state, .hr-more {
   padding: 32px 20px;
   text-align: center;

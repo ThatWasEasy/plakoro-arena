@@ -836,6 +836,8 @@
     "pages": "{n} ページ",
     "ownedCount": "{n} / {total} 章を解放済み",
     "prototypeNote": "プロトタイプ：権限はまだサーバーに接続していません。",
-    "unlockAll": "すべて解放"
+    "unlockAll": "すべて解放",
+    "zoomOut": "縮小",
+    "zoomIn": "拡大"
   }
 }

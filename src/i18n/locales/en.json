@@ -836,6 +836,8 @@
     "pages": "{n} pages",
     "ownedCount": "{n} of {total} chapters unlocked",
     "prototypeNote": "Prototype: entitlements are simulated, not yet served.",
-    "unlockAll": "Unlock all"
+    "unlockAll": "Unlock all",
+    "zoomOut": "Zoom out",
+    "zoomIn": "Zoom in"
   }
 }

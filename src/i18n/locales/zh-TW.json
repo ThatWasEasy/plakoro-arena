@@ -835,6 +835,8 @@
     "pages": "{n} 頁",
     "ownedCount": "已解鎖 {n} / {total} 章",
     "prototypeNote": "原型：權限尚未接上伺服器，持有狀態為模擬值。",
-    "unlockAll": "全部解鎖"
+    "unlockAll": "全部解鎖",
+    "zoomOut": "縮小",
+    "zoomIn": "放大"
   }
 }
