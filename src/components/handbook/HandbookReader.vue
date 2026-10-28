@@ -19,6 +19,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { fetchUnit } from '../../data/handbookSource'
+import { pageOf, setProgress } from '../../data/handbookProgress'
 
 const props = defineProps({
   unit: { type: Object, required: true },
@@ -184,6 +185,7 @@ async function render() {
       stamp(ctx, canvas.width, canvas.height, props.watermark)
       out.push({ n, url: canvas.toDataURL('image/jpeg', 0.86), ratio: viewport.height / viewport.width })
       pages.value = [...out]
+      if (out.length === 1) restore()
     }
   } catch (e) {
     error.value = e.message === 'locked' ? t('handbook.locked') : t('handbook.loadFailed')
@@ -199,6 +201,18 @@ function onScroll() {
   const kids = [...el.querySelectorAll('.hr-page')]
   const i = kids.findIndex(k => k.offsetTop + k.offsetHeight > mid)
   currentPage.value = (i === -1 ? kids.length : i + 1) || 1
+  setProgress(props.unit.id, currentPage.value, total.value)
+}
+
+// Pick up where this chapter was left off. Done once the pages exist, since there is nothing
+// to scroll to before then.
+function restore() {
+  const page = pageOf(props.unit.id)
+  if (page <= 1) return
+  requestAnimationFrame(() => {
+    const el = scrollerRef.value?.querySelectorAll('.hr-page')[page - 1]
+    el?.scrollIntoView({ block: 'start' })
+  })
 }
 
 function onKey(e) {

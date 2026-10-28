@@ -839,6 +839,7 @@
     "unlockAll": "Unlock all",
     "zoomOut": "Zoom out",
     "zoomIn": "Zoom in",
-    "lockedShort": "LOCKED"
+    "lockedShort": "LOCKED",
+    "continue": "CONTINUE READING"
   }
 }

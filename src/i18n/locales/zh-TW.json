@@ -838,6 +838,7 @@
     "unlockAll": "全部解鎖",
     "zoomOut": "縮小",
     "zoomIn": "放大",
-    "lockedShort": "未解鎖"
+    "lockedShort": "未解鎖",
+    "continue": "繼續閱讀"
   }
 }

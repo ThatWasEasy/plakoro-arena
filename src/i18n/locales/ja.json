@@ -839,6 +839,7 @@
     "unlockAll": "すべて解放",
     "zoomOut": "縮小",
     "zoomIn": "拡大",
-    "lockedShort": "未解放"
+    "lockedShort": "未解放",
+    "continue": "続きを読む"
   }
 }

@@ -19,6 +19,7 @@ import { asset } from '../../data/assetPath'
 import { typeBgColor } from '../../data/constants'
 import { currentIdentity } from '../../data/currentPlayer'
 import { fetchManifest, isPrototype } from '../../data/handbookSource'
+import { mostRecent, pageOf, startedOf } from '../../data/handbookProgress'
 import HandbookReader from './HandbookReader.vue'
 
 const emit = defineEmits(['back'])
@@ -82,6 +83,14 @@ const sections = computed(() => {
 })
 
 const ownedCount = computed(() => units.value.filter(owns).length)
+
+// Where to pick back up. A 190-page book cut into 27 chapters needs a way in that is not
+// "find your place again" — without it the shelf is a pile.
+const resume = computed(() => mostRecent(units.value.filter(owns)))
+const resumePct = computed(() => {
+  const r = resume.value
+  return r && r.pages ? Math.min(100, Math.round(r.page / r.pages * 100)) : 0
+})
 const watermark = computed(() => currentIdentity.value?.code || '')
 
 function enter(u) {
@@ -135,6 +144,27 @@ onBeforeUnmount(() => {
 
       <div v-else class="hb-scroll">
         <div class="hb-sheet">
+
+          <!-- The book itself, before its parts. A shelf that opens straight into a list of
+               chapters never says what the thing is; this is also the one place the product
+               gets to look like a product. -->
+          <div class="hb-hero">
+            <div class="hb-vol">
+              <span class="hb-vol-pub">PLAKORO TAIWAN</span>
+              <span class="hb-vol-name">秘笈<br>手冊</span>
+              <span class="hb-vol-ed">2026 EDITION</span>
+            </div>
+          </div>
+
+          <!-- Only once something has actually been opened. An empty "continue reading" card
+               is a promise the shelf has not earned yet. -->
+          <button v-if="resume" class="hb-resume" @click="enter(resume.unit)">
+            <span class="hb-resume-lab">{{ t('handbook.continue') }}</span>
+            <span class="hb-resume-name">{{ label(resume.unit) }}</span>
+            <span class="hb-resume-pos">{{ resume.page }} / {{ resume.pages }}</span>
+            <span class="hb-progress"><i :style="{ width: resumePct + '%' }"></i></span>
+          </button>
+
           <section v-for="(sec, i) in sections" :key="i">
             <h2 v-if="sec.title" class="hb-group"><span>{{ sec.title }}</span></h2>
 
@@ -148,9 +178,8 @@ onBeforeUnmount(() => {
                   <span class="hb-entry-title">{{ label(u) }}</span>
                   <span class="hb-leader" aria-hidden="true"></span>
                   <span v-if="!owns(u)" class="hb-entry-lock">{{ t('handbook.lockedShort') }}</span>
+                  <span v-else-if="startedOf(u.id)" class="hb-dot" aria-hidden="true">●</span>
                   <span class="hb-entry-pages">{{ t('handbook.pages', { n: u.pages }) }}</span>
-                  <!-- The one thing that says "this opens". An engraver's fist rather than a
-                       chevron: the row has to look pressable without looking like a web link. -->
                   <span v-if="owns(u)" class="hb-go" aria-hidden="true">❯</span>
                 </button>
               </li>
@@ -172,6 +201,7 @@ onBeforeUnmount(() => {
                   <span class="hb-pick-name">{{ u.title }}</span>
                   <span class="hb-leader" aria-hidden="true"></span>
                   <span v-if="!owns(u)" class="hb-entry-lock">{{ t('handbook.lockedShort') }}</span>
+                  <span v-else-if="startedOf(u.id)" class="hb-dot" aria-hidden="true">●</span>
                   <span class="hb-entry-pages">{{ t('handbook.pages', { n: u.pages }) }}</span>
                   <span v-if="owns(u)" class="hb-go" aria-hidden="true">❯</span>
                 </button>
@@ -258,6 +288,60 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 0 70px rgba(120, 90, 50, 0.25);
 }
 
+/* --- the volume itself --- */
+.hb-hero {
+  display: grid;
+  place-items: center;
+  padding: 26px 0 30px;
+}
+.hb-vol {
+  width: 150px;
+  height: 206px;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: linear-gradient(150deg, #33281C, #19130D);
+  color: #F0E4CC;
+  /* A spine and a stacked shadow, so it reads as an object with thickness rather than a
+     rectangle with a gradient. */
+  border-left: 7px solid #4A3A27;
+  box-shadow: 7px 8px 0 rgba(95, 70, 40, .22), 12px 14px 22px rgba(60, 42, 20, .3);
+  transform: rotate(-4deg);
+}
+.hb-vol-pub { font-size: 8px; letter-spacing: .24em; color: #C8A86A; }
+.hb-vol-name { font-size: 30px; font-weight: 700; line-height: 1.18; letter-spacing: .06em; }
+.hb-vol-ed { font-size: 8.5px; letter-spacing: .2em; color: rgba(240, 228, 204, .62); }
+
+/* --- continue reading --- */
+.hb-resume {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 12px 14px;
+  border: 1px solid rgba(150, 118, 74, .5);
+  background: rgba(255, 252, 243, .62);
+  box-shadow: 2px 2px 0 rgba(120, 90, 50, .18);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hb-resume:active { transform: translate(1px, 1px); box-shadow: none; }
+.hb-resume-lab { grid-column: 1 / -1; font-size: 9.5px; letter-spacing: .22em; color: var(--ink-soft); }
+.hb-resume-name { font-size: 16px; font-weight: 700; }
+.hb-resume-pos { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; align-self: end; }
+.hb-progress { grid-column: 1 / -1; height: 3px; margin-top: 7px; background: rgba(150, 118, 74, .25); }
+.hb-progress i { display: block; height: 100%; background: #6B5234; }
+
+/* name is hb-progress, not hb-bar: the header is .hb-bar, and the collision gave the header
+   the progress bar's 3px height — the title all but vanished. */
+/* A chapter already opened, marked where the lock would be. Quiet on purpose — it is a
+   reminder, not a status to act on. */
+.hb-dot { flex: none; font-size: 7px; color: #9A7F55; }
+
 .hb-group {
   display: flex;
   align-items: center;
@@ -275,7 +359,61 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--rule);
 }
 .hb-group span { flex: none; }
-section:first-child .hb-group { margin-top: 6px; }
+section:first-child /* --- the volume itself --- */
+.hb-hero {
+  display: grid;
+  place-items: center;
+  padding: 26px 0 30px;
+}
+.hb-vol {
+  width: 150px;
+  height: 206px;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: linear-gradient(150deg, #33281C, #19130D);
+  color: #F0E4CC;
+  /* A spine and a stacked shadow, so it reads as an object with thickness rather than a
+     rectangle with a gradient. */
+  border-left: 7px solid #4A3A27;
+  box-shadow: 7px 8px 0 rgba(95, 70, 40, .22), 12px 14px 22px rgba(60, 42, 20, .3);
+  transform: rotate(-4deg);
+}
+.hb-vol-pub { font-size: 8px; letter-spacing: .24em; color: #C8A86A; }
+.hb-vol-name { font-size: 30px; font-weight: 700; line-height: 1.18; letter-spacing: .06em; }
+.hb-vol-ed { font-size: 8.5px; letter-spacing: .2em; color: rgba(240, 228, 204, .62); }
+
+/* --- continue reading --- */
+.hb-resume {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 12px 14px;
+  border: 1px solid rgba(150, 118, 74, .5);
+  background: rgba(255, 252, 243, .62);
+  box-shadow: 2px 2px 0 rgba(120, 90, 50, .18);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hb-resume:active { transform: translate(1px, 1px); box-shadow: none; }
+.hb-resume-lab { grid-column: 1 / -1; font-size: 9.5px; letter-spacing: .22em; color: var(--ink-soft); }
+.hb-resume-name { font-size: 16px; font-weight: 700; }
+.hb-resume-pos { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; align-self: end; }
+.hb-progress { grid-column: 1 / -1; height: 3px; margin-top: 7px; background: rgba(150, 118, 74, .25); }
+.hb-progress i { display: block; height: 100%; background: #6B5234; }
+
+/* name is hb-progress, not hb-bar: the header is .hb-bar, and the collision gave the header
+   the progress bar's 3px height — the title all but vanished. */
+/* A chapter already opened, marked where the lock would be. Quiet on purpose — it is a
+   reminder, not a status to act on. */
+.hb-dot { flex: none; font-size: 7px; color: #9A7F55; }
+
+.hb-group { margin-top: 6px; }
 
 /* --- chapters, set as a contents list --- */
 .hb-toc { list-style: none; margin: 0; padding: 0; }
