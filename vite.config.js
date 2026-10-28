@@ -32,9 +32,14 @@ export default defineConfig({
       '/api/handbook': {
         target: 'http://localhost:4801',
         changeOrigin: true,
-        rewrite: p => (p === '/api/handbook'
-          ? '/manifest.json'
-          : p.replace(/^\/api\/handbook\//, '/') + '.pdf')
+        // /api/handbook/<catalogue>            -> that catalogue's manifest
+        // /api/handbook/<catalogue>/<unit>      -> one chapter
+        rewrite: p => {
+          const rest = p.replace(/^\/api\/handbook\/?/, '')
+          const slash = rest.indexOf('/')
+          if (slash === -1) return `/${rest}/manifest.json`
+          return `/${rest.slice(0, slash)}/${rest.slice(slash + 1)}.pdf`
+        }
       }
     }
   },

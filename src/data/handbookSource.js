@@ -19,8 +19,15 @@ const useApi = import.meta.env.VITE_HANDBOOK_API === '1'
 
 export const isPrototype = !useApi
 
-export async function fetchManifest() {
-  const url = useApi ? `${API_BASE}/api/handbook` : '/api/handbook'
+/**
+ * Which book to show. The paid handbook and the free sample are the same shape — a manifest
+ * and a set of chapter PDFs — so they are one code path and two catalogues, not two screens.
+ * The sample is simply a shorter book.
+ */
+export const CATALOGUE = { HANDBOOK: 'handbook', PREVIEW: 'preview' }
+
+export async function fetchManifest(catalogue = CATALOGUE.HANDBOOK) {
+  const url = `${useApi ? API_BASE : ''}/api/handbook/${catalogue}`
   const res = await fetch(url, { headers: authHeader() })
   if (!res.ok) throw new Error(`manifest ${res.status}`)
   return res.json()
@@ -33,9 +40,9 @@ export async function fetchManifest() {
  * page and shared, and a blob: URL still ends up in the browser's download menu. Handing the
  * renderer raw bytes keeps the file from ever being a thing the viewer can save by itself.
  */
-export async function fetchUnit(id) {
+export async function fetchUnit(id, catalogue = CATALOGUE.HANDBOOK) {
   const base = useApi ? API_BASE : ''
-  const url = `${base}/api/handbook/${encodeURIComponent(id)}`
+  const url = `${base}/api/handbook/${catalogue}/${encodeURIComponent(id)}`
   const res = await fetch(url, { headers: authHeader() })
   // 404 is what the server answers for "you do not own this", deliberately — a 403 would
   // confirm the chapter exists and is merely unpaid.

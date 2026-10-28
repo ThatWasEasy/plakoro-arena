@@ -286,7 +286,10 @@ def write_unit(reader, unit, out_dir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--pdf', default='temp/Plakoro 秘笈手冊.pdf')
-    ap.add_argument('--out', default='handbook-build/pdf')
+    ap.add_argument('--catalogue', default='handbook',
+                    help="哪一份目錄：handbook（完整）或 preview（試閱）")
+    ap.add_argument('--out', default=None,
+                    help='預設是 handbook-build/catalogues/<catalogue>')
     ap.add_argument('--quality', type=int, default=80,
                     help='重新編碼內嵌影像的 JPEG 品質；0 表示不壓')
     args = ap.parse_args()
@@ -295,7 +298,7 @@ def main():
     if not src.is_file():
         sys.exit(f'找不到檔案：{src}')
     reader = PdfReader(str(src))
-    out = pathlib.Path(args.out)
+    out = pathlib.Path(args.out or f'handbook-build/catalogues/{args.catalogue}')
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob('*.pdf'):
         old.unlink()
@@ -342,8 +345,8 @@ def main():
               f'（省 {100 - 100 * b / a:.0f}%）')
     print(f"\n涵蓋 {covered}/{len(reader.pages)} 頁"
           f"（差額是「X. 範本」，刻意排除）")
-    print(f'書架：cd {out} && python3 -m http.server 4801'
-          '   → http://localhost:4801/shelf.html')
+    print(f'書架：cd {out.parent} && python3 -m http.server 4801'
+          f'   → http://localhost:4801/{out.name}/shelf.html')
     for level, msg in report:
         print(f'  {"⚠️ " if level == "warn" else "·"} {msg}')
 
