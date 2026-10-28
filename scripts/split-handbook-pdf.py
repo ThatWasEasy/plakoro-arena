@@ -40,6 +40,9 @@ except ImportError:
 REPORT = []
 
 CH3_PREFIX = '三、'
+# Front matter is a chapter as far as the shelf is concerned: it is where a reader starts, and
+# its contents list doubles as a look at what else there is to buy.
+FRONT_MATTER = ('序',)
 CHAPTER = re.compile(r'^[一二三四五六七八九十]+、')
 SET_HEADER = re.compile(r'^(啟程套組|探險盒\s*\d+|.*套組)\s*$')
 CHARACTER = re.compile(r'^\s*(\d+)\.\s*(.+?)\s*[（(]\s*([A-Za-z]{3}\d{2}(?:-\d{3})?)\s*[)）]\s*$')
@@ -115,19 +118,29 @@ def true_start(reader, page, code, total):
 def plan(reader):
     """Work out which pages belong to which sellable unit.
 
-    A character owns every page from its own heading up to whatever starts next, so the ranges
-    are derived from neighbours rather than from a length nobody wrote down. Set headers
-    ("探險盒 01") share a page with the first character under them and own nothing themselves —
-    they are recorded as a group label, because bundles are priced in the shop and a regroup
-    should be a pricing change, not a re-split.
+    Every top-level chapter is a unit, and chapter three — the 84% of the book that is
+    per-character writing — explodes into one unit per character. The catalogue then reads as
+    chapters with the character chapters sold alongside them, rather than as one
+    undifferentiated "everything else" bundle.
+
+    A unit owns every page from its own heading up to whatever starts next, so the ranges come
+    from neighbours rather than from a length nobody wrote down. Set headers ("探險盒 01")
+    share a page with the first character under them and own nothing themselves — they are
+    recorded as a group label, because bundles are priced in the shop and a regroup should be
+    a pricing change, not a re-split.
     """
     entries = outline_entries(reader)
     total = len(reader.pages)
 
     marks, in_ch3, group = [], False, None
     for _, page, title in entries:
-        if CHAPTER.match(title):
+        if CHAPTER.match(title) or title in FRONT_MATTER:
             in_ch3 = title.startswith(CH3_PREFIX)
+            # Chapter three owns no pages of its own: its divider page falls to the first
+            # character after it, and the chapter appears in the catalogue as the group those
+            # characters belong to.
+            if not in_ch3:
+                marks.append({'kind': 'chapter', 'page': page, 'title': title})
             continue
         if not in_ch3:
             continue
@@ -146,7 +159,7 @@ def plan(reader):
     # Deduplicate: Google repeats a bookmark when a heading is split across runs.
     seen, ordered = set(), []
     for m in marks:
-        key = (m['kind'], m.get('id'), m['page'])
+        key = (m['kind'], m.get('id'), m.get('title'), m['page'])
         if key in seen:
             continue
         seen.add(key)
@@ -163,9 +176,12 @@ def plan(reader):
             m['page'] = fixed
     ordered.sort(key=lambda m: m['page'])
 
+    # Each unit runs up to whatever starts next; the last one runs to the end of the book.
+    # (It used to fall back to "where chapter three ends", which was right when only characters
+    # were being cut and silently gave the final chapter zero pages once chapters were too.)
     for i, m in enumerate(ordered):
-        nxt = ordered[i + 1]['page'] if i + 1 < len(ordered) else None
-        m['end'] = (nxt if nxt is not None else _after_chapter_three(entries, total)) - 1
+        nxt = ordered[i + 1]['page'] if i + 1 < len(ordered) else total
+        m['end'] = nxt - 1
 
     # A page is the smallest thing that can be split, so a section starting halfway down one
     # carries the tail of its neighbour with it. Nothing can fix that here — the page belongs
@@ -186,34 +202,36 @@ def plan(reader):
             REPORT.append(('warn', f"{m.get('id', m['title'])} 的書籤偏了 {m['drift']:+d} 頁，"
                                    '已依標題所在頁修正'))
 
-    units, claimed = [], set()
+    units = []
     for m in ordered:
         if m['kind'] == 'template':
-            claimed.update(range(m['page'], m['end'] + 1))
             continue
         pages = list(range(m['page'], m['end'] + 1))
-        claimed.update(pages)
-        units.append({'id': m['id'], 'kind': 'character', 'title': m['title'],
-                      'group': m['group'], 'cardCode': m['code'], 'pages': pages})
+        if m['kind'] == 'chapter':
+            units.append({'id': chapter_id(m['title']), 'kind': 'chapter',
+                          'title': m['title'], 'group': None, 'pages': pages})
+        else:
+            units.append({'id': m['id'], 'kind': 'character', 'title': m['title'],
+                          'group': m['group'], 'cardCode': m['code'], 'pages': pages})
 
-    # Everything chapter three did not claim is the base book: the opening chapters and the
-    # ones that follow. Non-contiguous on purpose — a buyer of the base should get both halves.
-    base_pages = [p for p in range(total) if p not in claimed]
-    units.insert(0, {'id': 'base', 'kind': 'base', 'title': '本體',
-                     'group': None, 'pages': base_pages})
+    # The cover and the contents list come before the first bookmark, so nothing claimed them.
+    # They belong with the front matter.
+    if units and units[0]['pages'] and units[0]['pages'][0] > 0:
+        units[0]['pages'] = list(range(0, units[0]['pages'][0])) + units[0]['pages']
     return units
 
 
-def _after_chapter_three(entries, total):
-    """The first page of whatever chapter follows chapter three."""
-    seen_ch3 = False
-    for _, page, title in entries:
-        if CHAPTER.match(title):
-            if seen_ch3:
-                return page
-            if title.startswith(CH3_PREFIX):
-                seen_ch3 = True
-    return total
+CHAPTER_NUMERAL = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
+                   '七': 7, '八': 8, '九': 9, '十': 10}
+
+
+def chapter_id(title):
+    """A stable id for a chapter, so re-wording a heading does not orphan what people bought."""
+    if title in FRONT_MATTER:
+        return 'front'
+    n = CHAPTER_NUMERAL.get(title[0])
+    return f'ch{n}' if n else 'ch-' + re.sub(r'\W+', '', title)[:12].lower()
+
 
 
 def write_unit(reader, unit, out_dir):

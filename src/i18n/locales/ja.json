@@ -838,6 +838,7 @@
     "prototypeNote": "プロトタイプ：権限はまだサーバーに接続していません。",
     "unlockAll": "すべて解放",
     "zoomOut": "縮小",
-    "zoomIn": "拡大"
+    "zoomIn": "拡大",
+    "lockedShort": "未解放"
   }
 }

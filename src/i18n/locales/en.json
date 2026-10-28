@@ -838,6 +838,7 @@
     "prototypeNote": "Prototype: entitlements are simulated, not yet served.",
     "unlockAll": "Unlock all",
     "zoomOut": "Zoom out",
-    "zoomIn": "Zoom in"
+    "zoomIn": "Zoom in",
+    "lockedShort": "LOCKED"
   }
 }

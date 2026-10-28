@@ -837,6 +837,7 @@
     "prototypeNote": "原型：權限尚未接上伺服器，持有狀態為模擬值。",
     "unlockAll": "全部解鎖",
     "zoomOut": "縮小",
-    "zoomIn": "放大"
+    "zoomIn": "放大",
+    "lockedShort": "未解鎖"
   }
 }
