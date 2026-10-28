@@ -156,25 +156,27 @@ onBeforeUnmount(() => {
               </li>
             </ul>
 
-            <!-- Characters as plates. -->
-            <div v-else class="hb-plates">
-              <button
-                v-for="u in sec.items"
-                :key="u.id"
-                class="hb-plate"
-                :class="{ locked: !owns(u) }"
-                :disabled="!owns(u)"
-                @click="enter(u)"
-              >
-                <span class="hb-frame" :style="{ '--tint': tint(u) }">
-                  <img :src="art(u)" :alt="u.title" loading="lazy">
-                </span>
-                <span class="hb-plate-name">{{ u.title }}</span>
-                <span class="hb-plate-pages">
-                  {{ owns(u) ? t('handbook.pages', { n: u.pages }) : t('handbook.lockedShort') }}
-                </span>
-              </button>
-            </div>
+            <!-- Characters as rows, same slip as the chapters above, with the figure standing
+                 out past the top edge. The overflow is the whole point: it turns a list into a
+                 line-up, which is how you pick a character. -->
+            <ul v-else class="hb-roster">
+              <li v-for="u in sec.items" :key="u.id">
+                <button
+                  class="hb-pick"
+                  :class="{ locked: !owns(u) }"
+                  :style="{ '--tint': tint(u) }"
+                  :disabled="!owns(u)"
+                  @click="enter(u)"
+                >
+                  <span class="hb-figure"><img :src="art(u)" :alt="u.title" loading="lazy"></span>
+                  <span class="hb-pick-name">{{ u.title }}</span>
+                  <span class="hb-leader" aria-hidden="true"></span>
+                  <span v-if="!owns(u)" class="hb-entry-lock">{{ t('handbook.lockedShort') }}</span>
+                  <span class="hb-entry-pages">{{ t('handbook.pages', { n: u.pages }) }}</span>
+                  <span v-if="owns(u)" class="hb-go" aria-hidden="true">❯</span>
+                </button>
+              </li>
+            </ul>
           </section>
         </div>
       </div>
@@ -343,52 +345,65 @@ section:first-child .hb-group { margin-top: 6px; }
 .hb-entry.locked { cursor: default; }
 .hb-entry.locked .hb-entry-title { color: var(--ink-soft); font-weight: 600; }
 
-/* --- characters, set as plates --- */
-.hb-plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 16px 12px; }
-.hb-plate {
-  transition: transform .1s ease;
+/* --- characters, set as a line-up --- */
+.hb-roster { list-style: none; margin: 0; padding: 0; }
+/* Room for the figure to stand above the slip without touching the row before it. */
+.hb-roster li + li { margin-top: 20px; }
+
+.hb-pick {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 0;
-  border: 0;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  /* Left inset is the figure's lane; the artwork sits in it and rises out of the top. */
+  padding: 10px 12px 10px 92px;
+  border: 1px solid transparent;
   background: none;
   color: inherit;
   font: inherit;
+  text-align: left;
   cursor: pointer;
+  /* Not hidden: the figure breaking the frame is the effect, not a mistake. */
+  overflow: visible;
+  transition: transform .1s ease;
 }
-/* A ruled frame, like a plate pasted into a manual — the tint only shows as a wash behind the
-   figure, because the portraits are opaque JPEGs and would paint over a filled ground. */
-.hb-frame {
-  position: relative;
-  display: block;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  padding: 7px;
-  border: 1px solid var(--rule);
-  outline: 1px solid rgba(195, 167, 127, 0.4);
-  outline-offset: 2px;
+.hb-pick:not(.locked) {
+  border-color: rgba(150, 118, 74, 0.45);
+  /* The character's type, washed into the paper from the figure's side rather than filling
+     the row — a tinted slip, not a coloured button. */
   background:
-    linear-gradient(0deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55)),
-    var(--tint, #D9C7A3);
+    linear-gradient(90deg, color-mix(in srgb, var(--tint) 55%, transparent), rgba(255, 252, 243, 0.6) 62%);
+  box-shadow: 1px 1px 0 rgba(120, 90, 50, 0.16);
 }
-.hb-plate:not(.locked):active { transform: translateY(1px) scale(.985); }
-.hb-plate:not(.locked) .hb-frame { box-shadow: 1px 1px 0 rgba(120, 90, 50, 0.18); }
-.hb-frame img { width: 100%; height: 100%; object-fit: contain; display: block; mix-blend-mode: multiply; }
-.hb-plate-name { font-size: 13px; font-weight: 700; line-height: 1.25; text-align: center; }
-.hb-plate-pages {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-  font-family: system-ui, sans-serif;
+.hb-pick:not(.locked):active { transform: translate(1px, 1px); box-shadow: none; }
+.hb-pick.locked { border-bottom-color: rgba(195, 167, 127, 0.45); }
+
+.hb-figure {
+  position: absolute;
+  left: 2px;
+  bottom: -2px;
+  width: 86px;
+  /* Taller than the row, so the figure clears the top edge. */
+  height: 84px;
+  pointer-events: none;
 }
-/* Not hidden — a chapter nobody owns still has to be recognisable, because that is what makes
-   it worth buying. Drained to a faded plate, with the state said in words underneath. */
-.hb-plate.locked { cursor: default; }
-.hb-plate.locked .hb-frame { filter: sepia(.5) saturate(.4); opacity: .55; }
-.hb-plate.locked .hb-plate-name { color: var(--ink-soft); font-weight: 600; }
+.hb-figure img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom;
+  display: block;
+  /* multiply so the portrait's white JPEG ground sinks into the paper.
+     No drop-shadow: the source is an opaque rectangle, so the shadow it cast was a rectangle
+     too — a grey box standing behind every unlocked figure. */
+  mix-blend-mode: multiply;
+}
+.hb-pick.locked .hb-figure img { filter: sepia(.5) saturate(.35); opacity: .5; }
+
+.hb-pick-name { font-size: 15px; font-weight: 700; }
+.hb-pick.locked .hb-pick-name { color: var(--ink-soft); font-weight: 600; }
 
 .hb-state {
   flex: 1;
@@ -402,6 +417,7 @@ section:first-child .hb-group { margin-top: 6px; }
 
 @media (min-width: 560px) {
   .hb-sheet { padding: 34px 32px 64px; }
-  .hb-plates { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 20px 16px; }
+  .hb-pick { min-height: 64px; padding-left: 108px; }
+  .hb-figure { width: 100px; height: 98px; }
 }
 </style>
