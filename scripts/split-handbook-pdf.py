@@ -39,6 +39,29 @@ except ImportError:
 
 REPORT = []
 
+def load_config(path):
+    """How the book is cut into products.
+
+    Read from a file rather than from markers in the manuscript: the manuscript is what
+    readers see, so a marker in a heading is a marker in the printed PDF. A config is also
+    diffable, and adding a set is one line.
+
+    Everything it holds is an exception to the default — each top-level chapter is one volume
+    — so an empty config still produces a sane split.
+    """
+    try:
+        raw = json.loads(pathlib.Path(path).read_text(encoding='utf-8'))
+    except FileNotFoundError:
+        return {'explode': [], 'bundle': {}, 'exclude': []}
+    return {
+        'explode': raw.get('explode', []),
+        'bundle': raw.get('bundle', {}),
+        'exclude': raw.get('exclude', []),
+    }
+
+
+CONFIG = {'explode': [], 'bundle': {}, 'exclude': []}
+
 CH3_PREFIX = '三、'
 # Front matter is a chapter as far as the shelf is concerned: it is where a reader starts, and
 # its contents list doubles as a look at what else there is to buy.
@@ -135,7 +158,7 @@ def plan(reader):
     marks, in_ch3, group = [], False, None
     for _, page, title in entries:
         if CHAPTER.match(title) or title in FRONT_MATTER:
-            in_ch3 = title.startswith(CH3_PREFIX)
+            in_ch3 = title in CONFIG['explode']
             # Chapter three owns no pages of its own: its divider page falls to the first
             # character after it, and the chapter appears in the catalogue as the group those
             # characters belong to.
@@ -144,7 +167,7 @@ def plan(reader):
             continue
         if not in_ch3:
             continue
-        if TEMPLATE.match(title):
+        if title in CONFIG['exclude'] or TEMPLATE.match(title):
             marks.append({'kind': 'template', 'page': page, 'title': title})
             continue
         m = CHARACTER.match(title)
@@ -208,8 +231,11 @@ def plan(reader):
             continue
         pages = list(range(m['page'], m['end'] + 1))
         if m['kind'] == 'chapter':
+            bundle = next((b for b, titles in CONFIG['bundle'].items()
+                           if m['title'] in titles), None)
             units.append({'id': chapter_id(m['title']), 'kind': 'chapter',
-                          'title': m['title'], 'group': None, 'pages': pages})
+                          'title': m['title'], 'group': None,
+                          'bundle': bundle, 'pages': pages})
         else:
             units.append({'id': m['id'], 'kind': 'character', 'title': m['title'],
                           'group': m['group'], 'cardCode': m['code'], 'pages': pages})
@@ -328,6 +354,7 @@ def main():
     ap.add_argument('--pdf', default='temp/Plakoro 秘笈手冊.pdf')
     ap.add_argument('--catalogue', default='handbook',
                     help="哪一份目錄：handbook（完整）或 preview（試閱）")
+    ap.add_argument('--config', default='scripts/handbook.config.json')
     ap.add_argument('--out', default=None,
                     help='預設是 handbook-build/catalogues/<catalogue>')
     ap.add_argument('--quality', type=int, default=80,
@@ -337,6 +364,8 @@ def main():
     src = pathlib.Path(args.pdf)
     if not src.is_file():
         sys.exit(f'找不到檔案：{src}')
+    global CONFIG
+    CONFIG = load_config(args.config)
     reader = PdfReader(str(src))
     out = pathlib.Path(args.out or f'handbook-build/catalogues/{args.catalogue}')
     out.mkdir(parents=True, exist_ok=True)
@@ -385,6 +414,14 @@ def main():
         b = sum(y for _, y in saved_total)
         print(f'\n影像重新編碼：{a / 1048576:.0f}MB → {b / 1048576:.0f}MB'
               f'（省 {100 - 100 * b / a:.0f}%）')
+    # Only the bundle lists can be checked this way: explode and exclude titles are gone from
+    # `units` by design, so their absence proves nothing.
+    titles = {u['title'] for u in units}
+    for name in [t for v in CONFIG['bundle'].values() for t in v]:
+        if name not in titles:
+            report.append(('warn', f'設定檔的 bundle 提到「{name}」，但文件裡沒有這個標題'
+                                   ' —— 可能是改過名字'))
+
     print(f"\n涵蓋 {covered}/{len(reader.pages)} 頁"
           f"（差額是「X. 範本」，刻意排除）")
     print(f'書架：cd {out.parent} && python3 -m http.server 4801'

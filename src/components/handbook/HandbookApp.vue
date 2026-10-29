@@ -70,23 +70,53 @@ function tint(u) {
 
 // Chapters read as a contents list; characters read as plates. Grouping keeps them apart
 // without needing a tab bar — the book's own order already separates them.
+// The six main chapters stand on the shelf as one volume, because that is what they are —
+// the handbook itself, beside its character supplements. They stay six separately sellable
+// units underneath; opening the volume lists them with their own locks. Collapsing them into
+// one product later would be a pricing change, not a rebuild.
+// Which units are shelved together as one volume, and which stand alone. Driven by the
+// manifest's `bundle`, which the split config decides — so moving Meta out of the main
+// volume is a line in a config, not a change here.
+const bundled = computed(() => {
+  const m = new Map()
+  for (const u of units.value) {
+    if (!u.bundle) continue
+    if (!m.has(u.bundle)) m.set(u.bundle, [])
+    m.get(u.bundle).push(u)
+  }
+  return m
+})
+const openBundle = ref(null)
+const mainUnits = computed(() => (openBundle.value ? bundled.value.get(openBundle.value) : []) || [])
+
 const shelves = computed(() => {
   const out = []
+  const seenBundles = new Set()
   for (const u of units.value) {
-    const title = u.kind === 'character' ? (u.group || '') : t('handbook.mainVolumes')
-    const last = out[out.length - 1]
-    if (last && last.title === title) last.items.push(u)
-    else out.push({ id: 's' + out.length, title, items: [u] })
-  }
-  // The book's own order puts the closing chapters after the characters; on a shelf they
-  // belong with the rest of the main volumes.
-  const main = out.filter(x => x.title === t('handbook.mainVolumes'))
-  if (main.length > 1) {
-    main[0].items.push(...main.slice(1).flatMap(x => x.items))
-    return [main[0], ...out.filter(x => x.title !== t('handbook.mainVolumes'))]
+    const shelfTitle = u.kind === 'character' ? (u.group || '') : t('handbook.mainVolumes')
+    let shelf = out.find(x => x.title === shelfTitle)
+    if (!shelf) {
+      shelf = { id: 's' + out.length, title: shelfTitle, items: [] }
+      out.push(shelf)
+    }
+    if (u.bundle) {
+      // One entry for the whole bundle, at the position of its first member.
+      if (seenBundles.has(u.bundle)) continue
+      seenBundles.add(u.bundle)
+      shelf.items.push({ bundle: u.bundle, kind: 'bundle' })
+    } else {
+      shelf.items.push(u)
+    }
   }
   return out
 })
+
+function bundleUnits(id) { return bundled.value.get(id) || [] }
+function bundlePages(id) { return bundleUnits(id).reduce((n, u) => n + u.pages, 0) }
+function bundleOwned(id) { return bundleUnits(id).filter(owns).length }
+
+// What the single main volume reports on its cover.
+
 
 const sections = computed(() => {
   const out = []
@@ -208,22 +238,34 @@ onBeforeUnmount(() => {
         <section v-for="sec in shelves" :key="sec.id" class="hb-shelf" :id="sec.id">
           <h2 class="hb-shelf-head">
             <span>{{ sec.title }}</span>
+            <!-- The main shelf holds one volume made of six chapters, so its count is the
+                 chapters, not the books standing there. -->
             <small>{{ t('handbook.volumes', { n: sec.items.length }) }}</small>
           </h2>
 
           <div class="hb-case">
             <div class="hb-books">
+
+              <!-- A bundle stands as one volume; opening it lists what is inside. -->
               <button
                 v-for="u in sec.items"
-                :key="u.id"
+                :key="u.id || u.bundle"
                 class="hb-book"
-                :class="[u.kind, { locked: !owns(u) }]"
+                :class="[u.kind, { locked: u.kind !== 'bundle' && !owns(u) }]"
                 :style="{ '--tint': tint(u) }"
-                :disabled="!owns(u)"
-                @click="enter(u)"
+                :disabled="u.kind !== 'bundle' && !owns(u)"
+                @click="u.kind === 'bundle' ? (openBundle = u.bundle) : enter(u)"
               >
                 <span class="hb-spine" aria-hidden="true"></span>
-                <span v-if="u.kind === 'chapter'" class="hb-face chapterface">
+                <template v-if="u.kind === 'bundle'">
+                  <span class="hb-face chapterface">
+                    <span class="hb-numeral">❧</span>
+                    <span class="hb-booktitle">{{ t('handbook.title') }}</span>
+                  </span>
+                  <span class="hb-extent">{{ bundlePages(u.bundle) }}</span>
+                  <span class="hb-owned">{{ bundleOwned(u.bundle) }} / {{ bundleUnits(u.bundle).length }}</span>
+                </template>
+                <span v-else-if="u.kind === 'chapter'" class="hb-face chapterface">
                   <span class="hb-numeral">{{ numeral(u) }}</span>
                   <span class="hb-booktitle">{{ label(u) }}</span>
                 </span>
@@ -231,9 +273,11 @@ onBeforeUnmount(() => {
                   <img :src="art(u)" :alt="u.title" loading="lazy">
                   <span class="hb-booktitle">{{ u.title }}</span>
                 </span>
-                <span class="hb-extent">{{ u.pages }}</span>
-                <span v-if="!owns(u)" class="hb-locked" aria-hidden="true">🔒</span>
-                <span v-else-if="startedOf(u.id)" class="hb-ribbon" aria-hidden="true"></span>
+                <template v-if="u.kind !== 'bundle'">
+                  <span class="hb-extent">{{ u.pages }}</span>
+                  <span v-if="!owns(u)" class="hb-locked" aria-hidden="true">🔒</span>
+                  <span v-else-if="startedOf(u.id)" class="hb-ribbon" aria-hidden="true"></span>
+                </template>
               </button>
             </div>
             <!-- The board the books stand on, drawn over their feet so they sit *in* the
@@ -241,6 +285,28 @@ onBeforeUnmount(() => {
             <div class="hb-board" aria-hidden="true"></div>
           </div>
         </section>
+      </div>
+
+      <!-- Inside the main volume: its chapters, each with its own lock. Same sheet pattern as
+           the reader's own contents list. -->
+      <div v-if="openBundle" class="hb-jump" @click.self="openBundle = null">
+        <div class="hb-main-sheet">
+          <div class="hb-main-head">{{ t('handbook.title') }}</div>
+          <button
+            v-for="u in mainUnits"
+            :key="u.id"
+            class="hb-main-row"
+            :class="{ locked: !owns(u) }"
+            :disabled="!owns(u)"
+            @click="openBundle = null; enter(u)"
+          >
+            <span class="hb-main-seal">{{ numeral(u) }}</span>
+            <span class="hb-main-title">{{ label(u) }}</span>
+            <span v-if="!owns(u)" class="hb-main-lock">{{ t('handbook.lockedShort') }}</span>
+            <span class="hb-main-pages">{{ t('handbook.pages', { n: u.pages }) }}</span>
+            <span v-if="owns(u)" class="hb-go">❯</span>
+          </button>
+        </div>
       </div>
 
       <HandbookReader v-if="open" :unit="open" :watermark="watermark" @close="open = null" />
@@ -442,6 +508,46 @@ onBeforeUnmount(() => {
 .hb-book.locked .hb-face { filter: saturate(.45) brightness(.94); opacity: .82; }
 .hb-book.locked .hb-booktitle { color: var(--ink-soft); }
 .hb-book.locked .chapterface .hb-booktitle { color: rgba(242,232,214,.6); }
+
+/* "4 / 6" on the main volume's cover: one book, but six things inside it, and the shelf
+   should say so without being opened. */
+.hb-owned {
+  /* Top-left, beside the extent badge: the title runs full width along the foot, so the
+     bottom corners are not free. */
+  position: absolute; left: 11px; top: 4px; z-index: 3;
+  padding: 1px 5px; background: rgba(200,168,106,.9); color: #241B13;
+  font-size: 9px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+
+.hb-main-sheet {
+  align-self: flex-end;
+  width: 100%; max-height: 72%; overflow-y: auto;
+  padding: 16px 18px calc(20px + env(safe-area-inset-bottom));
+  background: #EFE9DC; border-top: 3px solid var(--wood);
+}
+.hb-main-head {
+  font-size: 12px; font-weight: 700; letter-spacing: .26em; color: var(--ink-soft);
+  padding-bottom: 9px; border-bottom: 1px solid rgba(122,86,54,.35);
+}
+.hb-main-row {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 12px 2px; border: 0; border-bottom: 1px solid rgba(122,86,54,.22);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.hb-main-seal {
+  flex: none; width: 26px; height: 26px; display: grid; place-items: center;
+  border: 1px solid var(--wood); font-size: 13px; font-weight: 700;
+}
+.hb-main-title { flex: 1; font-size: 16px; font-weight: 700; }
+.hb-main-pages { flex: none; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.hb-main-lock {
+  flex: none; padding: 1px 7px; border: 1px solid var(--wood);
+  font-size: 9.5px; letter-spacing: .14em; color: var(--ink-soft); font-family: system-ui, sans-serif;
+}
+.hb-main-row.locked { cursor: default; }
+.hb-main-row.locked .hb-main-title, .hb-main-row.locked .hb-main-seal {
+  color: var(--ink-soft); font-weight: 600;
+}
 
 .hb-state {
   flex: 1; display: grid; place-items: center; padding: 40px 20px;
