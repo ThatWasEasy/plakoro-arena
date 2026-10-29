@@ -20,6 +20,7 @@ import { typeBgColor } from '../../data/constants'
 import { currentIdentity } from '../../data/currentPlayer'
 import { fetchManifest, isPrototype } from '../../data/handbookSource'
 import { mostRecent, pageOf, startedOf } from '../../data/handbookProgress'
+import Icon from '../Icon.vue'
 import HandbookReader from './HandbookReader.vue'
 
 const emit = defineEmits(['back'])
@@ -274,7 +275,6 @@ onBeforeUnmount(() => {
                   <span class="hb-face hb-maincover">
                     <span class="hb-maintitle">{{ t('handbook.title') }}</span>
                   </span>
-                  <span class="hb-extent">{{ bundlePages(u.bundle) }}</span>
                   <span class="hb-owned">{{ bundleOwned(u.bundle) }} / {{ bundleUnits(u.bundle).length }}</span>
                 </template>
                 <span v-else-if="u.kind === 'chapter'" class="hb-face hb-maincover">
@@ -289,8 +289,7 @@ onBeforeUnmount(() => {
                   <span class="hb-covercode">{{ u.cardCode }}</span>
                 </span>
                 <template v-if="u.kind !== 'bundle'">
-                  <span class="hb-extent">{{ u.pages }}</span>
-                  <span v-if="!owns(u)" class="hb-locked" aria-hidden="true">🔒</span>
+                  <span v-if="!owns(u)" class="hb-locked" aria-hidden="true"><Icon name="lock" /></span>
                   <span v-else-if="startedOf(u.id)" class="hb-ribbon" aria-hidden="true"></span>
                 </template>
               </button>
@@ -498,21 +497,27 @@ onBeforeUnmount(() => {
 }
 .hb-covername {
   position: absolute;
-  left: 25.6%; width: 55.3%;
-  top: 76.4%; height: 9.8%;
+  /* Centred on the printed box but not confined to it: the name is the one thing here that
+     must be readable at shelf size, and the box is drawn for a page, not a thumbnail. A long
+     name simply sits proud of the rule. */
+  left: 4%; width: 92%;
+  top: 75.5%; height: 11%;
   display: grid; place-items: center;
-  /* As large as the printed box allows — the name is the one thing on this cover that has to
-     be readable at shelf size. */
-  font-size: 11.5px; font-weight: 700; line-height: 1;
+  font-size: 15px; font-weight: 700; line-height: 1;
   color: #231C14;
-  overflow: hidden; white-space: nowrap;
+  white-space: nowrap;
 }
 .hb-covercode {
   position: absolute;
-  /* On the strip of tape at the top right — a code on a label is what that element already
-     looks like. */
-  right: 5%; top: 8.5%;
-  font-size: 5.5px; font-weight: 700; letter-spacing: .04em;
+  /* Up the right edge, reading bottom to top — the way a catalogue number is set on a spine.
+     Printed flat at the top it had to be ~5px to fit the width and was unreadable; turned
+     on its side it has the whole height of the cover to use.
+     vertical-rl + rotate(180deg) rather than a bare rotate(-90deg): it keeps the element in
+     normal flow for positioning, so no transform-origin arithmetic. */
+  right: 1px; bottom: 15%;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 9px; font-weight: 700; letter-spacing: .12em;
   color: #3A2F22;
   font-family: ui-monospace, "SFMono-Regular", monospace;
 }
@@ -562,12 +567,6 @@ onBeforeUnmount(() => {
   width: 20px; height: 20px; display: grid; place-items: center;
   font-size: 10px; background: rgba(42,33,24,.8); color: #F2E8D6;
 }
-/* On a printed cover the top corners are already occupied — the publisher's mark on the left,
-   the code on its strip of tape on the right. The badges move to the foot, where the cover's
-   own footer strip is too small to read anyway. */
-.hb-book.character .hb-extent { top: auto; bottom: 12px; right: 5%; }
-.hb-book.character .hb-locked { top: auto; bottom: 12px; left: 7%; }
-
 .hb-book.locked { cursor: default; }
 /* Dimmed and drained, but not to grey: at .75 every locked cover collapsed into the same
    brown and the shelf stopped being scannable. The tint has to survive. */
@@ -625,9 +624,9 @@ onBeforeUnmount(() => {
 
 @media (min-width: 560px) {
   .hb-book { width: 112px; height: 160px; }
-  .hb-covername { font-size: 14px; }
+  .hb-covername { font-size: 18px; }
   .hb-maintitle { font-size: 15px; }
-  .hb-covercode { font-size: 6.5px; }
+  .hb-covercode { font-size: 11px; }
   .hb-books { gap: 14px; padding: 0 24px 22px; }
   .hb-shelf-head { margin: 0 24px 12px; }
 }
