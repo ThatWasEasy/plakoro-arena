@@ -271,16 +271,14 @@ onBeforeUnmount(() => {
               >
                 <span class="hb-spine" aria-hidden="true"></span>
                 <template v-if="u.kind === 'bundle'">
-                  <span class="hb-face chapterface">
-                    <span class="hb-numeral">❧</span>
-                    <span class="hb-booktitle">{{ t('handbook.title') }}</span>
+                  <span class="hb-face hb-maincover">
+                    <span class="hb-maintitle">{{ t('handbook.title') }}</span>
                   </span>
                   <span class="hb-extent">{{ bundlePages(u.bundle) }}</span>
                   <span class="hb-owned">{{ bundleOwned(u.bundle) }} / {{ bundleUnits(u.bundle).length }}</span>
                 </template>
-                <span v-else-if="u.kind === 'chapter'" class="hb-face chapterface">
-                  <span class="hb-numeral">{{ numeral(u) }}</span>
-                  <span class="hb-booktitle">{{ label(u) }}</span>
+                <span v-else-if="u.kind === 'chapter'" class="hb-face hb-maincover">
+                  <span class="hb-maintitle">{{ label(u) }}</span>
                 </span>
                 <!-- The printed cover, with the three places it leaves for us: the circle
                      for the figure, the ruled box for the name, the corner for the code. -->
@@ -503,7 +501,9 @@ onBeforeUnmount(() => {
   left: 25.6%; width: 55.3%;
   top: 76.4%; height: 9.8%;
   display: grid; place-items: center;
-  font-size: 9px; font-weight: 700; line-height: 1;
+  /* As large as the printed box allows — the name is the one thing on this cover that has to
+     be readable at shelf size. */
+  font-size: 11.5px; font-weight: 700; line-height: 1;
   color: #231C14;
   overflow: hidden; white-space: nowrap;
 }
@@ -521,19 +521,25 @@ onBeforeUnmount(() => {
   font-size: 11.5px; font-weight: 700; line-height: 1.25;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* Main volumes get a bound-in-cloth cover rather than a portrait — they are the book, not a
-   chapter about someone. */
-.chapterface {
-  justify-content: space-between;
-  background: linear-gradient(150deg, #33281C, #1C1510);
-  color: #F2E8D6;
-  padding-top: 12px;
+/* The hardback cover, shared by the main volume and every non-character chapter — its middle
+   is left clear precisely so a title can be set there, which is why a new DLC does not need
+   artwork of its own.
+   Measured off the file: the spine is cropped away (the shelf draws its own, and two would
+   read as a fold), leaving the clear panel at roughly x 22–88%, y 48–72%. */
+.hb-maincover {
+  display: block;
+  padding: 0;
+  background: #1C1510 url("/image/handbook-cover-main.jpg") center / 100% 100% no-repeat;
+  box-shadow: 2px 3px 6px rgba(60,40,22,.4);
 }
-.chapterface .hb-booktitle { font-size: 12px; white-space: normal; }
-.hb-numeral {
-  font-size: 22px; font-weight: 700; color: #C8A86A;
-  border: 1px solid rgba(200,168,106,.55); width: 30px; height: 30px;
+.hb-maintitle {
+  position: absolute;
+  left: 22%; width: 66%;
+  top: 48%; height: 24%;
   display: grid; place-items: center;
+  text-align: center;
+  font-size: 13px; font-weight: 700; line-height: 1.25;
+  color: #F2E8D6;
 }
 
 .hb-extent {
@@ -619,7 +625,8 @@ onBeforeUnmount(() => {
 
 @media (min-width: 560px) {
   .hb-book { width: 112px; height: 160px; }
-  .hb-covername { font-size: 11px; }
+  .hb-covername { font-size: 14px; }
+  .hb-maintitle { font-size: 15px; }
   .hb-covercode { font-size: 6.5px; }
   .hb-books { gap: 14px; padding: 0 24px 22px; }
   .hb-shelf-head { margin: 0 24px 12px; }
