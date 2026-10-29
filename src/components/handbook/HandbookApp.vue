@@ -269,9 +269,12 @@ onBeforeUnmount(() => {
                   <span class="hb-numeral">{{ numeral(u) }}</span>
                   <span class="hb-booktitle">{{ label(u) }}</span>
                 </span>
-                <span v-else class="hb-face">
-                  <img :src="art(u)" :alt="u.title" loading="lazy">
-                  <span class="hb-booktitle">{{ u.title }}</span>
+                <!-- The printed cover, with the three places it leaves for us: the circle
+                     for the figure, the ruled box for the name, the corner for the code. -->
+                <span v-else class="hb-face hb-cover">
+                  <img class="hb-art" :src="art(u)" :alt="u.title" loading="lazy">
+                  <span class="hb-covername">{{ u.title }}</span>
+                  <span class="hb-covercode">{{ u.cardCode }}</span>
                 </span>
                 <template v-if="u.kind !== 'bundle'">
                   <span class="hb-extent">{{ u.pages }}</span>
@@ -456,11 +459,41 @@ onBeforeUnmount(() => {
   background: var(--tint, #DCD3C2);
   box-shadow: 2px 3px 6px rgba(60,40,22,.35), inset 0 0 0 1px rgba(255,255,255,.35);
 }
-.hb-face img {
-  width: 100%; flex: 1; min-height: 0; object-fit: contain; display: block;
-  /* multiply so the portrait's white JPEG ground sinks into the cover's tint. The tints are
-     pale (TYPE_BG_COLORS), which is why this works without washing the figure out. */
+/* --- the printed character cover --- */
+/* Regions measured off the artwork rather than eyeballed, as percentages so they hold at any
+   book size: the circle spans x 21–80% / y 21.5–70%, the name box x 25.6–80.9% / y 76.4–86.2%. */
+.hb-cover {
+  display: block;
+  padding: 0;
+  background: #EFE7D5 url("/image/handbook-cover.jpg") center / 100% 100% no-repeat;
+  box-shadow: 2px 3px 6px rgba(60,40,22,.35);
+}
+.hb-art {
+  position: absolute;
+  /* Inset inside the circle so the figure never crosses its rule. */
+  left: 25%; width: 50%;
+  top: 25%; height: 42%;
+  object-fit: contain;
+  /* multiply so the portrait's white JPEG ground sinks into the printed paper. */
   mix-blend-mode: multiply;
+}
+.hb-covername {
+  position: absolute;
+  left: 25.6%; width: 55.3%;
+  top: 76.4%; height: 9.8%;
+  display: grid; place-items: center;
+  font-size: 9px; font-weight: 700; line-height: 1;
+  color: #231C14;
+  overflow: hidden; white-space: nowrap;
+}
+.hb-covercode {
+  position: absolute;
+  /* On the strip of tape at the top right — a code on a label is what that element already
+     looks like. */
+  right: 5%; top: 8.5%;
+  font-size: 5.5px; font-weight: 700; letter-spacing: .04em;
+  color: #3A2F22;
+  font-family: ui-monospace, "SFMono-Regular", monospace;
 }
 .hb-booktitle {
   flex: none; width: 100%; text-align: center;
@@ -502,10 +535,19 @@ onBeforeUnmount(() => {
   width: 20px; height: 20px; display: grid; place-items: center;
   font-size: 10px; background: rgba(42,33,24,.8); color: #F2E8D6;
 }
+/* On a printed cover the top corners are already occupied — the publisher's mark on the left,
+   the code on its strip of tape on the right. The badges move to the foot, where the cover's
+   own footer strip is too small to read anyway. */
+.hb-book.character .hb-extent { top: auto; bottom: 12px; right: 5%; }
+.hb-book.character .hb-locked { top: auto; bottom: 12px; left: 7%; }
+
 .hb-book.locked { cursor: default; }
 /* Dimmed and drained, but not to grey: at .75 every locked cover collapsed into the same
    brown and the shelf stopped being scannable. The tint has to survive. */
 .hb-book.locked .hb-face { filter: saturate(.45) brightness(.94); opacity: .82; }
+/* The cover is printed paper, so draining it reads as a faded copy rather than a greyed
+   control — which is the right signal for something not yet bought. */
+.hb-book.locked .hb-cover { filter: saturate(.3) brightness(.97); opacity: .72; }
 .hb-book.locked .hb-booktitle { color: var(--ink-soft); }
 .hb-book.locked .chapterface .hb-booktitle { color: rgba(242,232,214,.6); }
 
@@ -556,6 +598,8 @@ onBeforeUnmount(() => {
 
 @media (min-width: 560px) {
   .hb-book { width: 112px; height: 160px; }
+  .hb-covername { font-size: 11px; }
+  .hb-covercode { font-size: 6.5px; }
   .hb-books { gap: 14px; padding: 0 24px 22px; }
   .hb-shelf-head { margin: 0 24px 12px; }
 }
