@@ -264,6 +264,46 @@ def shrink(path, quality):
     return path.stat().st_size
 
 
+# The h5-as-styling noise again: the source's outline carries a bookmark for every star
+# rating, percentage triple and speaker label, so a chapter's 7 pages produce 80 bookmarks of
+# which 4 are section headings.
+TOC_NOISE = (
+    re.compile(r'[★☆]'),
+    re.compile(r'^\s*[\d.]+%'),
+    re.compile(r'^\s*(打擊|傷害)\s*\d'),
+    re.compile(r'^\s*(Andy|Shawn)\s*[：:]'),
+    re.compile(r'^\s*【'),
+    re.compile(r'^\s*此招式'),
+)
+
+
+def unit_toc(entries, unit):
+    """The sections inside one unit, as the book itself lists them.
+
+    Taken from the source's own outline rather than written by hand, so a chapter that gains a
+    section gains it here too. Only the level directly below the unit's own heading is kept —
+    one deeper is where the noise lives, and shallower is the unit itself.
+
+    Pages are relative to the unit, because that is the only numbering its reader knows.
+    """
+    first, last = unit['pages'][0], unit['pages'][-1]
+    inside = [(d, p, t) for d, p, t in entries if first <= p <= last]
+    if not inside:
+        return []
+    want = min(d for d, _, _ in inside) + 1
+    toc, seen = [], set()
+    for d, page, title in inside:
+        if d != want or any(rx.search(title) for rx in TOC_NOISE):
+            continue
+        label = title.rstrip('：: ').strip()
+        key = (label, page)
+        if not label or key in seen:
+            continue
+        seen.add(key)
+        toc.append({'title': label, 'page': page - first + 1})
+    return toc
+
+
 def write_unit(reader, unit, out_dir):
     """One unit, one file, carrying nothing that refers to the rest of the book.
 
@@ -304,6 +344,7 @@ def main():
         old.unlink()
 
     units = plan(reader)
+    entries = outline_entries(reader)
     manifest, report, saved_total = [], list(REPORT), []
     for u in units:
         if not u['pages']:
@@ -319,7 +360,8 @@ def main():
         saved_total.append((raw, path.stat().st_size))
         manifest.append({k: v for k, v in u.items() if k != 'pages'}
                         | {'pages': len(u['pages']), 'file': path.name,
-                           'bytes': path.stat().st_size})
+                           'bytes': path.stat().st_size,
+                           'toc': unit_toc(entries, u)})
 
     (out / 'manifest.json').write_text(
         json.dumps({'source': str(src), 'sourcePages': len(reader.pages), 'units': manifest},

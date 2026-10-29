@@ -840,6 +840,8 @@
     "zoomOut": "Zoom out",
     "zoomIn": "Zoom in",
     "lockedShort": "LOCKED",
-    "continue": "CONTINUE READING"
+    "continue": "CONTINUE READING",
+    "contents": "Contents",
+    "quickIndex": "Quick index"
   }
 }

@@ -69,6 +69,17 @@ const loading = ref(true)
 const error = ref('')
 const scrollerRef = ref(null)
 const currentPage = ref(1)
+const showToc = ref(false)
+
+// Straight from the manifest, which takes it from the book's own outline — so a chapter that
+// gains a section gains it here without anyone retyping a list.
+const toc = computed(() => props.unit.toc || [])
+
+function goTo(page) {
+  showToc.value = false
+  const el = scrollerRef.value?.querySelectorAll('.hr-page')[page - 1]
+  el?.scrollIntoView({ block: 'start' })
+}
 
 let doc = null
 let cancelled = false
@@ -242,6 +253,13 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
       <header class="hr-bar">
         <button class="hr-close" :aria-label="t('common.back')" @click="emit('close')">✕</button>
         <div class="hr-title">{{ unit.title }}</div>
+        <button
+          v-if="toc.length"
+          class="hr-tocbtn"
+          :class="{ on: showToc }"
+          :aria-label="t('handbook.contents')"
+          @click="showToc = !showToc"
+        >☰</button>
         <div class="hr-zoom">
           <button :disabled="!canZoomOut" :aria-label="t('handbook.zoomOut')" @click="stepZoom(-1)">−</button>
           <span class="hr-zoom-val">{{ Math.round(zoom * 100) }}%</span>
@@ -249,6 +267,24 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
         </div>
         <div class="hr-count">{{ pages.length ? `${currentPage} / ${total}` : '' }}</div>
       </header>
+
+      <!-- A sheet rather than a side panel: it is a jump list used for a second and
+           dismissed, and on a phone there is no side to put it on. -->
+      <div v-if="showToc" class="hr-toc" @click.self="showToc = false">
+        <div class="hr-toc-sheet">
+          <div class="hr-toc-head">{{ t('handbook.contents') }}</div>
+          <button
+            v-for="(e, i) in toc"
+            :key="i"
+            class="hr-toc-row"
+            :class="{ on: currentPage >= e.page && (!toc[i + 1] || currentPage < toc[i + 1].page) }"
+            @click="goTo(e.page)"
+          >
+            <span>{{ e.title }}</span>
+            <span class="hr-toc-pg">{{ e.page }}</span>
+          </button>
+        </div>
+      </div>
 
       <div v-if="loading && !pages.length" class="hr-state">{{ t('handbook.loading') }}</div>
       <div v-else-if="error" class="hr-state">{{ error }}</div>
@@ -305,6 +341,65 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
   cursor: pointer;
 }
 .hr-title { flex: 1; font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hr-tocbtn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.hr-tocbtn.on { background: #F0E4CC; color: #2C2117; }
+
+.hr-toc {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(20, 16, 10, 0.55);
+  display: flex;
+  align-items: flex-end;
+}
+.hr-toc-sheet {
+  width: 100%;
+  max-height: 70%;
+  overflow-y: auto;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  background: #EDE0C8;
+  color: #3E2F22;
+  font-family: "Noto Serif TC", "Songti TC", "Hiragino Mincho ProN", serif;
+}
+.hr-toc-head {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  color: #7A6753;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #C3A77F;
+}
+.hr-toc-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 2px;
+  border: 0;
+  border-bottom: 1px solid rgba(195, 167, 127, 0.45);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+/* Which section the reader is actually in — the thing a jump list is usually missing. */
+.hr-toc-row.on { font-weight: 700; }
+.hr-toc-row.on::before { content: "❯"; font-size: 9px; margin-right: 6px; }
+.hr-toc-pg { flex: none; font-size: 12px; color: #7A6753; font-variant-numeric: tabular-nums; }
+
 .hr-zoom { flex: none; display: flex; align-items: center; gap: 2px; }
 .hr-zoom button {
   width: 30px;

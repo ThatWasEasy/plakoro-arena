@@ -839,6 +839,8 @@
     "zoomOut": "縮小",
     "zoomIn": "放大",
     "lockedShort": "未解鎖",
-    "continue": "繼續閱讀"
+    "continue": "繼續閱讀",
+    "contents": "本章目錄",
+    "quickIndex": "快速目錄"
   }
 }

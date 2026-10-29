@@ -86,6 +86,26 @@ const ownedCount = computed(() => units.value.filter(owns).length)
 
 // Where to pick back up. A 190-page book cut into 27 chapters needs a way in that is not
 // "find your place again" — without it the shelf is a pile.
+const showIndex = ref(false)
+
+// Jump targets for the quick index. The shelf is 27 rows tall; without this, reaching
+// 探險盒 01 means scrolling past every starter.
+const jumps = computed(() => {
+  const out = [{ id: '__top', label: t('handbook.title') }]
+  for (const sec of sections.value) {
+    if (sec.title) out.push({ id: 'g' + sec.title, label: sec.title })
+  }
+  return out
+})
+
+function jumpTo(id) {
+  showIndex.value = false
+  const el = id === '__top'
+    ? document.querySelector('.hb-sheet')
+    : document.getElementById(id)
+  el?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+
 const resume = computed(() => mostRecent(units.value.filter(owns)))
 const resumePct = computed(() => {
   const r = resume.value
@@ -130,12 +150,29 @@ onBeforeUnmount(() => {
             {{ t('handbook.ownedCount', { n: ownedCount, total: units.length }) }}
           </div>
         </div>
+        <button
+          v-if="units.length"
+          class="hb-x hb-idx"
+          :class="{ on: showIndex }"
+          :aria-label="t('handbook.quickIndex')"
+          @click="showIndex = !showIndex"
+        >☰</button>
         <button class="hb-x" :aria-label="t('common.back')" @click="emit('back')">✕</button>
       </header>
 
       <div v-if="isPrototype" class="hb-proto">
         <span>{{ t('handbook.prototypeNote') }}</span>
         <label><input v-model="showAll" type="checkbox">{{ t('handbook.unlockAll') }}</label>
+      </div>
+
+      <!-- Toggled, not always on: it is a shortcut for a long page, and a permanent rail
+           would spend space the shelf is already short of on a phone. -->
+      <div v-if="showIndex" class="hb-jump" @click.self="showIndex = false">
+        <div class="hb-jump-sheet">
+          <button v-for="j in jumps" :key="j.id" class="hb-jump-row" @click="jumpTo(j.id)">
+            <span>{{ j.label }}</span><span class="hb-go">❯</span>
+          </button>
+        </div>
       </div>
 
       <div v-if="loading" class="hb-state">{{ t('handbook.loading') }}</div>
@@ -166,7 +203,7 @@ onBeforeUnmount(() => {
           </button>
 
           <section v-for="(sec, i) in sections" :key="i">
-            <h2 v-if="sec.title" class="hb-group"><span>{{ sec.title }}</span></h2>
+            <h2 v-if="sec.title" :id="'g' + sec.title" class="hb-group"><span>{{ sec.title }}</span></h2>
 
             <!-- Chapters as a contents list: numeral, title, leader, extent. The shape a
                  printed manual uses, because it is the shape that makes a list of chapters
@@ -259,6 +296,43 @@ onBeforeUnmount(() => {
   font-size: 13px;
   cursor: pointer;
 }
+
+.hb-idx.on { background: #F0E4CC; color: #2C2117; }
+
+.hb-jump {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(20, 16, 10, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+.hb-jump-sheet {
+  margin: 8px 10px 0 0;
+  min-width: 170px;
+  padding: 6px;
+  background: #EDE0C8;
+  border: 1px solid #A9865A;
+  box-shadow: 3px 4px 0 rgba(95, 70, 40, .3);
+}
+.hb-jump-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 10px 10px;
+  border: 0;
+  border-bottom: 1px solid rgba(195, 167, 127, .5);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.hb-jump-row:last-child { border-bottom: 0; }
 
 .hb-proto {
   flex: none;

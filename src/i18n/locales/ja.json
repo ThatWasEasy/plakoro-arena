@@ -840,6 +840,8 @@
     "zoomOut": "縮小",
     "zoomIn": "拡大",
     "lockedShort": "未解放",
-    "continue": "続きを読む"
+    "continue": "続きを読む",
+    "contents": "目次",
+    "quickIndex": "クイック目次"
   }
 }
