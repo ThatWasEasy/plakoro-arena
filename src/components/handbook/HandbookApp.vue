@@ -59,9 +59,22 @@ function label(u) {
   return u.kind === 'chapter' ? u.title.replace(/^[^、]+、\s*/, '') : u.title
 }
 
+// The cut-out, which is what lets the figure cast a shadow and sit proud of the cover rather
+// than being a white rectangle pasted into a circle. Falls back to the opaque original if a
+// character was added without re-running scripts/cutout-chara.py.
 function art(u) {
   const c = byName.value.get(u.title)
-  return c?.imageUrl || null
+  // Derived from imageUrl, not from `c.name`: the roster is localised, so `name` is the
+  // Chinese one while the files on disk are named in Japanese. Building the path from the
+  // name sent every request to a filename that does not exist, and the fallback quietly
+  // covered it up — 19 of 21 covers were still the opaque original.
+  return c?.imageUrl
+    ? c.imageUrl.replace('/CHARA/', '/CHARA-cut/').replace(/\.jpe?g$/i, '.webp')
+    : null
+}
+function artFallback(e, u) {
+  const c = byName.value.get(u.title)
+  if (c?.imageUrl && e.target.src !== c.imageUrl) e.target.src = c.imageUrl
 }
 function tint(u) {
   const c = byName.value.get(u.title)
@@ -272,7 +285,8 @@ onBeforeUnmount(() => {
                 <!-- The printed cover, with the three places it leaves for us: the circle
                      for the figure, the ruled box for the name, the corner for the code. -->
                 <span v-else class="hb-face hb-cover">
-                  <img class="hb-art" :src="art(u)" :alt="u.title" loading="lazy">
+                  <img class="hb-art" :src="art(u)" :alt="u.title" loading="lazy"
+                       @error="artFallback($event, u)">
                   <span class="hb-covername">{{ u.title }}</span>
                   <span class="hb-covercode">{{ u.cardCode }}</span>
                 </span>
@@ -470,12 +484,19 @@ onBeforeUnmount(() => {
 }
 .hb-art {
   position: absolute;
-  /* Inset inside the circle so the figure never crosses its rule. */
-  left: 25%; width: 50%;
-  top: 25%; height: 42%;
+  /* Larger than the circle and allowed to cross it. The figure is a cut-out pasted onto the
+     cover, and a cut-out that stops politely at a printed rule reads as clip-art; breaking
+     the rule is what makes it look stuck on. */
+  left: 17%; width: 66%;
+  top: 20%; height: 54%;
   object-fit: contain;
-  /* multiply so the portrait's white JPEG ground sinks into the printed paper. */
-  mix-blend-mode: multiply;
+  object-position: bottom;
+  /* Possible at all only because the source is keyed: on the opaque JPEG this cast the
+     rectangle's shadow, not the figure's. Two passes — a tight contact shadow to seat it on
+     the page, a wider soft one for depth. */
+  filter:
+    drop-shadow(0 1px 1px rgba(60, 44, 26, .55))
+    drop-shadow(1px 3px 5px rgba(60, 44, 26, .38));
 }
 .hb-covername {
   position: absolute;
