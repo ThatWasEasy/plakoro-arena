@@ -842,6 +842,8 @@
     "lockedShort": "LOCKED",
     "continue": "CONTINUE READING",
     "contents": "Contents",
-    "quickIndex": "Quick index"
+    "quickIndex": "Quick index",
+    "mainVolumes": "Main volumes",
+    "volumes": "{n} vols"
   }
 }

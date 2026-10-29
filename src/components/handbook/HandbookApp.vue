@@ -70,6 +70,24 @@ function tint(u) {
 
 // Chapters read as a contents list; characters read as plates. Grouping keeps them apart
 // without needing a tab bar — the book's own order already separates them.
+const shelves = computed(() => {
+  const out = []
+  for (const u of units.value) {
+    const title = u.kind === 'character' ? (u.group || '') : t('handbook.mainVolumes')
+    const last = out[out.length - 1]
+    if (last && last.title === title) last.items.push(u)
+    else out.push({ id: 's' + out.length, title, items: [u] })
+  }
+  // The book's own order puts the closing chapters after the characters; on a shelf they
+  // belong with the rest of the main volumes.
+  const main = out.filter(x => x.title === t('handbook.mainVolumes'))
+  if (main.length > 1) {
+    main[0].items.push(...main.slice(1).flatMap(x => x.items))
+    return [main[0], ...out.filter(x => x.title !== t('handbook.mainVolumes'))]
+  }
+  return out
+})
+
 const sections = computed(() => {
   const out = []
   for (const u of units.value) {
@@ -92,8 +110,8 @@ const showIndex = ref(false)
 // 探險盒 01 means scrolling past every starter.
 const jumps = computed(() => {
   const out = [{ id: '__top', label: t('handbook.title') }]
-  for (const sec of sections.value) {
-    if (sec.title) out.push({ id: 'g' + sec.title, label: sec.title })
+  for (const sec of shelves.value) {
+    if (sec.title) out.push({ id: sec.id, label: sec.title })
   }
   return out
 })
@@ -165,8 +183,6 @@ onBeforeUnmount(() => {
         <label><input v-model="showAll" type="checkbox">{{ t('handbook.unlockAll') }}</label>
       </div>
 
-      <!-- Toggled, not always on: it is a shortcut for a long page, and a permanent rail
-           would spend space the shelf is already short of on a phone. -->
       <div v-if="showIndex" class="hb-jump" @click.self="showIndex = false">
         <div class="hb-jump-sheet">
           <button v-for="j in jumps" :key="j.id" class="hb-jump-row" @click="jumpTo(j.id)">
@@ -180,72 +196,51 @@ onBeforeUnmount(() => {
       <div v-else-if="!units.length" class="hb-state">{{ t('handbook.empty') }}</div>
 
       <div v-else class="hb-scroll">
-        <div class="hb-sheet">
+        <button v-if="resume" class="hb-resume" @click="enter(resume.unit)">
+          <span class="hb-resume-lab">{{ t('handbook.continue') }}</span>
+          <span class="hb-resume-name">{{ label(resume.unit) }}</span>
+          <span class="hb-resume-pos">{{ resume.page }} / {{ resume.pages }}</span>
+          <span class="hb-progress"><i :style="{ width: resumePct + '%' }"></i></span>
+        </button>
 
-          <!-- The book itself, before its parts. A shelf that opens straight into a list of
-               chapters never says what the thing is; this is also the one place the product
-               gets to look like a product. -->
-          <div class="hb-hero">
-            <div class="hb-vol">
-              <span class="hb-vol-pub">PLAKORO TAIWAN</span>
-              <span class="hb-vol-name">秘笈<br>手冊</span>
-              <span class="hb-vol-ed">2026 EDITION</span>
+        <!-- One shelf per group. Horizontal, because that is how books are kept and because
+             27 covers stacked vertically is a page nobody reaches the bottom of. -->
+        <section v-for="sec in shelves" :key="sec.id" class="hb-shelf" :id="sec.id">
+          <h2 class="hb-shelf-head">
+            <span>{{ sec.title }}</span>
+            <small>{{ t('handbook.volumes', { n: sec.items.length }) }}</small>
+          </h2>
+
+          <div class="hb-case">
+            <div class="hb-books">
+              <button
+                v-for="u in sec.items"
+                :key="u.id"
+                class="hb-book"
+                :class="[u.kind, { locked: !owns(u) }]"
+                :style="{ '--tint': tint(u) }"
+                :disabled="!owns(u)"
+                @click="enter(u)"
+              >
+                <span class="hb-spine" aria-hidden="true"></span>
+                <span v-if="u.kind === 'chapter'" class="hb-face chapterface">
+                  <span class="hb-numeral">{{ numeral(u) }}</span>
+                  <span class="hb-booktitle">{{ label(u) }}</span>
+                </span>
+                <span v-else class="hb-face">
+                  <img :src="art(u)" :alt="u.title" loading="lazy">
+                  <span class="hb-booktitle">{{ u.title }}</span>
+                </span>
+                <span class="hb-extent">{{ u.pages }}</span>
+                <span v-if="!owns(u)" class="hb-locked" aria-hidden="true">🔒</span>
+                <span v-else-if="startedOf(u.id)" class="hb-ribbon" aria-hidden="true"></span>
+              </button>
             </div>
+            <!-- The board the books stand on, drawn over their feet so they sit *in* the
+                 shelf rather than floating above a stripe. -->
+            <div class="hb-board" aria-hidden="true"></div>
           </div>
-
-          <!-- Only once something has actually been opened. An empty "continue reading" card
-               is a promise the shelf has not earned yet. -->
-          <button v-if="resume" class="hb-resume" @click="enter(resume.unit)">
-            <span class="hb-resume-lab">{{ t('handbook.continue') }}</span>
-            <span class="hb-resume-name">{{ label(resume.unit) }}</span>
-            <span class="hb-resume-pos">{{ resume.page }} / {{ resume.pages }}</span>
-            <span class="hb-progress"><i :style="{ width: resumePct + '%' }"></i></span>
-          </button>
-
-          <section v-for="(sec, i) in sections" :key="i">
-            <h2 v-if="sec.title" :id="'g' + sec.title" class="hb-group"><span>{{ sec.title }}</span></h2>
-
-            <!-- Chapters as a contents list: numeral, title, leader, extent. The shape a
-                 printed manual uses, because it is the shape that makes a list of chapters
-                 readable at a glance. -->
-            <ul v-if="sec.kind === 'list'" class="hb-toc">
-              <li v-for="u in sec.items" :key="u.id">
-                <button class="hb-entry" :class="{ locked: !owns(u) }" :disabled="!owns(u)" @click="enter(u)">
-                  <span class="hb-seal">{{ numeral(u) }}</span>
-                  <span class="hb-entry-title">{{ label(u) }}</span>
-                  <span class="hb-leader" aria-hidden="true"></span>
-                  <span v-if="!owns(u)" class="hb-entry-lock">{{ t('handbook.lockedShort') }}</span>
-                  <span v-else-if="startedOf(u.id)" class="hb-dot" aria-hidden="true">●</span>
-                  <span class="hb-entry-pages">{{ t('handbook.pages', { n: u.pages }) }}</span>
-                  <span v-if="owns(u)" class="hb-go" aria-hidden="true">❯</span>
-                </button>
-              </li>
-            </ul>
-
-            <!-- Characters as rows, same slip as the chapters above, with the figure standing
-                 out past the top edge. The overflow is the whole point: it turns a list into a
-                 line-up, which is how you pick a character. -->
-            <ul v-else class="hb-roster">
-              <li v-for="u in sec.items" :key="u.id">
-                <button
-                  class="hb-pick"
-                  :class="{ locked: !owns(u) }"
-                  :style="{ '--tint': tint(u) }"
-                  :disabled="!owns(u)"
-                  @click="enter(u)"
-                >
-                  <span class="hb-figure"><img :src="art(u)" :alt="u.title" loading="lazy"></span>
-                  <span class="hb-pick-name">{{ u.title }}</span>
-                  <span class="hb-leader" aria-hidden="true"></span>
-                  <span v-if="!owns(u)" class="hb-entry-lock">{{ t('handbook.lockedShort') }}</span>
-                  <span v-else-if="startedOf(u.id)" class="hb-dot" aria-hidden="true">●</span>
-                  <span class="hb-entry-pages">{{ t('handbook.pages', { n: u.pages }) }}</span>
-                  <span v-if="owns(u)" class="hb-go" aria-hidden="true">❯</span>
-                </button>
-              </li>
-            </ul>
-          </section>
-        </div>
+        </section>
       </div>
 
       <HandbookReader v-if="open" :unit="open" :watermark="watermark" @close="open = null" />
@@ -262,374 +257,200 @@ onBeforeUnmount(() => {
   z-index: 9000;
   display: flex;
   flex-direction: column;
-  /* Sepia ink rather than black: on paper, black never appears, and the difference is most of
-     why a page reads as a document instead of a dialog. */
-  --ink: #3E2F22;
-  --ink-soft: #7A6753;
-  --rule: #C3A77F;
-  --paper: #EDE0C8;
-  background: var(--paper);
+  --ink: #2A2118;
+  --ink-soft: #7C6A55;
+  --wood: #7A5636;
+  --wood-dark: #5A3E26;
+  --wood-light: #9A7249;
+  background: #EFE9DC;
   color: var(--ink);
-  font-family: "Noto Serif TC", "Songti TC", "Hiragino Mincho ProN", "Source Han Serif TC", serif;
+  font-family: "Noto Serif TC", "Songti TC", "Hiragino Mincho ProN", serif;
 }
 
 .hb-bar {
   flex: none;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex; align-items: center; gap: 10px;
   padding: max(10px, env(safe-area-inset-top)) 16px 11px;
-  background: #2C2117;
-  color: #F0E4CC;
-  border-bottom: 3px double var(--rule);
+  background: #241B13;
+  color: #F2E8D6;
+  border-bottom: 3px solid var(--wood-dark);
 }
 .hb-bar-wrap { flex: 1; min-width: 0; }
-.hb-bar-title { font-size: 19px; font-weight: 700; letter-spacing: 0.22em; }
-.hb-bar-count { font-size: 10px; letter-spacing: 0.1em; color: rgba(240, 228, 204, 0.6); font-variant-numeric: tabular-nums; }
+.hb-bar-title { font-size: 19px; font-weight: 700; letter-spacing: .22em; }
+.hb-bar-count { font-size: 10px; letter-spacing: .1em; color: rgba(242,232,214,.58); font-variant-numeric: tabular-nums; }
 .hb-x {
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgba(240, 228, 204, 0.35);
-  background: none;
-  color: #F0E4CC;
-  font-size: 13px;
-  cursor: pointer;
+  flex: none; width: 30px; height: 30px; border: 1px solid rgba(242,232,214,.32);
+  background: none; color: #F2E8D6; font-size: 13px; cursor: pointer;
 }
-
-.hb-idx.on { background: #F0E4CC; color: #2C2117; }
-
-.hb-jump {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  background: rgba(20, 16, 10, 0.5);
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-}
-.hb-jump-sheet {
-  margin: 8px 10px 0 0;
-  min-width: 170px;
-  padding: 6px;
-  background: #EDE0C8;
-  border: 1px solid #A9865A;
-  box-shadow: 3px 4px 0 rgba(95, 70, 40, .3);
-}
-.hb-jump-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  width: 100%;
-  padding: 10px 10px;
-  border: 0;
-  border-bottom: 1px solid rgba(195, 167, 127, .5);
-  background: none;
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-}
-.hb-jump-row:last-child { border-bottom: 0; }
+.hb-idx.on { background: #F2E8D6; color: #241B13; }
 
 .hb-proto {
-  flex: none;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-  padding: 6px 16px;
-  background: #DCCBA6;
-  border-bottom: 1px solid var(--rule);
-  font-size: 11px;
-  color: #6B5636;
-  font-family: system-ui, sans-serif;
+  flex: none; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 6px 16px; background: #E0D2B4; border-bottom: 1px solid #C2A87F;
+  font-size: 11px; color: #6B5636; font-family: system-ui, sans-serif;
 }
 .hb-proto label { display: flex; align-items: center; gap: 4px; font-weight: 700; color: var(--ink); }
 
-.hb-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-/* The paper itself. A photograph of a real sheet beats any gradient at this, and at 17KB it
-   costs less than the shadows it replaces. */
-.hb-sheet {
-  min-height: 100%;
-  padding: 26px 20px 56px;
-  background-image: url("/image/paper.jpg");
-  background-size: 420px;
-  background-blend-mode: multiply;
-  background-color: #EDE0C8;
-  box-shadow: inset 0 0 70px rgba(120, 90, 50, 0.25);
+.hb-jump {
+  position: absolute; inset: 0; z-index: 10; background: rgba(20,14,8,.5);
+  display: flex; align-items: flex-start; justify-content: flex-end;
 }
+.hb-jump-sheet {
+  margin: 8px 10px 0 0; min-width: 170px; padding: 6px;
+  background: #EFE9DC; border: 1px solid var(--wood); box-shadow: 3px 4px 0 rgba(60,40,22,.35);
+}
+.hb-jump-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  width: 100%; padding: 10px; border: 0; border-bottom: 1px solid rgba(122,86,54,.3);
+  background: none; color: var(--ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.hb-jump-row:last-child { border-bottom: 0; }
+.hb-go { font-size: 11px; color: var(--ink-soft); }
 
-/* --- the volume itself --- */
-.hb-hero {
-  display: grid;
-  place-items: center;
-  padding: 26px 0 30px;
-}
-.hb-vol {
-  width: 150px;
-  height: 206px;
-  padding: 16px 14px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  background: linear-gradient(150deg, #33281C, #19130D);
-  color: #F0E4CC;
-  /* A spine and a stacked shadow, so it reads as an object with thickness rather than a
-     rectangle with a gradient. */
-  border-left: 7px solid #4A3A27;
-  box-shadow: 7px 8px 0 rgba(95, 70, 40, .22), 12px 14px 22px rgba(60, 42, 20, .3);
-  transform: rotate(-4deg);
-}
-.hb-vol-pub { font-size: 8px; letter-spacing: .24em; color: #C8A86A; }
-.hb-vol-name { font-size: 30px; font-weight: 700; line-height: 1.18; letter-spacing: .06em; }
-.hb-vol-ed { font-size: 8.5px; letter-spacing: .2em; color: rgba(240, 228, 204, .62); }
+.hb-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 0 48px; }
 
-/* --- continue reading --- */
 .hb-resume {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 10px;
-  width: 100%;
-  margin-bottom: 24px;
-  padding: 12px 14px;
-  border: 1px solid rgba(150, 118, 74, .5);
-  background: rgba(255, 252, 243, .62);
-  box-shadow: 2px 2px 0 rgba(120, 90, 50, .18);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  width: calc(100% - 32px); margin: 0 16px 26px; padding: 12px 14px;
+  border: 1px solid rgba(122,86,54,.4); background: #FBF6EA;
+  box-shadow: 2px 2px 0 rgba(90,62,38,.2);
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.hb-resume:active { transform: translate(1px, 1px); box-shadow: none; }
+.hb-resume:active { transform: translate(1px,1px); box-shadow: none; }
 .hb-resume-lab { grid-column: 1 / -1; font-size: 9.5px; letter-spacing: .22em; color: var(--ink-soft); }
 .hb-resume-name { font-size: 16px; font-weight: 700; }
 .hb-resume-pos { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; align-self: end; }
-.hb-progress { grid-column: 1 / -1; height: 3px; margin-top: 7px; background: rgba(150, 118, 74, .25); }
-.hb-progress i { display: block; height: 100%; background: #6B5234; }
+.hb-progress { grid-column: 1 / -1; height: 3px; margin-top: 7px; background: rgba(122,86,54,.22); }
+.hb-progress i { display: block; height: 100%; background: var(--wood); }
 
-/* name is hb-progress, not hb-bar: the header is .hb-bar, and the collision gave the header
-   the progress bar's 3px height — the title all but vanished. */
-/* A chapter already opened, marked where the lock would be. Quiet on purpose — it is a
-   reminder, not a status to act on. */
-.hb-dot { flex: none; font-size: 7px; color: #9A7F55; }
+/* --- a shelf --- */
+.hb-shelf { margin-bottom: 30px; }
+.hb-shelf-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0 16px 10px; font-size: 15px; font-weight: 700; letter-spacing: .1em;
+}
+.hb-shelf-head small { font-size: 11px; color: var(--ink-soft); letter-spacing: .06em; font-variant-numeric: tabular-nums; }
 
-.hb-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 30px 0 14px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  color: var(--ink-soft);
+.hb-case { position: relative; }
+.hb-books {
+  display: flex; align-items: flex-end; gap: 10px;
+  padding: 0 16px 20px;
+  overflow-x: auto; overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  /* Without this the snap pulls the first book flush to the edge and eats the padding —
+     the shelf looked like it started off-screen. */
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
 }
-.hb-group::before, .hb-group::after {
-  content: "";
-  flex: 1;
-  height: 0;
-  border-top: 1px solid var(--rule);
-}
-.hb-group span { flex: none; }
-section:first-child /* --- the volume itself --- */
-.hb-hero {
-  display: grid;
-  place-items: center;
-  padding: 26px 0 30px;
-}
-.hb-vol {
-  width: 150px;
-  height: 206px;
-  padding: 16px 14px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  background: linear-gradient(150deg, #33281C, #19130D);
-  color: #F0E4CC;
-  /* A spine and a stacked shadow, so it reads as an object with thickness rather than a
-     rectangle with a gradient. */
-  border-left: 7px solid #4A3A27;
-  box-shadow: 7px 8px 0 rgba(95, 70, 40, .22), 12px 14px 22px rgba(60, 42, 20, .3);
-  transform: rotate(-4deg);
-}
-.hb-vol-pub { font-size: 8px; letter-spacing: .24em; color: #C8A86A; }
-.hb-vol-name { font-size: 30px; font-weight: 700; line-height: 1.18; letter-spacing: .06em; }
-.hb-vol-ed { font-size: 8.5px; letter-spacing: .2em; color: rgba(240, 228, 204, .62); }
+.hb-books::-webkit-scrollbar { display: none; }
 
-/* --- continue reading --- */
-.hb-resume {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 10px;
-  width: 100%;
-  margin-bottom: 24px;
-  padding: 12px 14px;
-  border: 1px solid rgba(150, 118, 74, .5);
-  background: rgba(255, 252, 243, .62);
-  box-shadow: 2px 2px 0 rgba(120, 90, 50, .18);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.hb-resume:active { transform: translate(1px, 1px); box-shadow: none; }
-.hb-resume-lab { grid-column: 1 / -1; font-size: 9.5px; letter-spacing: .22em; color: var(--ink-soft); }
-.hb-resume-name { font-size: 16px; font-weight: 700; }
-.hb-resume-pos { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; align-self: end; }
-.hb-progress { grid-column: 1 / -1; height: 3px; margin-top: 7px; background: rgba(150, 118, 74, .25); }
-.hb-progress i { display: block; height: 100%; background: #6B5234; }
-
-/* name is hb-progress, not hb-bar: the header is .hb-bar, and the collision gave the header
-   the progress bar's 3px height — the title all but vanished. */
-/* A chapter already opened, marked where the lock would be. Quiet on purpose — it is a
-   reminder, not a status to act on. */
-.hb-dot { flex: none; font-size: 7px; color: #9A7F55; }
-
-.hb-group { margin-top: 6px; }
-
-/* --- chapters, set as a contents list --- */
-.hb-toc { list-style: none; margin: 0; padding: 0; }
-/* An unlocked chapter is a slip of paper sitting on the sheet; a locked one is just a line of
-   the contents list. Before this they looked identical and nothing said the row could be
-   pressed — the leader dots and page number read as print, which is exactly what they are. */
-.hb-entry {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 11px 12px 11px 10px;
-  border: 1px solid transparent;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: transform .1s ease, background-color .1s ease;
-}
-.hb-toc li + li { margin-top: 6px; }
-.hb-entry:not(.locked) {
-  border-color: rgba(150, 118, 74, 0.45);
-  background: rgba(255, 252, 243, 0.55);
-  box-shadow: 1px 1px 0 rgba(120, 90, 50, 0.16);
-}
-.hb-entry:not(.locked):active { transform: translate(1px, 1px); box-shadow: none; }
-.hb-entry.locked { border-bottom-color: rgba(195, 167, 127, 0.45); }
-
-/* A ruled square carrying the chapter's own numeral — it gives the row an object to press and
-   replaces the numbering that used to be repeated inside the title. */
-.hb-seal {
-  flex: none;
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--rule);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink-soft);
-}
-.hb-entry:not(.locked) .hb-seal { color: var(--ink); border-color: rgba(120, 90, 50, 0.6); }
-.hb-go { flex: none; font-size: 11px; color: var(--ink-soft); }
-.hb-entry-title { font-size: 16px; font-weight: 700; }
-/* Leader dots, the way a printed contents page joins a title to its page number. */
-.hb-leader {
-  flex: 1;
-  min-width: 14px;
-  align-self: center;
-  height: 1px;
-  background-image: radial-gradient(circle, var(--rule) 1px, transparent 1px);
-  background-size: 6px 2px;
-  background-repeat: repeat-x;
-}
-.hb-entry-pages { flex: none; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.hb-leader { align-self: flex-end; margin-bottom: 5px; }
-.hb-entry-lock {
-  flex: none;
-  padding: 1px 7px;
-  border: 1px solid var(--rule);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  color: var(--ink-soft);
-  font-family: system-ui, sans-serif;
-}
-.hb-entry.locked { cursor: default; }
-.hb-entry.locked .hb-entry-title { color: var(--ink-soft); font-weight: 600; }
-
-/* --- characters, set as a line-up --- */
-.hb-roster { list-style: none; margin: 0; padding: 0; }
-/* Room for the figure to stand above the slip without touching the row before it. */
-.hb-roster li + li { margin-top: 20px; }
-
-.hb-pick {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 56px;
-  /* Left inset is the figure's lane; the artwork sits in it and rises out of the top. */
-  padding: 10px 12px 10px 92px;
-  border: 1px solid transparent;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  /* Not hidden: the figure breaking the frame is the effect, not a mistake. */
-  overflow: visible;
-  transition: transform .1s ease;
-}
-.hb-pick:not(.locked) {
-  border-color: rgba(150, 118, 74, 0.45);
-  /* The character's type, washed into the paper from the figure's side rather than filling
-     the row — a tinted slip, not a coloured button. */
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--tint) 55%, transparent), rgba(255, 252, 243, 0.6) 62%);
-  box-shadow: 1px 1px 0 rgba(120, 90, 50, 0.16);
-}
-.hb-pick:not(.locked):active { transform: translate(1px, 1px); box-shadow: none; }
-.hb-pick.locked { border-bottom-color: rgba(195, 167, 127, 0.45); }
-
-.hb-figure {
-  position: absolute;
-  left: 2px;
-  bottom: -2px;
-  width: 86px;
-  /* Taller than the row, so the figure clears the top edge. */
-  height: 84px;
+/* The board. Drawn over the books' feet, which is the whole trick — it puts them *in* the
+   shelf instead of on top of a stripe. Sits outside the scroller so it stays put while the
+   books slide past it, the way a real shelf does. */
+.hb-board {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 22px;
   pointer-events: none;
+  background:
+    linear-gradient(180deg, var(--wood-light) 0 3px, var(--wood) 3px 9px, var(--wood-dark) 9px 100%);
+  box-shadow: 0 6px 10px rgba(60,40,22,.3);
 }
-.hb-figure img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: bottom;
-  display: block;
-  /* multiply so the portrait's white JPEG ground sinks into the paper.
-     No drop-shadow: the source is an opaque rectangle, so the shadow it cast was a rectangle
-     too — a grey box standing behind every unlocked figure. */
+/* The grain, and the two end supports a fitted shelf is screwed into. */
+.hb-board::before {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 2px, transparent 2px 9px);
+}
+.hb-board::after {
+  content: ""; position: absolute; left: 6px; right: 6px; top: 4px; height: 1px;
+  background: rgba(255,255,255,.18);
+}
+
+.hb-book {
+  position: relative; flex: none;
+  width: 92px; height: 132px;
+  /* Overlaps the board so the feet are hidden behind it. */
+  margin-bottom: -10px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform .12s ease;
+}
+.hb-book:not(.locked):active { transform: translateY(2px); }
+.hb-book:not(.locked):hover { transform: translateY(-3px); }
+
+/* A sliver of the board edge, so each volume reads as a thing with thickness. */
+.hb-spine {
+  position: absolute; left: 0; top: 0; bottom: 10px; width: 7px;
+  background: linear-gradient(90deg, rgba(0,0,0,.34), rgba(0,0,0,.08));
+  z-index: 2;
+}
+.hb-face {
+  position: absolute; inset: 0 0 10px 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 2px; padding: 7px 7px 8px 11px; overflow: hidden;
+  background: var(--tint, #DCD3C2);
+  box-shadow: 2px 3px 6px rgba(60,40,22,.35), inset 0 0 0 1px rgba(255,255,255,.35);
+}
+.hb-face img {
+  width: 100%; flex: 1; min-height: 0; object-fit: contain; display: block;
+  /* multiply so the portrait's white JPEG ground sinks into the cover's tint. The tints are
+     pale (TYPE_BG_COLORS), which is why this works without washing the figure out. */
   mix-blend-mode: multiply;
 }
-.hb-pick.locked .hb-figure img { filter: sepia(.5) saturate(.35); opacity: .5; }
+.hb-booktitle {
+  flex: none; width: 100%; text-align: center;
+  font-size: 11.5px; font-weight: 700; line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Main volumes get a bound-in-cloth cover rather than a portrait — they are the book, not a
+   chapter about someone. */
+.chapterface {
+  justify-content: space-between;
+  background: linear-gradient(150deg, #33281C, #1C1510);
+  color: #F2E8D6;
+  padding-top: 12px;
+}
+.chapterface .hb-booktitle { font-size: 12px; white-space: normal; }
+.hb-numeral {
+  font-size: 22px; font-weight: 700; color: #C8A86A;
+  border: 1px solid rgba(200,168,106,.55); width: 30px; height: 30px;
+  display: grid; place-items: center;
+}
 
-.hb-pick-name { font-size: 15px; font-weight: 700; }
-.hb-pick.locked .hb-pick-name { color: var(--ink-soft); font-weight: 600; }
+.hb-extent {
+  position: absolute; right: 4px; top: 4px; z-index: 3;
+  padding: 1px 4px; background: rgba(42,33,24,.72); color: #F2E8D6;
+  font-size: 9px; font-variant-numeric: tabular-nums;
+}
+/* A ribbon marker for a volume already started — what a reader leaves in a book. */
+.hb-ribbon {
+  position: absolute; left: 16px; top: -3px; width: 7px; height: 30px; z-index: 3;
+  background: #B4402F;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+}
+/* A clasp on the corner, not a padlock across the cover. Over the middle it read as the
+   character holding a lock, and it hid the one thing that tells the volumes apart. */
+.hb-locked {
+  /* Top-left: the extent badge has the right corner and the title runs full width along
+     the foot, so the only corner left is this one. */
+  position: absolute; left: 11px; top: 4px; z-index: 3;
+  width: 20px; height: 20px; display: grid; place-items: center;
+  font-size: 10px; background: rgba(42,33,24,.8); color: #F2E8D6;
+}
+.hb-book.locked { cursor: default; }
+/* Dimmed and drained, but not to grey: at .75 every locked cover collapsed into the same
+   brown and the shelf stopped being scannable. The tint has to survive. */
+.hb-book.locked .hb-face { filter: saturate(.45) brightness(.94); opacity: .82; }
+.hb-book.locked .hb-booktitle { color: var(--ink-soft); }
+.hb-book.locked .chapterface .hb-booktitle { color: rgba(242,232,214,.6); }
 
 .hb-state {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  padding: 40px 20px;
-  text-align: center;
-  color: var(--ink-soft);
-  font-size: 14px;
+  flex: 1; display: grid; place-items: center; padding: 40px 20px;
+  text-align: center; color: var(--ink-soft); font-size: 14px;
 }
 
 @media (min-width: 560px) {
-  .hb-sheet { padding: 34px 32px 64px; }
-  .hb-pick { min-height: 64px; padding-left: 108px; }
-  .hb-figure { width: 100px; height: 98px; }
+  .hb-book { width: 112px; height: 160px; }
+  .hb-books { gap: 14px; padding: 0 24px 22px; }
+  .hb-shelf-head { margin: 0 24px 12px; }
 }
 </style>
