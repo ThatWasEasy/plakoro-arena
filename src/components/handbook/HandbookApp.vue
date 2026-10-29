@@ -501,9 +501,15 @@ onBeforeUnmount(() => {
      must be readable at shelf size, and the box is drawn for a page, not a thumbnail. A long
      name simply sits proud of the rule. */
   left: 4%; width: 92%;
-  top: 75.5%; height: 11%;
+  top: 79%; height: 11%;
   display: grid; place-items: center;
-  font-size: 15px; font-weight: 700; line-height: 1;
+  /* The app's own display face, already loaded for move names. A Mincho at 15px over a
+     textured cover reads thin and muddy; this is the weight a cover label wants, and it
+     covers all 65 characters these titles use (龜 and 歐 included, which Japanese faces
+     often drop). */
+  font-family: 'CorporateLogoBold', 'Hiragino Sans', 'Noto Sans TC', sans-serif;
+  font-size: 15px; font-weight: 400; line-height: 1;
+  letter-spacing: .02em;
   color: #231C14;
   white-space: nowrap;
 }
@@ -514,7 +520,7 @@ onBeforeUnmount(() => {
      on its side it has the whole height of the cover to use.
      vertical-rl + rotate(180deg) rather than a bare rotate(-90deg): it keeps the element in
      normal flow for positioning, so no transform-origin arithmetic. */
-  right: 1px; bottom: 15%;
+  right: 1px; bottom: 26%;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   font-size: 9px; font-weight: 700; letter-spacing: .12em;
@@ -543,29 +549,24 @@ onBeforeUnmount(() => {
   top: 48%; height: 24%;
   display: grid; place-items: center;
   text-align: center;
-  font-size: 13px; font-weight: 700; line-height: 1.25;
+  font-family: 'CorporateLogoBold', 'Hiragino Sans', 'Noto Sans TC', sans-serif;
+  font-size: 14px; font-weight: 400; line-height: 1.3;
   color: #F2E8D6;
 }
 
-.hb-extent {
-  position: absolute; right: 4px; top: 4px; z-index: 3;
-  padding: 1px 4px; background: rgba(42,33,24,.72); color: #F2E8D6;
-  font-size: 9px; font-variant-numeric: tabular-nums;
-}
 /* A ribbon marker for a volume already started — what a reader leaves in a book. */
 .hb-ribbon {
   position: absolute; left: 16px; top: -3px; width: 7px; height: 30px; z-index: 3;
   background: #B4402F;
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
 }
-/* A clasp on the corner, not a padlock across the cover. Over the middle it read as the
-   character holding a lock, and it hid the one thing that tells the volumes apart. */
+/* A drawn clasp in the top-right corner, not an emoji across the cover: at this size an
+   emoji lock is a different object on every platform, and over the middle it read as the
+   character holding a padlock. */
 .hb-locked {
-  /* Top-left: the extent badge has the right corner and the title runs full width along
-     the foot, so the only corner left is this one. */
-  position: absolute; left: 11px; top: 4px; z-index: 3;
-  width: 20px; height: 20px; display: grid; place-items: center;
-  font-size: 10px; background: rgba(42,33,24,.8); color: #F2E8D6;
+  position: absolute; right: 0; top: 0; z-index: 4;
+  width: 21px; height: 21px; display: grid; place-items: center;
+  font-size: 11px; background: #241B13; color: #F2E8D6;
 }
 .hb-book.locked { cursor: default; }
 /* Dimmed and drained, but not to grey: at .75 every locked cover collapsed into the same
