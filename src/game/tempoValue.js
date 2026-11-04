@@ -53,7 +53,7 @@ export const REFERENCE_COUNT = 5
 
 // What the owner can sustain, under whatever restriction is being priced. The no-repeat
 // rule applies to them as much as to anyone, so this is their best two alternating.
-function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, nullifyDamage = false, bannedId = null, countDefensiveValue = true } = {}) {
+function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, charaDieRerolls = 0, nullifyDamage = false, bannedId = null, countDefensiveValue = true } = {}) {
   if (dieCount <= 0) return 0
   const rolls = enumerateRolls(dice.slice(0, dieCount))
   const scores = []
@@ -63,6 +63,7 @@ function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceI
       rolls,
       enemyDice: dice.slice(0, NORMAL_DICE),
       charaDiceInPlay,
+      charaDieRerolls,
       tempoValues: table,
       countDefensiveValue,
       enemyLastDamage: ASSUMED_ENEMY_LAST_DAMAGE
@@ -137,6 +138,67 @@ function tableFromPass(roster, previous, countDefensiveValue) {
     out[key] = referenceMean(rows, key)
   })
   return out
+}
+
+/**
+ * 同一個問題，但問的是自己：少一顆骰、少兩顆骰、多一顆骰，對「這一副牌組、這一組骰子」
+ * 值多少 HP。
+ *
+ * 跟 buildTempoTable 的差別不在算法，在對象。那張表要回答的是「拿走對手的骰子值多少」，
+ * 而對手是誰不知道，只能對最強的幾隻取平均再用那個平均去代；自己少骰子沒有這個未知數
+ * —— 牌組是哪一副、骰子長什麼樣，畫面上都擺著，直接算就有確切的數字，不必借別人的平均。
+ *
+ * 一樣不遞迴：裡面替每一招估值時用的是傳進來的對手表，不是自己這張 —— 否則「我少兩顆骰」
+ * 的代價要先知道「我少兩顆骰」的代價。一輪就停，跟 buildTempoTable 的迭代同一個理由。
+ *
+ * @param {object} character  一筆角色資料，`moves` 是招式 id 陣列
+ * @param {object} movesById  全部招式，以 id 為鍵
+ * @param {Array}  dice       這個人實際帶的骰子。不足 MAX_DICE 顆時補最後一顆 —— 要加骰
+ *   就得先知道加的是什麼骰，而最接近的猜測是「再來一顆跟現在同款的」。
+ * @param {object} table      對手表，給裡層估值用
+ * @returns {object|null} denyDice1 / denyDice2 / denyCharaDie / gainDice1 / gainDice2 /
+ *   rerollCharaDie1 / rerollCharaDie2
+ */
+export function selfDiceValues(character, movesById, dice, table, options = {}) {
+  const { countDefensiveValue = true } = options
+  const moveList = (character?.moves || []).map(id => movesById[id]).filter(Boolean)
+  if (moveList.length === 0 || !dice || dice.length === 0) return null
+
+  const padded = dice.slice(0, MAX_DICE)
+  while (padded.length < MAX_DICE) padded.push(padded[padded.length - 1])
+
+  const rolls = enumerateRolls(padded.slice(0, NORMAL_DICE))
+  const deck = moveList
+    .map(mv => ({
+      mv,
+      ev: moveExpectedValue(mv, {
+        rolls,
+        enemyDice: padded.slice(0, NORMAL_DICE),
+        tempoValues: table,
+        countDefensiveValue,
+        enemyLastDamage: ASSUMED_ENEMY_LAST_DAMAGE
+      }).ev
+    }))
+    .sort((a, b) => b.ev - a.ev)
+    .slice(0, DECK_SIZE)
+    .map(entry => entry.mv)
+
+  const at = opts => bestCommittable(deck, padded, table, { ...opts, countDefensiveValue })
+  const base = at({})
+  // 下限 0，跟 referenceMean 同一個理由：限制不會反過來付錢給承受的人，負號只會是
+  // 「這副牌組根本用不到那顆骰」的浮點雜訊。
+  const drop = v => Math.max(0, v)
+  return {
+    denyDice1: drop(base - at({ dieCount: NORMAL_DICE - 1 })),
+    denyDice2: drop(base - at({ dieCount: NORMAL_DICE - 2 })),
+    denyCharaDie: drop(base - at({ charaDiceInPlay: false })),
+    gainDice1: drop(at({ dieCount: NORMAL_DICE + 1 }) - base),
+    gainDice2: drop(at({ dieCount: MAX_DICE }) - base),
+    // 重擲是加法，量的是同一副牌組在命中率提高後多賺多少 —— 跟 denyCharaDie 量的
+    // 「骰子沒了得換招」不是同一件事，所以分開測。
+    rerollCharaDie1: drop(at({ charaDieRerolls: 1 }) - base),
+    rerollCharaDie2: drop(at({ charaDieRerolls: 2 }) - base)
+  }
 }
 
 /**

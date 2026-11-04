@@ -59,8 +59,11 @@ function addNote(state, type, kind) {
  * Anything the table doesn't cover is worth nothing, damage effects included: those are
  * already counted as damage and must not be paid for twice.
  */
-export function tempoWorth(type, value, table) {
+export function tempoWorth(type, value, table, selfTable = null) {
   if (!table) return 0
+  // 針對自己的那幾種效果用自己那張表 —— 少一顆骰對「我」值多少是算得出來的確切數字，
+  // 不必拿「對最強五隻的平均」來代。沒給就退回對手表，行為跟以前一樣。
+  const own = selfTable || table
   switch (type) {
     case 'MOD_DICE_ENEMY':
       return value <= -2 ? table.denyDice2 : value <= -1 ? table.denyDice1 : 0
@@ -83,18 +86,22 @@ export function tempoWorth(type, value, table) {
     // result is worth a share of that, and two rerolls more than one.
     case 'REROLL_DICE_ENEMY':
       return value >= 2 ? table.denyDice2 : table.denyDice1
-    // The mirror: a second look at your own character die. Worth a share of having the die at
-    // all, which is what denyCharaDie measures.
-    case 'REROLL_CHARADICE_SELF':
-      return value >= 2 ? table.denyCharaDie : table.denyCharaDie / 2
+    // 自己的角色骰多看一次。這不是「骰子被拿走」的反面 —— 被拿走你得換招，重擲是照樣打
+    // 同一招，只是命中率從 k/6 拉到 1-(1-k/6)^(r+1)。所以它的價錢只能從「自己最強的那幾招
+    // 在命中率提高後多賺多少」實算，selfDiceValues 會量出來。沒量到就退回舊的粗估。
+    case 'REROLL_CHARADICE_SELF': {
+      const measured = value >= 2 ? own.rerollCharaDie2 : own.rerollCharaDie1
+      if (typeof measured === 'number') return measured
+      return value >= 2 ? own.denyCharaDie : own.denyCharaDie / 2
+    }
     case 'MOD_DICE_STEAL':
       return table.denyDice1 + table.gainDice1
     // The only one that can come out negative: a few moves cost the caster their own dice.
     case 'MOD_DICE_SELF':
-      if (value >= 2) return table.gainDice2
-      if (value >= 1) return table.gainDice1
-      if (value <= -2) return -table.denyDice2
-      if (value <= -1) return -table.denyDice1
+      if (value >= 2) return own.gainDice2
+      if (value >= 1) return own.gainDice1
+      if (value <= -2) return -own.denyDice2
+      if (value <= -1) return -own.denyDice1
       return 0
     default:
       return 0
@@ -103,7 +110,7 @@ export function tempoWorth(type, value, table) {
 
 function addTempo(state, type, value, env) {
   addNote(state, type, NOTE_TEMPO)
-  state.tempo += tempoWorth(type, value, env.tempoValues)
+  state.tempo += tempoWorth(type, value, env.tempoValues, env.selfTempoValues)
 }
 
 // Damage reduction is the one non-damage effect that trades in the same currency as the rest
@@ -131,7 +138,11 @@ function addHeal(state, amount, env, type) {
     state.heal += amount
     return
   }
-  state.heal += Math.max(0, Math.min(amount, env.maxHp - env.selfHp))
+  // 同一次施放裡的多段回血共用同一個缺口 —— 上半段先回掉的，角色骰那段就回不到了。
+  // 各自獨立跟滿血算上限的話，生蛋（回 20 ＋ 角色骰一面回滿）在 100 血只缺 20，
+  // 卻會算出 20 + 20 的回血價值，比它最多能回的還多。
+  const headroom = Math.max(0, env.maxHp - env.selfHp - state.heal)
+  state.heal += Math.min(Math.max(0, amount), headroom)
 }
 
 function applyEffect(eff, state, env) {
@@ -347,9 +358,18 @@ function resolveBranch(mv, ce, env) {
 // from; `weight` is how much of the move's outcome the branch accounts for. They differ for
 // a multi-roll effect, which owns the die outright: there is no face on which the move
 // resolves without it, so its branch is unconditional and no miss branch exists.
-function buildBranches(mv, charaDiceInPlay) {
+function buildBranches(mv, charaDiceInPlay, charaDieFace) {
   if (!charaDiceInPlay || mv.chara.length === 0) {
     return [{ ce: null, hits: 0, weight: 1 }]
+  }
+  // 骰面被固定住時這顆骰不再是機率 —— 要嘛那一條判定每次都成立，要嘛每次都不成立。
+  // `hits` 是「六面中命中幾面」，下游一律拿它除以 6 當機率用，所以確定命中就是滿 6，
+  // 確定落空就是 0。多擲幾次的那種效果也一樣：每一次都是同一面。
+  if (charaDieFace) {
+    const hit = mv.chara.find(ce => ce.orientations.includes(charaDieFace))
+    return hit
+      ? [{ ce: hit, hits: CHARA_DIE_FACE_COUNT, weight: 1 }]
+      : [{ ce: null, hits: 0, weight: 1 }]
   }
   if (mv.chara.some(ce => MULTI_ROLL_CHARA.test(ce.type))) {
     return mv.chara.map(ce => ({ ce, hits: ce.orientations.length, weight: 1 }))
@@ -364,6 +384,29 @@ function buildBranches(mv, charaDiceInPlay) {
   const missed = CHARA_DIE_FACE_COUNT - claimed
   if (missed > 0) branches.push({ ce: null, hits: 0, weight: missed / CHARA_DIE_FACE_COUNT })
   return branches
+}
+
+// 有重擲時，每一面的機率不再是 k/6。玩家只有在當下這面不如其他還可能擲到的面時才會重擲，
+// 所以最終結果等於「擲 r+1 次裡最好的那一面」。把分支按價值由高到低排序、取累積機率 C_i，
+// 落在第 i 名（或更好）的機率是 1-(1-C_i)^(r+1)，相減就是這一支自己的權重。
+//
+// 三種情況不適用，維持原權重：骰子被禁（沒有面可選）、骰面被固定（沒有隨機性可利用）、
+// 以及招式自己就要擲好幾次角色骰的那種（那顆骰不歸玩家支配）。
+function rerolledWeights(resolved, rerolls, mv, charaDiceInPlay, charaDieFace) {
+  const natural = resolved.map(entry => entry.branch.weight)
+  if (!(rerolls > 0) || !charaDiceInPlay || charaDieFace || resolved.length < 2) return natural
+  if (mv.chara.some(ce => MULTI_ROLL_CHARA.test(ce.type))) return natural
+
+  const throws = rerolls + 1
+  const order = resolved.map((entry, i) => i).sort((a, b) => resolved[b].net - resolved[a].net)
+  const weights = new Array(resolved.length).fill(0)
+  let cumulative = 0
+  order.forEach(i => {
+    const before = cumulative
+    cumulative += natural[i]
+    weights[i] = Math.pow(1 - before, throws) - Math.pow(1 - cumulative, throws)
+  })
+  return weights
 }
 
 // Mean count of `type` among the rolls that can actually pay `cost` — the conditional the
@@ -409,6 +452,13 @@ export function largestTypePileMean(dice) {
  * @param {Array}  [options.enemyDice]  dice to assume the opponent throws, for the one move
  *                                      that makes them roll; omitted means "don't guess"
  * @param {boolean} [options.charaDiceInPlay]  false when the character die is blocked
+ * @param {string|null} [options.charaDieFace]  an orientation ('立'/'逆'/'上'/'下'/'左'/'右')
+ *   the character die is stuck on, so its effects stop being a probability and become a
+ *   certainty either way. Ignored when the die is blocked outright.
+ * @param {number} [options.charaDieRerolls]  how many extra throws of the character die the
+ *   caster gets. The die is rerolled only when the face it shows is worth less than one it
+ *   could still find, so the outcome is the best of `charaDieRerolls + 1` throws. Ignored
+ *   when the die is blocked, pinned to a face, or owned outright by a multi-roll effect.
  * @param {number|null} [options.selfHp]  remaining HP, or null to leave HP conditions unmet
  * @param {number|null} [options.maxHp]   full HP, so healing can be capped at what is
  *                                        actually missing; null values a heal at its
@@ -418,18 +468,25 @@ export function largestTypePileMean(dice) {
  *                                                  null leaves it uncounted
  * @param {object} [options.prev]  which previous-turn premises hold
  * @param {boolean} [options.countDefensiveValue]  credit damage reduction as HP kept
+ * @param {object} [options.selfTempoValues]  the caster's own dice prices (selfDiceValues).
+ *   Used for the effects aimed at the caster — losing or gaining their own dice, rerolling
+ *   their own character die — where the exact cost to this deck is computable and the
+ *   reference-opponent mean in `tempoValues` is only a stand-in. Falls back to `tempoValues`.
  */
 export function moveExpectedValue(mv, options) {
   const {
     rolls,
     enemyDice = null,
     charaDiceInPlay = true,
+    charaDieFace = null,
+    charaDieRerolls = 0,
     selfHp = null,
     maxHp = null,
     enemyLastDamage = null,
     prev = {},
     countDefensiveValue = false,
-    tempoValues = null
+    tempoValues = null,
+    selfTempoValues = null
   } = options
 
   const odds = payableCount(rolls, mv.cost)
@@ -446,6 +503,7 @@ export function moveExpectedValue(mv, options) {
     enemyLastDamage,
     countDefensiveValue,
     tempoValues,
+    selfTempoValues,
     prev: {
       enemyMoveFailed: false,
       selfMoveFailed: false,
@@ -468,30 +526,44 @@ export function moveExpectedValue(mv, options) {
   }
 
   const notes = new Map()
-  let repeatFaces = 0
+  let repeatWeight = 0
   let damageOnHit = 0
   let selfOnHit = 0
   let defensiveOnHit = 0
   let healOnHit = 0
   let tempoOnHit = 0
 
-  const branches = buildBranches(mv, charaDiceInPlay).map(branch => {
+  // Resolved first, weighted second: a reroll's weights depend on which branch is worth more,
+  // which isn't known until every branch has been resolved.
+  const resolved = buildBranches(mv, charaDiceInPlay, charaDieFace).map(branch => {
     const state = resolveBranch(mv, branch.ce, { ...env, charaHits: branch.hits })
     // Mirrors proceedToAnimateWithCtx: a move can't heal the opponent, so damage floors at 0.
     const damage = Math.max(state.damage, 0)
-    damageOnHit += branch.weight * damage
-    selfOnHit += branch.weight * state.self
-    defensiveOnHit += branch.weight * state.defensive
-    healOnHit += branch.weight * state.heal
-    tempoOnHit += branch.weight * state.tempo
-    if (state.repeats) repeatFaces += branch.hits
+    return {
+      branch,
+      state,
+      damage,
+      net: damage - state.self + state.defensive + state.heal + state.tempo
+    }
+  })
+  const weights = rerolledWeights(resolved, charaDieRerolls, mv, charaDiceInPlay, charaDieFace)
+
+  const branches = resolved.map((entry, i) => {
+    const { branch, state, damage, net } = entry
+    const weight = weights[i]
+    damageOnHit += weight * damage
+    selfOnHit += weight * state.self
+    defensiveOnHit += weight * state.defensive
+    healOnHit += weight * state.heal
+    tempoOnHit += weight * state.tempo
+    if (state.repeats) repeatWeight += weight
     state.notes.forEach((kind, type) => addNote({ notes }, type, kind))
     return {
       orientations: branch.ce ? branch.ce.orientations : null,
-      probability: branch.weight,
+      probability: weight,
       damage,
       self: state.self,
-      net: damage - state.self + state.defensive + state.heal + state.tempo
+      net
     }
   })
 
@@ -510,8 +582,8 @@ export function moveExpectedValue(mv, options) {
 
   // A repeat is a fresh cast of the same move — new energy roll, new character die — so the
   // total is the fixed point of "value of one cast, plus another whole go at probability q".
-  if (repeatFaces > 0) {
-    const q = pSuccess * (repeatFaces / CHARA_DIE_FACE_COUNT)
+  if (repeatWeight > 0) {
+    const q = pSuccess * repeatWeight
     if (q < 1) {
       const casts = 1 / (1 - q)
       evDamage *= casts

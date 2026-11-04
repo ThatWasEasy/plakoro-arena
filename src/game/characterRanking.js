@@ -33,6 +33,7 @@
 import { enumerateRolls } from './energyPayment'
 import { moveExpectedValue } from './moveExpectedValue'
 import { ASSUMED_ENEMY_LAST_DAMAGE, suggestedBuild } from './suggestedDice'
+import { selfDiceValues } from './tempoValue'
 import { SUSTAINABLE_SLOTS, sustainableTop } from './turnValue'
 
 // Two, because that is what the no-repeat rule forces — see turnValue.js. A third slot is
@@ -125,7 +126,14 @@ export function rankCharacters(characters, movesById, options = {}) {
       const build = suggestedBuild(character, movesById)
       if (!build) return null
       const rolls = enumerateRolls(build.dice)
-      const base = { rolls, enemyDice: build.dice, tempoValues, enemyLastDamage, countDefensiveValue }
+      // 針對自己的骰子效果（自己少/多骰、重擲自己的角色骰）用這隻自己的價碼，不是
+      // tempoValues 那張「對最強五隻的平均」—— 排行表問的是這隻有多強，而她少一顆骰
+      // 損失多少是算得出來的。少了這一步，幾乎不吃角色骰的角色會因為「對手很在乎
+      // 角色骰」而被記上一筆不屬於她的價值。
+      const selfTempoValues = tempoValues
+        ? selfDiceValues(character, movesById, build.dice, tempoValues, { countDefensiveValue })
+        : null
+      const base = { rolls, enemyDice: build.dice, tempoValues, selfTempoValues, enemyLastDamage, countDefensiveValue }
       const plainResults = new Map()
       build.moveList.forEach(mv => plainResults.set(mv.id, moveExpectedValue(mv, base)))
       const unconditional = build.moveList.filter(mv => premiseOf(mv) === null)
