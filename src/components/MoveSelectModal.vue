@@ -66,7 +66,7 @@ watch(() => modal.value && modal.value.tempMoves.length, async (len) => {
       padding: '1.5rem 1.25rem',
       marginTop: '0.625rem',
       fontSize: '1.125rem',
-      fontFamily: `'CorporateLogoBold','Hiragino Sans','Noto Sans JP',sans-serif`
+      fontFamily: `'CorporateLogoBold',var(--ui-cjk)`
     }"
     @click="battle.confirmCharacterMoves(playerKey)"
   >{{ t('moveSelect.confirm') }}</button>
