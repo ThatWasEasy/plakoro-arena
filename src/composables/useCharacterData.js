@@ -98,6 +98,9 @@ wazaRaw.forEach(w => {
     id,
     chara_name: cleanKey(w.chara_name),
     name: w.waza_name,
+    // 卡面上印的原文名。localizedMoves 會把 name 換成當地語言，這一欄不換 ——
+    // 查卡、對照日文卡表、跟別人講哪一招的時候，中文譯名對不上印刷品。
+    nameJa: w.waza_name,
     type: w.waza_type,
     cost,
     baseDamage: parseInt(w.waza_damage, 10) || 0,
@@ -124,7 +127,9 @@ const CHARACTERS_BASE = charaRaw.map(c => {
     type: c.type,
     weaknesses: buildWeaknesses(c),
     hp: parseInt(c.HP, 10) || 100,
-    imageUrl: asset(`image/CHARA/${name}.jpg`),
+    // 只存相對路徑，網址留到 localizedCharacters 裡才用 asset() 組 —— 在這裡組的話
+    // 低流量模式的開關會被定死在模組載入的那一刻，之後切換不會生效。
+    imagePath: `image/CHARA/${name}.jpg`,
     moves: charaMoves,
     // Whether this one can be taken into a battle yet. Opt-out, so a card is playable unless
     // localCards.json says otherwise and `npm run fetch-data` can never silently bench one.
@@ -162,10 +167,11 @@ function localizedMoves(locale) {
 
 function localizedCharacters(locale) {
   const overlay = TRANSLATIONS[locale] && TRANSLATIONS[locale].chara
-  if (!overlay) return CHARACTERS_BASE
+  // 沒有譯名也要走一遍：imageUrl 是在這裡才組的（asset() 在這裡讀 lowData，低流量模式
+  // 的開關才跟得上），日文介面沒有 overlay，直接回 CHARACTERS_BASE 會變成每個角色都沒有圖。
   return CHARACTERS_BASE.map(c => {
-    const tr = overlay[c.id]
-    return tr && tr.name ? { ...c, name: tr.name } : c
+    const tr = overlay && overlay[c.id]
+    return { ...c, name: tr && tr.name ? tr.name : c.name, imageUrl: asset(c.imagePath) }
   })
 }
 

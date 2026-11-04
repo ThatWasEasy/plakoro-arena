@@ -50,6 +50,8 @@ function drawBorder(ctx) {
   ctx.strokeRect(4, 4, TEX_SIZE - 8, TEX_SIZE - 8)
 }
 
+// 骰面的圖一律用 raw 取：低流量模式下換成透明像素的話，能量面只剩一塊純色、
+// 角色骰面整片空白 —— 六個面長得一模一樣的骰子不是省流量，是壞掉。
 // `tintFromIcon` only makes sense for the energy-type badge icons (solid colored squares) — the
 // character die's ICON/{上,下,...}.png are black line-art symbols with a black outline, so
 // sampling their color would fill the face black and hide the symbol.
@@ -60,7 +62,7 @@ export async function buildSingleFaceTexture(type, { tintFromIcon = true } = {})
     // Energy face: flat type colour with the white glyph on it.
     fillBackground(ctx, typeChipColor(type))
     drawBorder(ctx)
-    const img = await loadImage(asset(`image/ICON/glyph/${type}.png`))
+    const img = await loadImage(asset(`image/ICON/glyph/${type}.png`, { raw: true }))
     const size = TEX_SIZE * 0.62
     const at = (TEX_SIZE - size) / 2
     ctx.drawImage(img, at, at, size, size)
@@ -69,7 +71,7 @@ export async function buildSingleFaceTexture(type, { tintFromIcon = true } = {})
     // to strip and no glyph-only version of these.
     fillBackground(ctx, '#FFFFFF')
     drawBorder(ctx)
-    const img = await loadImage(asset(`image/ICON/${type}.png`))
+    const img = await loadImage(asset(`image/ICON/${type}.png`, { raw: true }))
     const pad = TEX_SIZE * 0.08
     ctx.drawImage(img, pad, pad, TEX_SIZE - pad * 2, TEX_SIZE - pad * 2)
   }
@@ -80,7 +82,7 @@ export async function buildDualFaceTexture(types) {
   const canvas = makeCanvas()
   const ctx = canvas.getContext('2d')
   const [imgA, imgB] = await Promise.all(
-    types.map(t => loadImage(asset(`image/ICON/glyph/${t}.png`))))
+    types.map(t => loadImage(asset(`image/ICON/glyph/${t}.png`, { raw: true }))))
   const iconSize = TEX_SIZE * 0.42
   const inset = TEX_SIZE * 0.06
 

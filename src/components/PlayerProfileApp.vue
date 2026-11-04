@@ -11,6 +11,7 @@ import { useI18n } from 'vue-i18n'
 import * as authApi from '../data/authApi'
 import { audioSettings, setVolume } from '../data/audioSettings'
 import { sfxSettings, setSfxVolume } from '../data/sfxSettings'
+import { lowData, setLowData } from '../data/lowDataMode'
 import { currentIdentity, setCurrentPlayer, signOut } from '../data/currentPlayer'
 import { isAdminAccount, isAdminMode, setAdminMode } from '../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, isSecretAsset, tierOfAsset } from '../data/nameplateAssets'
@@ -356,6 +357,13 @@ function handleSignOut() {
           @update:model-value="setSfxVolume"
         />
       </div>
+
+      <!-- 低流量模式。public/image 有 21MB，光是招式卡的滿版底圖就 16MB（單張 1.5MB）——
+           在賽場的行動網路下那是開一次就吃掉的量。開啟後圖片一律不下載，版面照舊。 -->
+      <label class="pp-field pp-check">
+        <input type="checkbox" :checked="lowData" @change="setLowData($event.target.checked)">
+        <span>{{ t('profile.lowData') }}</span>
+      </label>
 
       <!-- Only ever rendered for the organiser's own account, so for everyone else admin mode
            isn't something to be refused — it's something they never learn is there. Off on every

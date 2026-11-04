@@ -6,6 +6,15 @@
 <title>PLAKORO ARENA</title>
 <link rel="icon" href="/image/ICON/favicon.png">
 <link rel="apple-touch-icon" href="/image/ICON/favicon.png">
+<!-- 思源黑體。中文原本會落到系統字型（macOS/iOS 是蘋方，而且 Hiragino 在前面時
+     有些字會拿到日文字形），同一句話裡混兩套字形就是「中文字體有點醜」的來源。
+     先走 Google Fonts：它按 unicode-range 切成 108 塊，瀏覽器只下載畫得到的那幾塊，
+     而且**全字庫都在**，文案或角色加了新字不用重做。
+     文案定下來之後要改成自架，跑 scripts/subset-font.py 產出 350KB 的子集，
+     把下面兩行換成那個 @font-face 就好。 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..700&display=swap">
 </head>
 <body>
 <div id="app"></div>

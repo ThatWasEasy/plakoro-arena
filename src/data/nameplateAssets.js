@@ -10,6 +10,8 @@
 //
 // Shared by the screen and the PNG export, so the two cannot disagree about what exists.
 
+import { bundled } from './assetPath'
+
 function registry(modules) {
   return Object.fromEntries(
     Object.entries(modules).map(([path, url]) => [
@@ -67,16 +69,18 @@ export function hasArtwork(kind, id) {
   return true
 }
 
+// 三個都包一層 bundled()：低流量模式下回透明像素。包在函式裡而不是在上面的 registry，
+// 是因為 registry 在模組載入時就跑完了，之後切換開關不會重算。
 export function backgroundUrl(id) {
-  return BACKGROUND_URLS[id] || BACKGROUND_URLS[FALLBACK_BACKGROUND]
+  return bundled(BACKGROUND_URLS[id] || BACKGROUND_URLS[FALLBACK_BACKGROUND])
 }
 
 export function avatarUrl(id) {
-  return AVATAR_URLS[id] || AVATAR_URLS[FALLBACK_AVATAR]
+  return bundled(AVATAR_URLS[id] || AVATAR_URLS[FALLBACK_AVATAR])
 }
 
 export function avatarBorderUrl(id) {
-  return AVATAR_BORDER_URLS[id] || null
+  return bundled(AVATAR_BORDER_URLS[id] || null)
 }
 
 // Seasonal tier ids look like `2026-10-champion`; the three mascots have no tier suffix at all —

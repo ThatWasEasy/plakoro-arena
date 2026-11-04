@@ -1,3 +1,9 @@
+/* 介面的中日文字型。日文版維持 Hiragino —— 日文字形才對；中文版把思源黑體放到最前面，
+   因為 Hiragino 在前的時候「骨、直、海、角」這些中日寫法不同的字會拿到日文字形，
+   一句話裡混兩套寫法就是中文看起來髒的原因。切換靠 <html lang>，i18n 會跟著改。 */
+:root{ --ui-cjk:'Hiragino Sans','Noto Sans JP',-apple-system,BlinkMacSystemFont,sans-serif; }
+:root:lang(zh){ --ui-cjk:'Noto Sans TC','PingFang TC',sans-serif; }
+
 @font-face{
   font-family:'851Gkktt';
   src:url('/851Gkktt_005.ttf') format('truetype');
@@ -49,7 +55,7 @@
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var(--ink);
-  font-family:"Hiragino Sans","Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;
+  font-family:var(--ui-cjk);
   overflow:hidden;}
 
 .img-icon { width:100%; height:100%; object-fit: contain; }
@@ -99,10 +105,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 .pc-name-wrap{display:flex; align-items:center; gap:0.3125rem; min-width:0; flex:1 1 auto; overflow:hidden;}
 .pc-type-icon{width:1.125rem; height:1.125rem; flex-shrink:0; display:flex; align-items:center; justify-content:center;}
 .pc-name{font-size:1.25rem; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
-  font-family:'CorporateLogoBold','Hiragino Sans','Noto Sans JP',sans-serif;
+  font-family:'CorporateLogoBold',var(--ui-cjk);
   -webkit-text-stroke:0.1875rem #fff; paint-order:stroke fill;}
 .pc-hp-num{font-size:1.4375rem; font-weight:800; color:#000; white-space:nowrap; flex-shrink:0;
-  font-family:'851Gkktt','Hiragino Sans','Noto Sans JP',sans-serif;
+  font-family:'851Gkktt',var(--ui-cjk);
   -webkit-text-stroke:0.1875rem #fff; paint-order:stroke fill;}
 .pc-hp-num.low{color:#E3A500; -webkit-text-stroke:0.1875rem #000;}
 .pc-hp-num.crit{color:#E4645E;}
@@ -164,7 +170,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 .win-mon-big img{width:100%; height:auto; object-fit:contain; filter:drop-shadow(0 16px 22px rgba(0,0,0,.35)); border-radius:var(--radius);}
 .win-text-col{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:1.625rem;}
 .win-title{font-size:2.25rem; font-weight:400; line-height:1.15; color:#fff; white-space:nowrap;
-  font-family:'CorporateLogoBold','Hiragino Sans','Noto Sans JP',sans-serif;
+  font-family:'CorporateLogoBold',var(--ui-cjk);
   -webkit-text-stroke:0.3125rem #000; paint-order:stroke fill; text-shadow:0 0.1875rem 0.25rem rgba(0,0,0,.35);}
 .win-title .hl{display:block; font-size:1.9em; color:#FFE94A;
   -webkit-text-stroke:0.4375rem #000; paint-order:stroke fill; text-shadow:0 0.25rem 0.375rem rgba(0,0,0,.4);}
@@ -188,7 +194,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
   100%{opacity:0;}
 }
 .turn-cutin-line1{position:relative; z-index:1;
-  font-family:'851Gkktt','Hiragino Sans','Noto Sans JP',sans-serif; font-size:4.25rem;
+  font-family:'851Gkktt',var(--ui-cjk); font-size:4.25rem;
   font-weight:normal; color:#fff; letter-spacing:.03em; white-space:nowrap;
   text-shadow:
     0 0 0.375rem rgba(var(--tc-glow),.8),
@@ -199,7 +205,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
   animation:cutin-move-from-left 1.92s both;}
 .turn-cutin-line2{position:relative; z-index:1;
   display:flex; align-items:center; justify-content:center; gap:0.5rem;
-  font-family:'851Gkktt','Hiragino Sans','Noto Sans JP',sans-serif; font-size:4.25rem;
+  font-family:'851Gkktt',var(--ui-cjk); font-size:4.25rem;
   color:#fff;
   text-shadow:
   0 0 0.375rem rgba(var(--tc-glow),.8),
@@ -295,7 +301,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 .pick-bottom{background:#262420; padding:0.375rem 0.25rem 0.625rem;}
 .nm-row{display:flex; align-items:baseline; justify-content:center; gap:0.1875rem; min-width:0;}
 .pick-card .nm{font-size:0.7188rem; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  font-family:'CorporateLogoBold','Hiragino Sans','Noto Sans JP',sans-serif; min-width:0; flex-shrink:1;}
+  font-family:'CorporateLogoBold',var(--ui-cjk); min-width:0; flex-shrink:1;}
 .nm-wk{font-size:0.7188rem; color:#C7C4BC; white-space:nowrap; flex-shrink:0; display:inline-flex; align-items:center; gap:0.0625rem;}
 .nm-wk .nm-wk-icon{width:0.875rem; height:0.875rem;}
 
@@ -365,19 +371,27 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 .mc-top-row{display:flex; align-items:center; justify-content:space-between; gap:0.375rem; min-height:0;}
 .mc-typename{display:flex; align-items:center; gap:0.375rem; min-width:0; flex:1;}
 .mc-type-icon{width:1.5rem; height:1.5rem; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.mc-names{display:flex; flex-direction:column; min-width:0; flex:1;}
 .mc-name-big{font-size:1.125rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  font-family:'CorporateLogoBold','Hiragino Sans','Noto Sans JP',sans-serif;
+  font-family:'CorporateLogoBold',var(--ui-cjk);
   color:#fff; padding-left:0.1875rem; margin-left:-0.1875rem;
   text-shadow:
     -0.125rem 0 0 #000, 0.125rem 0 0 #000, 0 -0.125rem 0 #000, 0 0.125rem 0 #000,
     -0.125rem -0.125rem 0 #000, 0.125rem -0.125rem 0 #000, -0.125rem 0.125rem 0 #000, 0.125rem 0.125rem 0 #000,
     0 0 0.1875rem #000;}
+/* 原文名。描邊比中文名細一級，讓它讀起來是附註而不是第二個標題。 */
+.mc-name-ja{font-size:0.6875rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
+  color:#fff; opacity:0.92; margin-top:-0.0625rem;
+  text-shadow:
+    -0.0625rem 0 0 #000, 0.0625rem 0 0 #000, 0 -0.0625rem 0 #000, 0 0.0625rem 0 #000,
+    0 0 0.125rem #000;}
 
 .mc-right-stack{display:flex; flex-direction:column; align-items:flex-end; gap:0.1875rem; flex-shrink:0;}
 .mc-cost{display:flex; gap:0.125rem;}
 .cost-dot{width:1.0625rem; height:1.0625rem; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
 .mc-dmg{font-size:1.375rem; font-weight:900; white-space:nowrap; flex-shrink:0;
-  font-family:'851Gkktt','Hiragino Sans','Noto Sans JP',sans-serif;
+  font-family:'851Gkktt',var(--ui-cjk);
   color:#000;
   text-shadow:
     -0.0625rem 0 0 #fff, 0.0625rem 0 0 #fff, 0 -0.0625rem 0 #fff, 0 0.0625rem 0 #fff,
@@ -399,6 +413,27 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 .mc-chara-row{color:#fff; padding-top:0.1875rem; margin-top:0.0625rem; min-width:0;
   display:flex; align-items:center; gap:0.3125rem; font-size:0.5938rem; font-weight:600; line-height:1.2; flex-shrink:0;}
 .mc-chara-row .oi{width:1.0625rem; height:1.0625rem; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+
+/* 低流量模式的卡面上半部。底圖沒了之後留著那塊飽和色只是一片色塊，不如整片拿掉；
+   但白字黑描邊本來是為了壓在照片上才那樣設計的，在白底上既難讀又髒，所以一起換成
+   墨色無描邊。下半部（.mc-bottom）的深色底是 CSS 畫的，不受影響。 */
+.mc-top.low{background:none;}
+.mc-top.low .mc-name-big, .mc-top.low .mc-name-ja{color:var(--ink); text-shadow:none; opacity:1;}
+.mc-top.low .mc-effect{color:var(--sub); text-shadow:none;}
+.mc-top.low .mc-dmg{text-shadow:none;}
+/* 屬性與能量晶片的替身。底色是 CSS 畫的 —— 顏色本來就是這些晶片最快的辨識方式，
+   一個字的代號只是補上「到底是哪一種」。 */
+.mc-type-text, .cost-text{
+  display:flex; align-items:center; justify-content:center;
+  width:100%; height:100%; border-radius:0.25rem;
+  color:#fff; font-weight:800; line-height:1;
+  text-shadow:0 0 0.0625rem rgba(0,0,0,.45);
+  border:0.0625rem solid rgba(0,0,0,.18);}
+.mc-type-text{font-size:0.75rem;}
+.cost-text{font-size:0.5625rem;}
+/* 方向鍵本身就是「上下左右立逆」，直接印就是最準的標示。 */
+.oi-text{display:flex; align-items:center; justify-content:center; width:100%; height:100%;
+  font-size:0.75rem; font-weight:800; line-height:1; color:inherit;}
 
 .mc-chara-row .txt{flex:1 1 auto; min-width:0; overflow:visible; text-overflow:clip; white-space:normal; word-break:break-word; overflow-wrap:break-word; text-align:left;}
 
@@ -432,7 +467,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 .dr-success-col{flex:3; display:flex; flex-direction:column; border-radius:var(--radius-sm); overflow:hidden;
   min-height:0;}
 .dr-col-header{padding:0.5rem 0.625rem; font-size:0.8438rem; font-weight:900; color:#fff; text-align:center; flex-shrink:0;
-  font-family:'CorporateLogoBold','Hiragino Sans','Noto Sans JP',sans-serif;}
+  font-family:'CorporateLogoBold',var(--ui-cjk);}
 .dr-header-success .hl{color:#2A2A2A;}
 .dr-btn-list{flex:1; display:grid; grid-template-rows:repeat(4,1fr); gap:0.3125rem; padding:0 0.5rem 0.5rem; min-height:0;}
 .dr-chara-btn{width:100%; border:0.125rem solid #fff; border-radius:0.625rem; padding:0.5rem 0.625rem; background:#111;
@@ -477,7 +512,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 .dr-header-fail{color:#5C5A50;}
 .dr-fail-btn{flex:1; margin:0 0.625rem 0.625rem; border:0.125rem solid #fff; border-radius:0.625rem; background:#3E6E86;
   color:#fff; font-size:1.0938rem; font-weight:900; cursor:pointer; box-shadow:0 3px 10px rgba(0,0,0,.2);
-  font-family:'CorporateLogoBold','Hiragino Sans','Noto Sans JP',sans-serif;}
+  font-family:'CorporateLogoBold',var(--ui-cjk);}
 
 .dr-back-box{flex:2; display:flex; flex-direction:column; border-radius:var(--radius-sm); overflow:hidden;
   background:#E9E7E0; min-height:0;}
@@ -485,7 +520,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
   font-size:0.9688rem; font-weight:800; line-height:1.35; cursor:pointer;
   display:flex; align-items:center; justify-content:center; text-align:center;
   box-shadow:0 3px 8px rgba(0,0,0,.12);
-  font-family:'CorporateLogoBold','Hiragino Sans','Noto Sans JP',sans-serif;}
+  font-family:'CorporateLogoBold',var(--ui-cjk);}
 
 .fx-flash{position:absolute; border-radius:50%; pointer-events:none; z-index:60;
   animation:fxpop .7s ease-out forwards; mix-blend-mode:multiply;}
@@ -523,7 +558,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 }
 .dmg-overlay-num{position:absolute; inset:0; z-index:62; display:flex; align-items:center; justify-content:center;
   font-size:1.625rem; font-weight:900; pointer-events:none;
-  font-family:'851Gkktt','Hiragino Sans','Noto Sans JP',sans-serif;
+  font-family:'851Gkktt',var(--ui-cjk);
   text-shadow:
     -0.09375rem 0 0 #fff, 0.09375rem 0 0 #fff, 0 -0.09375rem 0 #fff, 0 0.09375rem 0 #fff,
     -0.09375rem -0.09375rem 0 #fff, 0.09375rem -0.09375rem 0 #fff, -0.09375rem 0.09375rem 0 #fff, 0.09375rem 0.09375rem 0 #fff;
@@ -543,3 +578,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
   background:#1F1F1D; color:#fff; text-align:center; white-space:nowrap;
   font-size:0.6875rem; font-weight:800; letter-spacing:.06em; padding:0.1875rem 0;}
 .pick-card{position:relative;}
+
+/* 低流量模式：首頁那張吉祥物桌布是 Vite 打包進來的（見 ModeSelect.vue 的 .mode-bg::before），
+   走不到 asset()，只能從這裡關掉。連動畫一起停 —— 背景沒了之後它只是在空轉。
+   寫在全域而不是 ModeSelect 的 scoped 區塊：那裡的 :global(html.low-data) .mode-bg::before
+   會被編譯成只剩 html.low-data，整條規則打在錯的元素上。 */
+html.low-data .mode-bg::before { background-image:none; animation:none; }

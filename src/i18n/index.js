@@ -17,16 +17,25 @@ function detectDefaultLocale() {
   return 'ja'
 }
 
+// index.html 寫死 lang="ja"，換語言時沒人改它。字型堆疊（style.css 的 --ui-cjk）靠
+// :lang() 決定中文要不要用思源黑體，所以這個屬性必須跟著語言走，不然中文版會一直吃到
+// 日文字形。順便也讓螢幕閱讀器念對語言。
+function applyLang(locale) {
+  document.documentElement.lang = locale
+}
+
 export const i18n = createI18n({
   legacy: false,
   locale: detectDefaultLocale(),
   fallbackLocale: 'ja',
   messages: { ja, en, 'zh-TW': zhTW }
 })
+applyLang(i18n.global.locale.value)
 
 export function setLocale(locale) {
   if (!SUPPORTED_LOCALES.includes(locale)) return
   i18n.global.locale.value = locale
+  applyLang(locale)
   try {
     localStorage.setItem(LOCALE_STORAGE_KEY, locale)
   } catch (e) {}

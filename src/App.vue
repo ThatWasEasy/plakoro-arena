@@ -32,6 +32,7 @@ import GiftRevealApp from './components/GiftRevealApp.vue'
 import LoginApp from './components/auth/LoginApp.vue'
 import AdminSwitchApp from './components/admin/AdminSwitchApp.vue'
 import AdminRewardsApp from './components/admin/AdminRewardsApp.vue'
+import AdminHandbookApp from './components/admin/AdminHandbookApp.vue'
 import { isSignedIn } from './data/currentPlayer'
 import { tapVersion } from './data/betaMode'
 import ModeSelect from './components/ModeSelect.vue'
@@ -218,6 +219,8 @@ onBeforeUnmount(uninstallButtonSfx)
       <AdminSwitchApp v-else-if="mode === 'adminSwitch'" @back="leaveMode()" />
 
       <AdminRewardsApp v-else-if="mode === 'adminRewards'" @back="leaveMode()" />
+
+      <AdminHandbookApp v-else-if="mode === 'adminHandbook'" @back="leaveMode()" />
 
       <SoloApp v-else />
 

@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import * as CANNON from 'cannon-es'
 import woodTableUrl from '../assets/wooden-table.png'
+import { bundled } from '../data/assetPath'
 import rollSound1Url from '../assets/rolling-dice-01.mp3'
 import rollSound2Url from '../assets/rolling-dice-02.mp3'
 
@@ -121,7 +122,7 @@ export function useDiceRoll3D(canvasEl) {
     fillLight.position.set(0, 8, 10)
     scene.add(fillLight)
 
-    const tableTexture = new THREE.TextureLoader().load(woodTableUrl)
+    const tableTexture = new THREE.TextureLoader().load(bundled(woodTableUrl))
     tableTexture.colorSpace = THREE.SRGBColorSpace
 
     const groundMesh = new THREE.Mesh(

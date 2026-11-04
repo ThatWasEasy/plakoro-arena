@@ -1,5 +1,6 @@
 import { TYPE_BG_COLORS } from './constants'
 import { asset } from './assetPath'
+import { lowData } from './lowDataMode'
 
 export const PRELOAD_IMAGE_PATHS = [
   asset("image/ICON/キャラコロ.png"),
@@ -55,6 +56,9 @@ function loadImageWithTimeout(src, timeoutMs) {
 }
 
 export function preloadEssentialImages() {
+  // 攔在這裡而不是 PRELOAD_IMAGE_PATHS：那個陣列在模組載入時就算好了，之後才開啟
+  // 低流量模式的話它裡面還是真實網址。
+  if (lowData.value) return Promise.resolve([])
   const cache = readImageLoadCache()
   const tasks = PRELOAD_IMAGE_PATHS.map(src => {
     const timeoutMs = cache[src] ? 1500 : 4000
@@ -64,6 +68,7 @@ export function preloadEssentialImages() {
 }
 
 export function preloadCharacterImages(characters) {
+  if (lowData.value) return Promise.resolve([])
   const cache = readImageLoadCache()
   const tasks = characters.filter(c => c.imageUrl).map(c => {
     const timeoutMs = cache[c.imageUrl] ? 1500 : 4000
