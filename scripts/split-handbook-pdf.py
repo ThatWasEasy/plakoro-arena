@@ -57,10 +57,12 @@ def load_config(path):
         'explode': raw.get('explode', []),
         'bundle': raw.get('bundle', {}),
         'exclude': raw.get('exclude', []),
+        'tiers': raw.get('tiers', {}),
+        'season': raw.get('season', {}),
     }
 
 
-CONFIG = {'explode': [], 'bundle': {}, 'exclude': []}
+CONFIG = {'explode': [], 'bundle': {}, 'exclude': [], 'tiers': {}, 'season': {}}
 
 CH3_PREFIX = '三、'
 # Front matter is a chapter as far as the shelf is concerned: it is where a reader starts, and
@@ -251,6 +253,32 @@ CHAPTER_NUMERAL = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
                    '七': 7, '八': 8, '九': 9, '十': 10}
 
 
+def season_of(unit):
+    """past / current / upcoming，不是角色就回 None。
+
+    放在設定檔而不是寫死：當季會變成歷史，那應該是改一行設定，不是重切一次手冊。
+    """
+    if unit['kind'] != 'character':
+        return None
+    sid = CONFIG['season'].get('id', {})
+    if unit['id'] in sid:
+        return sid[unit['id']]
+    return CONFIG['season'].get('group', {}).get(unit.get('group') or '')
+
+
+def tier_of(unit, season):
+    """解開這一冊的最低方案。
+
+    在這裡算完寫進 manifest，前端就只要比對讀者自己的方案，不用知道規則長什麼樣。
+    """
+    tiers = CONFIG.get('tiers', {})
+    for key in tiers.get('order', []):
+        for rule in tiers.get('grants', {}).get(key, []):
+            if rule == unit['id'] or (rule.startswith('season:') and rule[7:] == season):
+                return key
+    return None
+
+
 def chapter_id(title):
     """A stable id for a chapter, so re-wording a heading does not orphan what people bought."""
     if title in FRONT_MATTER:
@@ -387,13 +415,17 @@ def main():
                                        '安裝：python3 -m pip install --user pymupdf'))
                 args.quality = 0
         saved_total.append((raw, path.stat().st_size))
+        season = season_of(u)
         manifest.append({k: v for k, v in u.items() if k != 'pages'}
+                        | {'season': season, 'tier': tier_of(u, season)}
+
                         | {'pages': len(u['pages']), 'file': path.name,
                            'bytes': path.stat().st_size,
                            'toc': unit_toc(entries, u)})
 
     (out / 'manifest.json').write_text(
-        json.dumps({'source': str(src), 'sourcePages': len(reader.pages), 'units': manifest},
+        json.dumps({'source': str(src), 'sourcePages': len(reader.pages),
+                    'tiers': CONFIG.get('tiers', {}), 'units': manifest},
                    ensure_ascii=False, indent=2), encoding='utf-8')
 
     shelf = pathlib.Path(__file__).with_name('handbook-shelf.html')
@@ -416,6 +448,11 @@ def main():
               f'（省 {100 - 100 * b / a:.0f}%）')
     # Only the bundle lists can be checked this way: explode and exclude titles are gone from
     # `units` by design, so their absence proves nothing.
+    for m in manifest:
+        if not m.get('tier'):
+            report.append(('warn', f"「{m['title']}」沒有對應到任何方案 —— "
+                                   '沒有人買得到它，檢查 season 或 tiers.grants'))
+
     titles = {u['title'] for u in units}
     for name in [t for v in CONFIG['bundle'].values() for t in v]:
         if name not in titles:

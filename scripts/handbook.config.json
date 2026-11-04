@@ -6,18 +6,96 @@
     "預設規則（不用設定）：每個頂層章節各自成冊，標題階層由 Google Docs 的樣式決定。",
     "下面三項是預設規則表達不了的例外。"
   ],
-
   "_explode_comment": "這些章節不是一冊，而是一層書架 —— 底下每個子標題各自成冊。",
-  "explode": ["三、全角色攻略"],
-
+  "explode": [
+    "三、全角色攻略"
+  ],
   "_bundle_comment": [
     "合併成一本陳列。底層仍是各自可販售的單位，只是書架上站成一本，點開才列出內容。",
     "鍵是 bundle 的 id，值是要收進去的章節標題。沒列到的章節就自己站一本。"
   ],
   "bundle": {
-    "main": ["序", "一、PLAKORO 基礎規則", "二、PLAKORO 從零開始", "五、場外", "六、實用工具"]
+    "main": [
+      "序",
+      "一、PLAKORO 基礎規則",
+      "二、PLAKORO 從零開始",
+      "五、場外",
+      "六、實用工具"
+    ]
   },
-
   "_exclude_comment": "完全不出貨的段落。",
-  "exclude": ["X. 範本"]
+  "exclude": [
+    "X. 範本"
+  ],
+  "_season_comment": [
+    "角色屬於哪個賽季狀態。這是會隨時間變的 —— 當季結束就變歷史 —— 所以放在資料裡，",
+    "改一行就好，不用動程式。",
+    "group 用套組名稱設預設，id 可以覆寫單一角色。",
+    "目前「探險盒 01」底下同時放著 EBC01 與 EBC02 的角色（原稿還沒加「探險盒 02」標題），",
+    "所以 EBC02 六隻先用 id 覆寫成 current。"
+  ],
+  "season": {
+    "group": {
+      "啟程套組": "past",
+      "探險盒 01": "past"
+    },
+    "id": {
+      "chara.EBC02-001": "current",
+      "chara.EBC02-002": "current",
+      "chara.EBC02-003": "current",
+      "chara.EBC02-004": "current",
+      "chara.EBC02-005": "current",
+      "chara.EBC02-006": "current"
+    }
+  },
+  "_tier_comment": [
+    "Patreon 訂閱方案。高階自動包含低階（order 由低到高）。",
+    "grants 列出「這個方案額外解鎖什麼」：unit id、chapter:<id>、season:<past|current|upcoming>。"
+  ],
+  "tiers": {
+    "order": [
+      "basic",
+      "pro",
+      "master",
+      "masterPlus"
+    ],
+    "meta": {
+      "basic": {
+        "name": "Basic｜PLAKORO 入門玩家",
+        "usd": 3
+      },
+      "pro": {
+        "name": "Pro｜PLAKORO 賽場玩家",
+        "usd": 5
+      },
+      "master": {
+        "name": "Master｜PLAKORO 上位選手",
+        "usd": 8
+      },
+      "masterPlus": {
+        "name": "Master+｜PLAKORO 前瞻研究者",
+        "usd": 10
+      }
+    },
+    "grants": {
+      "basic": [
+        "front",
+        "ch1",
+        "ch2",
+        "ch5",
+        "ch6"
+      ],
+      "pro": [
+        "ch4",
+        "season:past"
+      ],
+      "master": [
+        "season:current"
+      ],
+      "masterPlus": [
+        "season:upcoming"
+      ]
+    },
+    "join": "https://www.patreon.com/17027037/join"
+  }
 }

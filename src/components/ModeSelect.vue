@@ -1,4 +1,7 @@
 <script setup>
+import leaderboardIcon from '../assets/images/leaderboard.png'
+import logoIcon from '../assets/logo.png'
+import { bundled } from '../data/assetPath'
 import { useI18n } from 'vue-i18n'
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -40,7 +43,12 @@ const MODES = [
   { key: 'tierList' },
   // Paid content, so the card is always shown and the chapters behind it are not: what a
   // player owns is checked when a chapter is opened, never by hiding the shelf.
-  { key: 'handbook' },
+  //
+  // `comingSoon` while the subscription billing is still being wired up: the shelf itself is
+  // ready enough to test on production, but the server answers 404 to everyone except the
+  // organiser (HANDBOOK_ADMIN_ONLY), so letting players in would only show them an empty
+  // shelf. The card stays visible because 即將上線 is the announcement — see 'online' above.
+  { key: 'handbook', comingSoon: true },
   { key: 'typeChart' },
   // A link out, not a mode. `url` is what tells the menu to render an anchor instead of a
   // button — the card looks the same either way, but one changes screen and one leaves.
@@ -57,7 +65,8 @@ const MODES = [
   // point) — hidden rather than just inert, so its existence isn't a hint to someone poking
   // around the menu who hasn't passed the PIN check.
   { key: 'adminSwitch', group: 'tools', adminOnly: true },
-  { key: 'adminRewards', group: 'tools', adminOnly: true }
+  { key: 'adminRewards', group: 'tools', adminOnly: true },
+  { key: 'adminHandbook', group: 'tools', adminOnly: true }
 ]
 
 const GROUPS = [{ key: 'tools' }]
@@ -204,7 +213,7 @@ const rows = computed(() => {
            same corner, and a second one on the same line would read as a pair of equals. -->
       <div class="mode-marks">
         <button class="mode-mark" :aria-label="t('leaderboard.title')" @click="emit('pick', 'leaderboard')">
-          <img src="../assets/images/leaderboard.png" alt="" aria-hidden="true">
+          <img :src="bundled(leaderboardIcon)" alt="" aria-hidden="true">
           <span class="mode-mark-bubble mode-mark-bubble-lb">{{ t('leaderboard.title') }}</span>
         </button>
         <a
@@ -214,7 +223,7 @@ const rows = computed(() => {
           rel="noopener noreferrer"
           :aria-label="t('mode.line')"
         >
-          <img src="../assets/logo.png" alt="" aria-hidden="true">
+          <img :src="bundled(logoIcon)" alt="" aria-hidden="true">
           <span class="mode-mark-bubble">{{ t('mode.lineJoin') }}</span>
         </a>
       </div>

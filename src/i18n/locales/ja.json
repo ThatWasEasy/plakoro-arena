@@ -9,7 +9,8 @@
     "and": "と",
     "cancel": "キャンセル",
     "methodology": "計算方法と前提",
-    "close": "閉じる"
+    "close": "閉じる",
+    "save": "保存"
   },
   "app": {
     "loading": "NOW LOADING...",
@@ -155,6 +156,7 @@
     "traitChart": "キャラ特性図",
     "adminSwitch": "アカウント管理",
     "adminRewards": "大会報酬の管理",
+    "adminHandbook": "ハンドブック権限",
     "group": {
       "tools": "その他のツール"
     },
@@ -214,7 +216,36 @@
     "inheritNotFound": "番号 {code} は見つかりません",
     "inheritFromLabel": "{name}（{code}）の記録を引き継ぐ →",
     "inheritTo": "受け取る番号",
-    "inheritConfirm": "⚠ {from}（{fromCode}）の参加記録・対戦・アイテム・PTP はすべて {to}（{toCode}）へ移ります。{fromCode} は残りますが空になります。"
+    "inheritConfirm": "⚠ {from}（{fromCode}）の参加記録・対戦・アイテム・PTP はすべて {to}（{toCode}）へ移ります。{fromCode} は残りますが空になります。",
+    "handbookTitle": "ハンドブック権限",
+    "handbookTiers": "サブスクプラン",
+    "handbookTiersHint": "上から下へ低→高。上位プランは下位をすべて含みます。価格は表示用で、決済は Patreon 側です。",
+    "handbookTierName": "プラン名",
+    "handbookJoinUrl": "Patreon 登録リンク（空なら最下位プランのものを使用）",
+    "handbookAddTier": "プランを追加",
+    "handbookCoverage": "各プランが読める冊数",
+    "handbookOrphans": "{n} 冊がどのプランにも対応していません（{names}…）。誰も読めません。",
+    "handbookAccess": "各冊の最低プラン",
+    "handbookAccessHint": "指定しなければ分割時に決まった既定値を使います。新キャラは何も触らなくても公開されます。",
+    "handbookBulk": "グループ全体を…",
+    "handbookInherit": "既定値を使う",
+    "handbookInheritAs": "既定値を使う（{tier}）",
+    "handbookSaved": "保存しました",
+    "handbookSaving": "保存中…",
+    "subTitle": "ハンドブック購読",
+    "subNone": "未開通",
+    "subTier": "プラン",
+    "subExpires": "有効期限",
+    "subNoExpiry": "空欄＝無期限",
+    "subExpired": "{date} に期限切れ",
+    "subActiveUntil": "{date} まで有効",
+    "subForever": "無期限",
+    "subNote": "メモ（交換・スタッフ・補償…）",
+    "subSave": "開通／更新",
+    "subClear": "購読を解除",
+    "subSaving": "処理中…",
+    "handbookFreeBadge": "未登録",
+    "handbookFreeHint": "この段にした冊は誰でも無料で読めます（未ログインでも）。この段は削除できません —— 消すと無料の冊が誰にも見えなくなります。"
   },
   "priceLog": {
     "title": {
@@ -314,14 +345,14 @@
     "moveOddsButton": "ワザ成功率",
     "moveOdds": {
       "title": "ワザ成功率",
-      "hint": "ポケモンを選ぶと、今のダイス構成での各ワザの成功率と期待値が出ます",
       "changeCharacter": "変更",
       "diceInPlay": "振るダイス",
       "moveHeader": "ワザ（ダイス{n}個）",
       "successRate": "成功率",
       "charaDieOdds": "キャラコロ",
       "expectedValue": "期待値",
-      "settings": "計算の前提",
+      "settings": "期待値の計算パラメータ",
+      "displayOptions": "表示",
       "exportImage": "画像を書き出す",
       "exportingImage": "書き出し中…",
       "sortByNumber": "カード番号順に並べる",
@@ -332,7 +363,22 @@
       "prevSelfFailed": "前の自分の番、自分のエネコロが失敗した",
       "prevPrereqSucceeded": "前の自分の番、指定のワザが成功した",
       "prevSelfUnhurt": "前の相手の番にダメージを受けていない",
+      "charaDieBlocked": "キャラダイス無効",
+      "charaDieFaceDown": "キャラダイスは下固定",
       "evHint": "期待値＝（相手に与えるダメージ − 自分が受けるダメージ）の平均に成功率を掛けた値。回復はプラスとして数えます。弱点は計算に入れません。下段の内訳は足すと期待値になります（与ダメ計は小計です）",
+      "tempoPricesTitle": "テンポ価値の換算（HP）",
+      "tempoColEnemy": "相手",
+      "tempoColSelf": "自分",
+      "tempoColSelfSet": "自分（セット{n}）",
+      "tempoPricesHint": "「相手」列は現環境で最強 5 体の平均。",
+      "tempoDenyDice1": "エネルギーダイス −1",
+      "tempoDenyDice2": "エネルギーダイス −2",
+      "tempoDenyCharaDie": "キャラダイス無効",
+      "tempoDenyDice2AndChara": "ダイス −2 ＋キャラダイス無効",
+      "tempoNullifyDamage": "ダメージ無効",
+      "tempoBindMove": "技を 1 つ封じる",
+      "tempoGainDice1": "エネルギーダイス +1",
+      "tempoGainDice2": "エネルギーダイス +2",
       "noteNeedsHp": "残りHPを入れると計算されます",
       "noteNeedsPrev": "上の前提条件に基づく数値",
       "noteMirrorDice": "相手のダイスもこの構成と同じと仮定",
@@ -348,7 +394,12 @@
       "tempoCalculating": "（計算中…）",
       "evPartTempo": "テンポ",
       "enemyLastDamageLabel": "相手の前のワザのダメージ",
-      "showBreakdownDetail": "内訳を表示"
+      "showBreakdownDetail": "内訳を表示",
+      "showDiceRamp": "ダイスごとの確率",
+      "pureDamage": "期待値はダメージのみ",
+      "rampOnly": "ダイス {n} のみ",
+      "rampUpTo": "ダイス 1–{n}",
+      "rampAll": "全ダイス"
     },
     "showCumulativeProb": "累計確率で表示",
     "showExactProb": "ちょうどの確率で表示",
@@ -759,7 +810,8 @@
     "playerCode": "プレイヤー番号",
     "rename": "名前を変更",
     "renameDo": "変更する",
-    "renameConfirm": "「{name}」として表示されます"
+    "renameConfirm": "「{name}」として表示されます",
+    "lowData": "低通信モード"
   },
   "notice": {
     "current": "PLAKORO 攻略ハンドブックが近日公開 — 詳細は Plakoro Taiwan の Line までお問い合わせください"
@@ -844,6 +896,28 @@
     "contents": "目次",
     "quickIndex": "クイック目次",
     "mainVolumes": "本編",
-    "volumes": "{n} 冊"
+    "volumes": "{n} 冊",
+    "included": "収録内容",
+    "sample": "試し読み",
+    "samplePending": "試し読みは準備中です。",
+    "startReading": "読む",
+    "needPlan": "必要プラン",
+    "perMonth": "${n} / 月",
+    "join": "Patreon で登録",
+    "planUnknown": "未公開",
+    "yourPlan": "現在のプラン：{plan}",
+    "noPlan": "未登録"
+  },
+  "typeShort": {
+    "無色": "無",
+    "ちょう": "超",
+    "かくとう": "闘",
+    "ほのお": "炎",
+    "みず": "水",
+    "くさ": "草",
+    "はがね": "鋼",
+    "あく": "悪",
+    "ひこう": "飛",
+    "かみなり": "雷"
   }
 }

@@ -9,7 +9,8 @@
     "and": "and",
     "cancel": "Cancel",
     "methodology": "Methodology & assumptions",
-    "close": "Close"
+    "close": "Close",
+    "save": "Save"
   },
   "app": {
     "loading": "NOW LOADING...",
@@ -155,6 +156,7 @@
     "traitChart": "Trait chart",
     "adminSwitch": "Account Admin",
     "adminRewards": "Manage Tournament Rewards",
+    "adminHandbook": "Handbook Access",
     "group": {
       "tools": "More tools"
     },
@@ -214,7 +216,36 @@
     "inheritNotFound": "No player with code {code}",
     "inheritFromLabel": "{name} ({code}) hands everything over to →",
     "inheritTo": "Receiving code",
-    "inheritConfirm": "⚠ {from} ({fromCode}) — entries, matches, items and PTP all move to {to} ({toCode}). {fromCode} stays, but empty."
+    "inheritConfirm": "⚠ {from} ({fromCode}) — entries, matches, items and PTP all move to {to} ({toCode}). {fromCode} stays, but empty.",
+    "handbookTitle": "Handbook Access",
+    "handbookTiers": "Subscription tiers",
+    "handbookTiersHint": "Top to bottom is low to high; a higher tier includes every lower one. Prices are display only — billing lives on Patreon.",
+    "handbookTierName": "Tier name",
+    "handbookJoinUrl": "Patreon join link (blank falls back to the lowest tier’s)",
+    "handbookAddTier": "Add tier",
+    "handbookCoverage": "Volumes each tier can read",
+    "handbookOrphans": "{n} volume(s) match no tier ({names}…) — nobody can read them.",
+    "handbookAccess": "Minimum tier per volume",
+    "handbookAccessHint": "Anything not set here uses the default worked out when the book was split, so a new character needs no clicks to go live.",
+    "handbookBulk": "Set whole group…",
+    "handbookInherit": "Use default",
+    "handbookInheritAs": "Use default ({tier})",
+    "handbookSaved": "Saved",
+    "handbookSaving": "Saving…",
+    "subTitle": "Handbook subscription",
+    "subNone": "No subscription",
+    "subTier": "Tier",
+    "subExpires": "Expires",
+    "subNoExpiry": "Blank = never expires",
+    "subExpired": "Expired on {date}",
+    "subActiveUntil": "Active until {date}",
+    "subForever": "Never expires",
+    "subNote": "Note (trade, staff, make-good…)",
+    "subSave": "Grant / update",
+    "subClear": "Cancel subscription",
+    "subSaving": "Working…",
+    "handbookFreeBadge": "No subscription",
+    "handbookFreeHint": "Setting a volume to this makes it free for everyone, signed in or not. This row cannot be removed — removing it would hide the free volumes, not open them."
   },
   "priceLog": {
     "title": {
@@ -314,14 +345,14 @@
     "moveOddsButton": "Move Odds",
     "moveOdds": {
       "title": "Move Odds",
-      "hint": "Pick a Pokémon to see each move's success rate and expected value under the current dice build.",
       "changeCharacter": "Change",
       "diceInPlay": "Dice in play",
       "moveHeader": "Move ({n} dice)",
       "successRate": "Success",
       "charaDieOdds": "Char. die",
       "expectedValue": "Expected value",
-      "settings": "Assumptions",
+      "settings": "Expected-value parameters",
+      "displayOptions": "Display",
       "exportImage": "Export image",
       "exportingImage": "Exporting…",
       "sortByNumber": "Sort by card number",
@@ -332,7 +363,22 @@
       "prevSelfFailed": "Your energy dice failed last turn",
       "prevPrereqSucceeded": "The prerequisite move landed last turn",
       "prevSelfUnhurt": "Took no damage last turn",
+      "charaDieBlocked": "Character die blocked",
+      "charaDieFaceDown": "Character die locked face-down",
       "evHint": "Expected value = average of (damage dealt − damage taken by yourself), multiplied by the success rate. Healing counts as a gain. Weakness is left out. The parts underneath add up to the figure (Dmg is a subtotal, not another part).",
+      "tempoPricesTitle": "Tempo prices (HP)",
+      "tempoColEnemy": "Opponent",
+      "tempoColSelf": "Self",
+      "tempoColSelfSet": "Self (set {n})",
+      "tempoPricesHint": "The Opponent column averages the strongest five in the current pool.",
+      "tempoDenyDice1": "One die fewer",
+      "tempoDenyDice2": "Two dice fewer",
+      "tempoDenyCharaDie": "Character die blocked",
+      "tempoDenyDice2AndChara": "Two dice fewer + no chara die",
+      "tempoNullifyDamage": "Damage nullified",
+      "tempoBindMove": "One move banned",
+      "tempoGainDice1": "One die more",
+      "tempoGainDice2": "Two dice more",
       "noteNeedsHp": "Counted once you enter remaining HP",
       "noteNeedsPrev": "Based on the assumptions above",
       "noteMirrorDice": "Assumes the opponent rolls this same build",
@@ -348,7 +394,12 @@
       "tempoCalculating": "(working…)",
       "evPartTempo": "Tempo",
       "enemyLastDamageLabel": "Opponent's last move",
-      "showBreakdownDetail": "Show breakdown"
+      "showBreakdownDetail": "Show breakdown",
+      "showDiceRamp": "Per-die ramp",
+      "pureDamage": "Expected value: damage only",
+      "rampOnly": "Die {n} only",
+      "rampUpTo": "Dice 1–{n}",
+      "rampAll": "All dice"
     },
     "showCumulativeProb": "Show cumulative odds",
     "showExactProb": "Show exact odds",
@@ -759,7 +810,8 @@
     "playerCode": "Player code",
     "rename": "Rename",
     "renameDo": "Confirm",
-    "renameConfirm": "You will appear as “{name}”"
+    "renameConfirm": "You will appear as “{name}”",
+    "lowData": "Low data mode"
   },
   "notice": {
     "current": "The PLAKORO strategy guide is coming soon — ask on the Plakoro Taiwan Line for details"
@@ -844,6 +896,28 @@
     "contents": "Contents",
     "quickIndex": "Quick index",
     "mainVolumes": "Main volumes",
-    "volumes": "{n} vols"
+    "volumes": "{n} vols",
+    "included": "Included",
+    "sample": "Sample",
+    "samplePending": "A sample is being prepared.",
+    "startReading": "Start reading",
+    "needPlan": "Requires plan",
+    "perMonth": "${n} / mo",
+    "join": "Subscribe on Patreon",
+    "planUnknown": "Not yet available",
+    "yourPlan": "Your plan: {plan}",
+    "noPlan": "No subscription"
+  },
+  "typeShort": {
+    "無色": "CO",
+    "ちょう": "PS",
+    "かくとう": "FT",
+    "ほのお": "FR",
+    "みず": "WA",
+    "くさ": "GR",
+    "はがね": "ST",
+    "あく": "DK",
+    "ひこう": "FL",
+    "かみなり": "EL"
   }
 }

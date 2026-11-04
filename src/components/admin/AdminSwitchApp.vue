@@ -70,13 +70,76 @@ async function select(code) {
   pointsReason.value = ''
   pointsError.value = ''
   detailError.value = ''
+  subError.value = ''
   busyDetail.value = true
   try {
     detail.value = await adminApi.getPlayer(adminToken.value, code)
+    seedSubscription()
   } catch (e) {
     detailError.value = e.message
   } finally {
     busyDetail.value = false
+  }
+}
+
+// ── 手冊訂閱 ───────────────────────────────────────────────────────────────
+// Patreon 的金流在站外，這裡是唯一能把「他付了」變成「他看得到」的地方，也是換物、
+// 工作人員、補償這些沒有金流的情形唯一的入口。
+const subTiers = ref([])
+const subTier = ref('')
+const subExpires = ref('')
+const subNote = ref('')
+const subBusy = ref(false)
+const subError = ref('')
+
+// 'free' 不是一檔可以開通的方案，而是「沒有訂閱」本身 —— 要那個狀態就是取消訂閱。
+adminApi.getHandbookTiers(adminToken.value)
+  .then(cfg => { subTiers.value = (cfg.tiers || []).filter(x => x.key !== 'free') })
+  .catch(() => { subTiers.value = [] })
+
+// 表單一律從伺服器那份重新長出來。沿用上一個玩家留在欄位裡的日期，是這種畫面最容易
+// 發生、也最難發現的錯誤。
+function seedSubscription() {
+  const s = detail.value?.subscription
+  subTier.value = s?.tier || ''
+  subExpires.value = s?.expiresOn ? String(s.expiresOn).slice(0, 10) : ''
+  subNote.value = s?.note || ''
+}
+
+const subState = computed(() => {
+  const s = detail.value?.subscription
+  if (!s) return t('admin.subNone')
+  const date = s.expiresOn ? String(s.expiresOn).slice(0, 10) : null
+  if (!date) return t('admin.subForever')
+  return s.active ? t('admin.subActiveUntil', { date }) : t('admin.subExpired', { date })
+})
+
+async function saveSubscription() {
+  if (!subTier.value) return
+  subBusy.value = true
+  subError.value = ''
+  try {
+    detail.value = await adminApi.setSubscription(
+      adminToken.value, selectedCode.value, subTier.value, subExpires.value, subNote.value
+    )
+    seedSubscription()
+  } catch (e) {
+    subError.value = e.message
+  } finally {
+    subBusy.value = false
+  }
+}
+
+async function dropSubscription() {
+  subBusy.value = true
+  subError.value = ''
+  try {
+    detail.value = await adminApi.clearSubscription(adminToken.value, selectedCode.value)
+    seedSubscription()
+  } catch (e) {
+    subError.value = e.message
+  } finally {
+    subBusy.value = false
   }
 }
 
@@ -367,6 +430,40 @@ async function toggle(kind, asset) {
             </div>
           </div>
 
+          <!-- 手冊訂閱。Patreon 的金流在站外，所以這裡是唯一能把「他真的付了」變成
+               「他看得到」的地方 —— 也包含換物、工作人員、補償這些根本沒有金流的情形。
+               到期日留空就是不過期；填了日期，當天仍然有效，隔天失效。 -->
+          <div class="as-sub">
+            <div class="as-sub-head">
+              <span class="as-sub-title">{{ t('admin.subTitle') }}</span>
+              <span :class="['as-sub-state', { off: !detail.subscription?.active }]">{{ subState }}</span>
+            </div>
+            <div class="as-sub-row">
+              <select v-model="subTier" class="as-input as-sub-tier">
+                <option value="">{{ t('admin.subNone') }}</option>
+                <option v-for="tier in subTiers" :key="tier.key" :value="tier.key">{{ tier.name }}</option>
+              </select>
+              <input v-model="subExpires" class="as-input as-sub-date" type="date" :disabled="!subTier">
+            </div>
+            <input
+              v-model="subNote" class="as-input" :placeholder="t('admin.subNote')" :disabled="!subTier">
+            <div class="as-sub-row">
+              <span class="as-sub-hint">{{ t('admin.subNoExpiry') }}</span>
+              <button
+                class="btn as-claim-btn"
+                :disabled="subBusy || !subTier"
+                @click="saveSubscription"
+              >{{ subBusy ? t('admin.subSaving') : t('admin.subSave') }}</button>
+              <button
+                v-if="detail.subscription"
+                class="btn fail as-claim-btn"
+                :disabled="subBusy"
+                @click="dropSubscription"
+              >{{ t('admin.subClear') }}</button>
+            </div>
+            <span v-if="subError" class="as-error">{{ subError }}</span>
+          </div>
+
           <!-- Only for players who have no account yet. Someone already signed in has nothing
                to claim, and minting a code for them would be a way to take their account over. -->
           <div v-if="!detail.hasAccount" class="as-claim">
@@ -554,6 +651,21 @@ async function toggle(kind, asset) {
 
 /* PTP sits directly under the stats line: it is another fact about this player, and the two
    get read together when somebody asks what they are owed. */
+.as-sub {
+  display: flex; flex-direction: column; gap: 0.3125rem;
+  padding: 0.4375rem 0.5rem;
+  border: 0.0625rem solid var(--line); border-radius: 0.5rem; background: var(--card);
+}
+.as-sub-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.as-sub-title { font-size: 0.6875rem; font-weight: 800; color: var(--ink); }
+.as-sub-state { font-size: 0.625rem; font-weight: 800; color: var(--accent-strong); }
+.as-sub-state.off { color: var(--sub); }
+.as-sub-row { display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; }
+.as-sub-tier { flex: 1 1 8rem; min-width: 0; }
+.as-sub-date { flex: none; width: 8.5rem; }
+.as-sub-hint { flex: 1; font-size: 0.5625rem; font-weight: 600; color: var(--sub); }
+.as-sub-row .as-claim-btn { padding: 0.25rem 0.5rem; font-size: 0.625rem; }
+
 .as-ptp {
   display: flex;
   flex-direction: column;

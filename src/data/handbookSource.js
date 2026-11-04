@@ -34,6 +34,23 @@ export async function fetchManifest(catalogue = CATALOGUE.HANDBOOK) {
 }
 
 /**
+ * 方案階梯、每一冊的最低方案，以及（有登入的話）自己手上的訂閱。
+ *
+ * 這一支永遠走真正的 API，即使手冊本身還在讀本機切出來的檔案：權限是後台現改現生效的，
+ * 綁在 manifest 上就代表每改一次價格都要重切一次書。拿不到就回 null，書架沿用 manifest
+ * 裡切書時算出來的預設值 —— 後台掛了不該讓整個書架消失。
+ */
+export async function fetchTierConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/handbook/tiers`, { headers: authHeader() })
+    if (!res.ok) return null
+    return await res.json()
+  } catch (e) {
+    return null
+  }
+}
+
+/**
  * One chapter, as bytes.
  *
  * Resolves to an ArrayBuffer rather than a URL on purpose: a URL can be copied out of the

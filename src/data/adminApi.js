@@ -116,3 +116,34 @@ export function deleteRewardPackage(token, id) {
     headers: authHeader(token)
   })
 }
+
+// 秘笈手冊的方案階梯與每一冊的最低方案。整份讀、整份存 —— 編輯器上刪掉一列時沒有差異
+// 可以送，只有每次重來才保證舊的一定不在（跟獎品組合同一種做法）。
+export function getHandbookTiers(token) {
+  return request('/api/admin/handbook/tiers', { headers: authHeader(token) })
+}
+
+export function saveHandbookTiers(token, payload) {
+  return request('/api/admin/handbook/tiers', {
+    method: 'PUT',
+    headers: authHeader(token),
+    body: JSON.stringify(payload)
+  })
+}
+
+// 開通／調整一個玩家的訂閱。`expiresOn` 是 'YYYY-MM-DD'，空字串代表不過期。
+// 兩支都回傳整份玩家狀態（跟 grantUnlock 一樣），畫面直接換掉手上那份，不自己拼。
+export function setSubscription(token, code, tierKey, expiresOn, note) {
+  return request(`/api/admin/players/${encodeURIComponent(code)}/subscription`, {
+    method: 'PUT',
+    headers: authHeader(token),
+    body: JSON.stringify({ tierKey, expiresOn, note })
+  })
+}
+
+export function clearSubscription(token, code) {
+  return request(`/api/admin/players/${encodeURIComponent(code)}/subscription`, {
+    method: 'DELETE',
+    headers: authHeader(token)
+  })
+}

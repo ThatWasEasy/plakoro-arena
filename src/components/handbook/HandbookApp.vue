@@ -18,9 +18,13 @@ import { useI18n } from 'vue-i18n'
 import { asset } from '../../data/assetPath'
 import { typeBgColor } from '../../data/constants'
 import { currentIdentity } from '../../data/currentPlayer'
-import { fetchManifest, isPrototype } from '../../data/handbookSource'
+import { fetchManifest, fetchTierConfig, isPrototype } from '../../data/handbookSource'
 import { mostRecent, pageOf, startedOf } from '../../data/handbookProgress'
+import {
+  applyServerConfig, joinUrlFor, metaOf, myTier, rankOf, setLadder, tierFor, tierLadder, unlocked
+} from '../../data/handbookTiers'
 import Icon from '../Icon.vue'
+import HandbookDetail from './HandbookDetail.vue'
 import HandbookReader from './HandbookReader.vue'
 
 const emit = defineEmits(['back'])
@@ -32,11 +36,12 @@ const loading = ref(true)
 const error = ref('')
 const open = ref(null)
 
-// Stand-in for `player_unlocks` until the endpoint exists. Deliberately a plain list: the real
-// version replaces it with what the server says this player owns, and nothing else changes.
-const PROTOTYPE_OWNED = new Set(['front', 'ch1', 'chara.STW04', 'chara.EBC02-001'])
+// Stand-in for the player's Patreon plan until the endpoint exists. 'pro' rather than the
+// cheapest on purpose: it leaves both sides of the lock on screen — the past sets readable,
+// the current season still shut — which is the thing worth looking at.
+const PROTOTYPE_TIER = 'pro'
 const showAll = ref(false)
-const owns = u => showAll.value || (isPrototype ? PROTOTYPE_OWNED.has(u.id) : u.owned === true)
+const owns = u => showAll.value || unlocked(u)
 
 // The handbook names characters the way the book does and the app names them the way the cards
 // do (STW01 against STC01-001), so the join is on the displayed name — which both sides take
@@ -128,8 +133,12 @@ const shelves = computed(() => {
 function bundleUnits(id) { return bundled.value.get(id) || [] }
 function bundlePages(id) { return bundleUnits(id).reduce((n, u) => n + u.pages, 0) }
 function bundleOwned(id) { return bundleUnits(id).filter(owns).length }
-
-// What the single main volume reports on its cover.
+// The plan that would open the *rest* of a bundle, which is the one worth quoting: a volume
+// half of which is already readable should ask for the half that is not.
+function bundleTier(id) {
+  return bundleUnits(id).filter(u => !owns(u))
+    .reduce((hi, u) => (rankOf(u.tier) > rankOf(hi) ? u.tier : hi), null)
+}
 
 
 const sections = computed(() => {
@@ -145,6 +154,7 @@ const sections = computed(() => {
 })
 
 const ownedCount = computed(() => units.value.filter(owns).length)
+const myPlanName = computed(() => metaOf(myTier.value)?.name || t('handbook.noPlan'))
 
 // Where to pick back up. A 190-page book cut into 27 chapters needs a way in that is not
 // "find your place again" — without it the shelf is a pile.
@@ -175,11 +185,50 @@ const resumePct = computed(() => {
 })
 const watermark = computed(() => currentIdentity.value?.code || '')
 
+// An owned volume opens; an unowned one explains itself. A shelf whose locked books do
+// nothing cannot sell anything, and "locked" is not an answer to "what is this".
+const detail = ref(null)
+
 function enter(u) {
   // Checked here as well as in the markup: a disabled button is a courtesy, the rule is the
   // server's 404, and this mirrors where that rule lives.
   if (owns(u)) open.value = u
+  else detail.value = u
 }
+
+// A volume with nothing readable in it has to say what it is before handing over a list of
+// locked rows; once any chapter is open, the list is the more useful thing to see.
+function enterBundle(id) {
+  if (bundleOwned(id)) openBundle.value = id
+  else detail.value = { kind: 'bundle', bundle: id }
+}
+
+function readDetail() {
+  const u = detail.value
+  detail.value = null
+  if (u.kind === 'bundle') openBundle.value = u.bundle
+  else open.value = u
+}
+
+const detailProps = computed(() => {
+  const u = detail.value
+  if (!u) return null
+  const members = u.kind === 'bundle' ? bundleUnits(u.bundle) : []
+  const need = u.kind === 'bundle' ? bundleTier(u.bundle) : tierFor(u)
+  return {
+    unit: u.kind === 'bundle'
+      ? { title: t('handbook.title'), pages: bundlePages(u.bundle), toc: [] }
+      : u,
+    owned: u.kind === 'bundle' ? bundleOwned(u.bundle) === members.length : owns(u),
+    cover: u.kind === 'character' ? asset('image/handbook-cover.jpg') : asset('image/handbook-cover-main.jpg'),
+    art: u.kind === 'character' ? art(u) : '',
+    code: u.cardCode || '',
+    members,
+    plan: metaOf(need),
+    join: joinUrlFor(need),
+    group: u.group || (u.kind === 'character' ? '' : t('handbook.mainVolumes'))
+  }
+})
 
 function onKey(e) {
   if (e.key === 'Escape' && !open.value) emit('back')
@@ -189,7 +238,16 @@ onMounted(async () => {
   document.addEventListener('keydown', onKey)
   document.body.style.overflow = 'hidden'
   try {
-    units.value = (await fetchManifest()).units || []
+    // 兩個來源，各管各的：manifest 說有哪些冊（切書的產物），API 說誰看得到（後台現改現
+    // 生效）。API 沒回應就整份退回 manifest 裡切書時算的預設值 —— 權限服務掛掉不該讓
+    // 書架變成一片空白，只是後台的調整當下不生效而已。
+    const [m, cfg] = await Promise.all([fetchManifest(), fetchTierConfig()])
+    units.value = m.units || []
+    if (!applyServerConfig(cfg)) {
+      setLadder(m.tiers)
+      // 原型沒有 session 可讀，直接給一個方案看效果。
+      myTier.value = isPrototype ? PROTOTYPE_TIER : null
+    }
   } catch (e) {
     error.value = t('handbook.manifestFailed')
   } finally {
@@ -210,6 +268,7 @@ onBeforeUnmount(() => {
           <div class="hb-bar-title">{{ t('handbook.title') }}</div>
           <div v-if="units.length" class="hb-bar-count">
             {{ t('handbook.ownedCount', { n: ownedCount, total: units.length }) }}
+            <span class="hb-bar-plan">{{ myPlanName }}</span>
           </div>
         </div>
         <button
@@ -224,6 +283,12 @@ onBeforeUnmount(() => {
 
       <div v-if="isPrototype" class="hb-proto">
         <span>{{ t('handbook.prototypeNote') }}</span>
+        <!-- Switching plan here is the only way to see what each one actually opens, which is
+             the question the shelf now exists to answer. -->
+        <select v-model="myTier" :aria-label="t('handbook.yourPlan', { plan: myPlanName })">
+          <option :value="null">{{ t('handbook.noPlan') }}</option>
+          <option v-for="k in tierLadder.order" :key="k" :value="k">{{ metaOf(k)?.name }}</option>
+        </select>
         <label><input v-model="showAll" type="checkbox">{{ t('handbook.unlockAll') }}</label>
       </div>
 
@@ -267,8 +332,7 @@ onBeforeUnmount(() => {
                 class="hb-book"
                 :class="[u.kind, { locked: u.kind !== 'bundle' && !owns(u) }]"
                 :style="{ '--tint': tint(u) }"
-                :disabled="u.kind !== 'bundle' && !owns(u)"
-                @click="u.kind === 'bundle' ? (openBundle = u.bundle) : enter(u)"
+                @click="u.kind === 'bundle' ? enterBundle(u.bundle) : enter(u)"
               >
                 <span class="hb-spine" aria-hidden="true"></span>
                 <template v-if="u.kind === 'bundle'">
@@ -311,7 +375,6 @@ onBeforeUnmount(() => {
             :key="u.id"
             class="hb-main-row"
             :class="{ locked: !owns(u) }"
-            :disabled="!owns(u)"
             @click="openBundle = null; enter(u)"
           >
             <span class="hb-main-seal">{{ numeral(u) }}</span>
@@ -322,6 +385,13 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
+
+      <HandbookDetail
+        v-if="detailProps"
+        v-bind="detailProps"
+        @close="detail = null"
+        @read="readDetail"
+      />
 
       <HandbookReader v-if="open" :unit="open" :watermark="watermark" @close="open = null" />
     </div>
@@ -358,6 +428,8 @@ onBeforeUnmount(() => {
 .hb-bar-wrap { flex: 1; min-width: 0; }
 .hb-bar-title { font-size: 19px; font-weight: 700; letter-spacing: .22em; }
 .hb-bar-count { font-size: 10px; letter-spacing: .1em; color: rgba(242,232,214,.58); font-variant-numeric: tabular-nums; }
+.hb-bar-plan { color: rgba(242,232,214,.82); }
+.hb-bar-plan::before { content: '·'; margin: 0 .5em; color: rgba(242,232,214,.4); }
 .hb-x {
   flex: none; width: 30px; height: 30px; border: 1px solid rgba(242,232,214,.32);
   background: none; color: #F2E8D6; font-size: 13px; cursor: pointer;
@@ -370,6 +442,10 @@ onBeforeUnmount(() => {
   font-size: 11px; color: #6B5636; font-family: system-ui, sans-serif;
 }
 .hb-proto label { display: flex; align-items: center; gap: 4px; font-weight: 700; color: var(--ink); }
+.hb-proto select {
+  font: inherit; font-size: 11px; color: var(--ink);
+  background: #F3EADA; border: 1px solid #C2A87F; padding: 2px 4px;
+}
 
 .hb-jump {
   position: absolute; inset: 0; z-index: 10; background: rgba(20,14,8,.5);
@@ -507,8 +583,10 @@ onBeforeUnmount(() => {
      textured cover reads thin and muddy; this is the weight a cover label wants, and it
      covers all 65 characters these titles use (龜 and 歐 included, which Japanese faces
      often drop). */
-  font-family: 'CorporateLogoBold', 'Hiragino Sans', 'Noto Sans TC', sans-serif;
-  font-size: 15px; font-weight: 400; line-height: 1;
+  font-family: 'CorporateLogoBold', 'Noto Sans TC', 'PingFang TC', sans-serif;
+  /* 700 而不是 400：CorporateLogoBold 大部分中文字都沒有，實際畫出來的是後面那支。
+     思源的 Regular 擺在印刷封面的框線裡太輕，撐不起一個標籤。 */
+  font-size: 15px; font-weight: 700; line-height: 1;
   letter-spacing: .02em;
   color: #231C14;
   white-space: nowrap;
@@ -549,7 +627,7 @@ onBeforeUnmount(() => {
   top: 48%; height: 24%;
   display: grid; place-items: center;
   text-align: center;
-  font-family: 'CorporateLogoBold', 'Hiragino Sans', 'Noto Sans TC', sans-serif;
+  font-family: 'CorporateLogoBold', 'Noto Sans TC', 'PingFang TC', sans-serif;
   font-size: 14px; font-weight: 400; line-height: 1.3;
   color: #F2E8D6;
 }

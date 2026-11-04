@@ -9,7 +9,8 @@
     "and": "和",
     "cancel": "取消",
     "methodology": "計算方式與前提",
-    "close": "關閉"
+    "close": "關閉",
+    "save": "儲存"
   },
   "app": {
     "loading": "載入中...",
@@ -155,6 +156,7 @@
     "traitChart": "角色特性分佈",
     "adminSwitch": "帳號管理",
     "adminRewards": "賽事獎品管理",
+    "adminHandbook": "手冊訂閱權限",
     "group": {
       "tools": "其他工具"
     },
@@ -214,7 +216,36 @@
     "inheritNotFound": "查不到編號 {code}",
     "inheritFromLabel": "{name}（{code}）即將繼承給 →",
     "inheritTo": "接收的編號",
-    "inheritConfirm": "⚠ {from}（{fromCode}）的參賽紀錄、對局、道具、PTP 將全部轉給 {to}（{toCode}）。{fromCode} 會保留下來，但之後是空的。"
+    "inheritConfirm": "⚠ {from}（{fromCode}）的參賽紀錄、對局、道具、PTP 將全部轉給 {to}（{toCode}）。{fromCode} 會保留下來，但之後是空的。",
+    "handbookTitle": "手冊訂閱權限",
+    "handbookTiers": "訂閱方案",
+    "handbookTiersHint": "由上到下是由低到高，高階自動包含低階。價格只是顯示用，金流在 Patreon。",
+    "handbookTierName": "方案名稱",
+    "handbookJoinUrl": "Patreon 訂閱連結（留空就用最低階那檔的）",
+    "handbookAddTier": "新增方案",
+    "handbookCoverage": "各方案看得到幾冊",
+    "handbookOrphans": "有 {n} 冊沒有對應到任何方案（{names}…），沒有人看得到。",
+    "handbookAccess": "每一冊最低要哪個方案",
+    "handbookAccessHint": "沒有特別指定的就沿用切書時算出來的預設值，所以新角色上架不用先來這裡點一輪。",
+    "handbookBulk": "整組設為…",
+    "handbookInherit": "沿用預設",
+    "handbookInheritAs": "沿用預設（{tier}）",
+    "handbookSaved": "已儲存",
+    "handbookSaving": "儲存中…",
+    "subTitle": "手冊訂閱",
+    "subNone": "尚未開通",
+    "subTier": "方案",
+    "subExpires": "到期日",
+    "subNoExpiry": "留空＝不過期",
+    "subExpired": "已於 {date} 到期",
+    "subActiveUntil": "有效至 {date}",
+    "subForever": "不過期",
+    "subNote": "備註（換物、工作人員、補償…）",
+    "subSave": "開通／更新",
+    "subClear": "取消訂閱",
+    "subSaving": "處理中…",
+    "handbookFreeBadge": "未訂閱",
+    "handbookFreeHint": "把某一冊設成「未訂閱」就是免費公開，沒登入的人也看得到。這一層不能刪 —— 刪了只會讓免費的冊子變成沒人看得到。"
   },
   "priceLog": {
     "title": {
@@ -314,14 +345,14 @@
     "moveOddsButton": "招式機率",
     "moveOdds": {
       "title": "招式成功機率",
-      "hint": "選一隻寶可夢，即可看到目前骰子配置下各招式的成功率與期望效益",
       "changeCharacter": "更換",
       "diceInPlay": "參與擲骰",
       "moveHeader": "招式（{n} 顆骰）",
       "successRate": "成功率",
       "charaDieOdds": "角色骰",
       "expectedValue": "期望效益",
-      "settings": "計算前提",
+      "settings": "期望值計算參數",
+      "displayOptions": "顯示",
       "exportImage": "匯出圖片",
       "exportingImage": "匯出中…",
       "sortByNumber": "依編號排序",
@@ -332,7 +363,22 @@
       "prevSelfFailed": "上一個自己回合，自己能量骰失敗",
       "prevPrereqSucceeded": "上一個自己回合，指定招式成功",
       "prevSelfUnhurt": "上回合自己沒受傷",
+      "charaDieBlocked": "角色骰被禁用",
+      "charaDieFaceDown": "角色骰固定朝下",
       "evHint": "期望效益＝（對手扣血 − 自己扣血）的平均，再乘上成功率；回血算加分。不計弱點加成。下方的組成相加就是期望效益（傷害總共為小計，不另外相加）",
+      "tempoPricesTitle": "節奏價值換算表（HP）",
+      "tempoColEnemy": "對手",
+      "tempoColSelf": "自己",
+      "tempoColSelfSet": "自己（組 {n}）",
+      "tempoPricesHint": "「對手」欄取現在環境中最強五隻算平均數。",
+      "tempoDenyDice1": "少 1 顆能量骰",
+      "tempoDenyDice2": "少 2 顆能量骰",
+      "tempoDenyCharaDie": "擋掉角色骰",
+      "tempoDenyDice2AndChara": "少 2 顆骰＋擋角色骰",
+      "tempoNullifyDamage": "傷害歸零",
+      "tempoBindMove": "封住 1 個招式",
+      "tempoGainDice1": "多 1 顆能量骰",
+      "tempoGainDice2": "多 2 顆能量骰",
       "noteNeedsHp": "填入剩餘 HP 後才會計入",
       "noteNeedsPrev": "依上方前提條件計算",
       "noteMirrorDice": "假設對手骰組與本組相同",
@@ -348,7 +394,12 @@
       "tempoCalculating": "（計算中…）",
       "evPartTempo": "干擾",
       "enemyLastDamageLabel": "對手上一招白板",
-      "showBreakdownDetail": "顯示詳細資訊"
+      "showBreakdownDetail": "顯示詳細資訊",
+      "showDiceRamp": "逐顆骰機率",
+      "pureDamage": "期望值只算傷害",
+      "rampOnly": "只有骰 {n}",
+      "rampUpTo": "骰 1–{n}",
+      "rampAll": "全部骰子"
     },
     "showCumulativeProb": "顯示累計機率",
     "showExactProb": "顯示恰好機率",
@@ -758,7 +809,8 @@
     "playerCode": "玩家編號",
     "rename": "更改名稱",
     "renameDo": "確認變更",
-    "renameConfirm": "將顯示為「{name}」"
+    "renameConfirm": "將顯示為「{name}」",
+    "lowData": "低流量模式"
   },
   "notice": {
     "current": "PLAKORO 攻略手冊即將上線，詳情請上 Plakoro Taiwan Line 詢問"
@@ -843,6 +895,28 @@
     "contents": "本章目錄",
     "quickIndex": "快速目錄",
     "mainVolumes": "本篇",
-    "volumes": "{n} 冊"
+    "volumes": "{n} 冊",
+    "included": "包含內容",
+    "sample": "試閱",
+    "samplePending": "試閱內容準備中。",
+    "startReading": "開始閱讀",
+    "needPlan": "需要方案",
+    "perMonth": "${n} / 月",
+    "join": "前往 Patreon 訂閱",
+    "planUnknown": "尚未開放",
+    "yourPlan": "目前方案：{plan}",
+    "noPlan": "尚未訂閱"
+  },
+  "typeShort": {
+    "無色": "無",
+    "ちょう": "超",
+    "かくとう": "鬥",
+    "ほのお": "火",
+    "みず": "水",
+    "くさ": "草",
+    "はがね": "鋼",
+    "あく": "惡",
+    "ひこう": "飛",
+    "かみなり": "雷"
   }
 }
