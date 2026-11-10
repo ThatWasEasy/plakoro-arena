@@ -158,8 +158,12 @@ def plan(reader):
     total = len(reader.pages)
 
     marks, in_ch3, group = [], False, None
-    for _, page, title in entries:
-        if CHAPTER.match(title) or title in FRONT_MATTER:
+    for depth, page, title in entries:
+        # 只有最上層的標題算一章。CHAPTER 這條式子只看「一、」這種開頭，不看階層，
+        # 所以章節底下如果也用中文數字編號（第五章的「一、先攻與後攻」就是），它會被
+        # 當成另一個第一章 —— 兩個 unit 算出同一個 ch1，檔案互相蓋掉，而真正的母章
+        # 因為下一個 mark 緊接著它而分到零頁。深度才是這件事的事實來源。
+        if depth == 0 and (CHAPTER.match(title) or title in FRONT_MATTER):
             in_ch3 = title in CONFIG['explode']
             # Chapter three owns no pages of its own: its divider page falls to the first
             # character after it, and the chapter appears in the catalogue as the group those
