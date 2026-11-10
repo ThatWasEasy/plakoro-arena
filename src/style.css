@@ -557,6 +557,34 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
   box-shadow:0 3px 8px rgba(0,0,0,.12);
   font-family:'CorporateLogoBold',var(--ui-cjk);}
 
+/* 直握時這塊決議面板改成上下排。
+ *
+ * 它原本是橫的：左邊「招式成功」一欄、右邊「能量不足／返回」一欄，兩欄的高度由舞台撐滿。
+ * 那在舞台還會把直的手機轉成橫的時候是對的（短而寬），但舞台不再旋轉之後（見
+ * useStageLayout.js），同一段 CSS 在 430×932 上會把兩欄壓成 250 與 119 寬，而裡面
+ * flex:1 的按鈕被整欄撐開 —— 量到的是「招式失敗」322px 高、「返回」226px 高的直條。
+ *
+ * 所以直的時候讓它直著排，並且把那幾顆按鈕的高度從「撐滿」改回「照內容」。
+ */
+@media (orientation: portrait) {
+  .dr-result-cols{flex-direction:column;}
+  /* 失敗與返回在直版並排成一列：它們是同一層級的兩個出口，疊起來只是白白吃掉高度。 */
+  .dr-right-col{flex:none; flex-direction:row;}
+  .dr-fail-box{flex:1.6;}
+  .dr-back-box{flex:1;}
+  .dr-fail-btn, .dr-back-btn{flex:none; min-height:2.75rem; padding:0.625rem;}
+  /* 招式那幾顆原本是四等分一欄的格線，直版改成照內容高、排不下就捲。 */
+  .dr-btn-list{grid-template-rows:none; grid-auto-rows:minmax(2.75rem,auto);
+    align-content:start; overflow-y:auto;}
+  .dr-chara-btn, .dr-success-only-btn{flex:none; min-height:2.75rem;}
+
+  /* 選招那一排同一個毛病：格線把兩張卡拉到整個面板的高度（量到 199 寬 × 725 高）。
+     卡片本來就有自己的比例，所以直版讓它照比例、靠上排，多出來的高度留白，不是把卡
+     撐爛。排不下就捲。 */
+  .ms-grid{align-content:start; overflow-y:auto;}
+  .move-select-panel .move-card{aspect-ratio:3/4; height:auto;}
+}
+
 .fx-flash{position:absolute; border-radius:50%; pointer-events:none; z-index:60;
   animation:fxpop .7s ease-out forwards; mix-blend-mode:multiply;}
 @keyframes fxpop{0%{transform:scale(.2); opacity:0;} 30%{opacity:.85;} 100%{transform:scale(1.6); opacity:0;}}

@@ -6,36 +6,27 @@ import { onMounted, onUnmounted, ref } from 'vue'
 const DESIGN_WIDTH = 375
 const ROOT_FONT_SIZE = 16
 
-// Whether #stage is currently rotated 90° (see layoutStage() below) — there's only ever one
-// stage, so this is a single shared flag rather than something each caller re-derives. Anything
-// that turns raw pointer events (always in true, unrotated viewport coordinates) into
-// stage-relative directions — e.g. the 3D dice tray's drag/throw handling — needs this to
-// correct for the rotation; see DiceRoll3DCanvas.vue.
+/**
+ * 舞台有沒有被轉過 90°。
+ *
+ * **永遠是 false。** 舞台不再自己把直的手機轉成橫的 —— 要不要橫著拿是玩家自己的決定，
+ * 不是我們替他做的。留著這個旗標是因為指標事件的修正還讀它（見 DiceRoll3DCanvas.vue）：
+ * 不轉了，修正就是個不做事的分支，但把它一起拆掉會動到骰子的拖曳判斷，那是另一件事。
+ */
 export const isStagePortrait = ref(false)
 
 export function useStageLayout(stageEl) {
   function layoutStage() {
-    const stage = stageEl.value
-    if (!stage) return
+    // 舞台就是視窗（見 style.css 的 #stage），所以這裡只剩一件事：決定 1rem 有多大。
+    //
+    // 橫的時候照舊，用 16:9 算出來的高度當基準 —— 既有的每一個 rem 值都是照那個比例
+    // 調出來的，換基準等於重調整個 App。
+    // 直的時候改用寬度：拿高度算的話，390×844 的手機會得到 9px 的 1rem，整個畫面縮成
+    // 一條。直握是會發生的事，不是要被懲罰的事。
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const isPortrait = vh > vw
-    const logicalW = isPortrait ? vh : vw
-    const logicalH = isPortrait ? vw : vh
-    let stageW = logicalW
-    let stageH = stageW * 9 / 16
-    if (stageH > logicalH) {
-      stageH = logicalH
-      stageW = stageH * 16 / 9
-    }
-    stage.style.width = stageW + 'px'
-    stage.style.height = stageH + 'px'
-    stage.style.transform = isPortrait ? 'translate(-50%,-50%) rotate(90deg)' : 'translate(-50%,-50%)'
-    isStagePortrait.value = isPortrait
-
-    // stageH is always the stage's short edge — the same edge the design's 375px width maps
-    // to whether or not the stage is currently rotated for portrait phones.
-    document.documentElement.style.fontSize = (ROOT_FONT_SIZE * stageH / DESIGN_WIDTH) + 'px'
+    const base = vh > vw ? vw : Math.min(vh, vw * 9 / 16)
+    document.documentElement.style.fontSize = (ROOT_FONT_SIZE * base / DESIGN_WIDTH) + 'px'
   }
 
   onMounted(() => {
