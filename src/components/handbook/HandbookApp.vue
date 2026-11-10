@@ -180,9 +180,18 @@ function bundlePages(id) { return bundleUnits(id).reduce((n, u) => n + u.pages, 
 function bundleOwned(id) { return bundleUnits(id).filter(owns).length }
 // The plan that would open the *rest* of a bundle, which is the one worth quoting: a volume
 // half of which is already readable should ask for the half that is not.
+//
+// 全部都讀得到的時候改問「這本屬於哪一檔」，而不是回 null —— null 會讓 planTag 退到
+// 「免費」，但一本要付費的書不會因為你買了就變免費。那個標籤是講這本書的身價，不是
+// 講你的錢包。
+//
+// 用 tierFor 而不是 u.tier：後台的逐冊覆寫優先，跟單冊的標籤同一個來源。讀 u.tier 的話
+// 後台把某一冊降階之後，整本的標籤還是會停在切書時算的那一檔。
 function bundleTier(id) {
-  return bundleUnits(id).filter(u => !owns(u))
-    .reduce((hi, u) => (rankOf(u.tier) > rankOf(hi) ? u.tier : hi), null)
+  const all = bundleUnits(id)
+  const locked = all.filter(u => !owns(u))
+  return (locked.length ? locked : all)
+    .reduce((hi, u) => (rankOf(tierFor(u)) > rankOf(hi) ? tierFor(u) : hi), null)
 }
 
 
