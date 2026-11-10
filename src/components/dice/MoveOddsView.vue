@@ -130,6 +130,9 @@ const sortByNumber = computed({
   get: () => !sortByEv.value,
   set: v => { sortByEv.value = !v }
 })
+// 兩組以上的骰時，期望值排序要照哪一組。並排比較的重點常常是「B 把哪幾招推上來了」，
+// 鎖死在 A 的話得自己在兩欄之間用眼睛重排一次。
+const sortSetIndex = ref(0)
 const countDefensiveValue = ref(true)
 const countTempoValue = ref(true)
 // 「期望值只算傷害」—— 設定面板裡那兩個折算開關的快捷鍵，外加扣掉回復。
@@ -249,10 +252,14 @@ function oddsText(payable, total) {
 // The move's own success rate, then one more figure per character-die effect it has (joint
 // with that effect actually landing) — slash-joined into one number so the two readings sit
 // together without needing the die's own orientation icons repeated up here.
-function successText(row, si) {
-  const parts = [oddsText(row.odds[si].payable, row.odds[si].total)]
-  row.charaEffects.forEach(entry => {
-    const j = entry.joint[si]
+//
+// 吃的是一組機率而不是一整列，因為骰子階梯要用同一份寫法把每一階都印成這個樣子 ——
+// 階梯只印招式本身的成功率的話，「多帶一顆骰幫了多少」只回答得了一半：卡片下半部那
+// 幾條角色骰效果，才是多數招式真正在等的東西。
+function successText(moveOdds, charaOddsList) {
+  const parts = [oddsText(moveOdds.payable, moveOdds.total)]
+  charaOddsList.forEach(charaOdds => {
+    const j = jointOdds(moveOdds, charaOdds)
     parts.push(oddsText(j.payable, j.total))
   })
   // Counts-on readings already contain their own "/" (as in "120/216"), so joining those with
@@ -385,16 +392,18 @@ const moveRows = computed(() => {
         perSet: rampRollsPerSet.value.map((rolls, si) => evaluate(mv, rolls[ri], si))
       })),
       noteKeys: noteKinds.map(kind => NOTE_LABEL_KEYS[kind]).filter(Boolean),
-      // Per dice set, since the joint figure depends on that set's own success rate.
-      charaEffects: mv.chara.map(ce => {
-        const charaOdds = charaEffectOdds(ce.orientations)
-        return { ce, charaOdds, joint: odds.map(moveOdds => jointOdds(moveOdds, charaOdds)) }
-      })
+      // 角色骰自己的面數，與能量骰無關 —— 每一組骰、每一階骰數都是同一份，聯合機率在
+      // 要印的時候才跟當下那組成功率相乘。
+      charaOddsList: mv.chara.map(ce => charaEffectOdds(ce.orientations))
     }
   })
-  // Sorted on set A: with two builds side by side one order has to win, and A is the one the
-  // comparison is anchored to.
-  if (sortByEv.value) rows.sort((a, b) => b.evs[0].ev - a.evs[0].ev)
+  // 並排的兩組骰只能有一個順序，照哪一組由玩家挑（預設 A，比較本來就是以它為基準）。
+  // 夾一下上限：這個畫面是 v-if 掛上來的，骰組在它開著的時候不會變，但讀到不存在的那
+  // 一組會是 undefined.ev —— 整份排序連同畫面一起垮，不值得賭在別處的掛載方式不變。
+  if (sortByEv.value) {
+    const si = Math.min(sortSetIndex.value, rollsPerSet.value.length - 1)
+    rows.sort((a, b) => b.evs[si].ev - a.evs[si].ev)
+  }
   return rows
 })
 
@@ -487,9 +496,28 @@ async function exportImage() {
           </div>
         </div>
 
-        <!-- Second row: what the table shows, kept off the dice line above. Those steppers are
-             the thing being adjusted most often, and burying them behind four checkboxes that
-             wrap differently at every width made them hard to find twice in a row. -->
+        <!-- 排序自成一行，標題跟上面的擲骰數同一個字級：兩者都在講「這張表是怎麼算出來、
+             怎麼排出來的」，跟下面那排「畫面上要顯示什麼」不是同一件事。
+             照哪一組骰排，只有兩組以上時才有得選；照編號排的時候與骰組無關。 -->
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          <span style="font-size:0.75rem; font-weight:800; color:var(--sub);">{{ t('diceBuilder.moveOdds.sortLabel') }}</span>
+          <label style="display:flex; align-items:center; gap:0.1875rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="sortByNumber" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.sortByNumber') }}
+          </label>
+          <label style="display:flex; align-items:center; gap:0.1875rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
+            <input type="checkbox" v-model="sortByEv" style="width:0.75rem; height:0.75rem; margin:0;">
+            {{ t('diceBuilder.moveOdds.sortBySet') }}
+          </label>
+          <!-- 下拉放在 label 外面：包進去的話點開選單等於點到那個勾選框。 -->
+          <select v-if="hasCompare && sortByEv" v-model.number="sortSetIndex" class="odds-sort-select">
+            <option v-for="(label, si) in setLabels" :key="si" :value="si">{{ t('diceBuilder.set', { label }) }}</option>
+          </select>
+        </div>
+
+        <!-- What the table shows, kept off the dice line above. Those steppers are the thing
+             being adjusted most often, and burying them behind a row of checkboxes that wrap
+             differently at every width made them hard to find twice in a row. -->
         <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
           <label style="display:flex; align-items:center; gap:0.1875rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
             <input type="checkbox" v-model="pureDamage" style="width:0.75rem; height:0.75rem; margin:0;">
@@ -503,10 +531,6 @@ async function exportImage() {
                  :style="{ opacity: charaDieBlocked ? 0.45 : 1 }">
             <input type="checkbox" v-model="charaDieFaceDown" :disabled="charaDieBlocked" style="width:0.75rem; height:0.75rem; margin:0;">
             {{ t('diceBuilder.moveOdds.charaDieFaceDown') }}
-          </label>
-          <label style="display:flex; align-items:center; gap:0.1875rem; font-size:0.625rem; font-weight:800; color:var(--sub); cursor:pointer;">
-            <input type="checkbox" v-model="sortByNumber" style="width:0.75rem; height:0.75rem; margin:0;">
-            {{ t('diceBuilder.moveOdds.sortByNumber') }}
           </label>
           <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="showDisplayOptions = !showDisplayOptions">
             {{ t('diceBuilder.moveOdds.displayOptions') }}
@@ -624,10 +648,6 @@ async function exportImage() {
       </div>
 
       <div style="width:100%; max-width:40rem; padding:0 0.625rem;">
-        <div style="font-size:0.6875rem; font-weight:800; color:var(--sub); padding:0 0.125rem 0.25rem; border-bottom:0.125rem solid var(--line); margin-bottom:0.5rem;">
-          {{ t('diceBuilder.moveOdds.moveHeader', { n: activeCount }) }}
-        </div>
-
         <div class="move-pick-list">
           <div v-for="row in moveRows" :key="row.mv.id" style="display:flex; flex-direction:column; gap:0.25rem; min-width:0;">
             <!-- one row per dice set, success rate on its left edge and expected value on its
@@ -655,7 +675,7 @@ async function exportImage() {
                   <span style="font-size:0.5625rem; font-weight:800; color:var(--sub); flex-shrink:0;">{{ t('diceBuilder.moveOdds.successRate') }}</span>
                   <!-- the move's own success rate, joined with one more figure per character-die
                        effect it has (joint with that effect actually landing too) -->
-                  <span :style="{ fontSize: '0.8125rem', fontWeight: 900, whiteSpace: showCounts ? 'normal' : 'nowrap', color: o.payable === 0 ? 'var(--line)' : 'var(--ink)' }">{{ successText(row, si) }}</span>
+                  <span :style="{ fontSize: '0.8125rem', fontWeight: 900, whiteSpace: showCounts ? 'normal' : 'nowrap', color: o.payable === 0 ? 'var(--line)' : 'var(--ink)' }">{{ successText(row.odds[si], row.charaOddsList) }}</span>
                 </div>
 
                 <!-- the headline figure: what the move is worth per cast -->
@@ -668,13 +688,13 @@ async function exportImage() {
 
             <!-- 一顆一顆加上去的讀數，每一階各自的成功率與期望效益。放在主讀數底下、
                  卡片上方：它是同一個數字的展開，不是另一段獨立資訊。 -->
-            <div v-if="row.ramp.length" class="odds-ramp">
+            <div v-if="row.ramp.length" class="odds-ramp" :class="{ wide: showCounts }">
               <div v-for="(step, ri) in row.ramp" :key="ri" class="odds-ramp-row">
                 <span class="odds-ramp-label">{{ step.label }}</span>
                 <template v-for="(result, si) in step.perSet" :key="si">
                   <span v-if="hasCompare" class="odds-ramp-set">{{ setLabels[si] }}</span>
                   <span :class="['odds-ramp-pct', { nil: result.odds.payable === 0 }]">
-                    {{ oddsText(result.odds.payable, result.odds.total) }}
+                    {{ successText(result.odds, row.charaOddsList) }}
                   </span>
                   <span :class="['odds-ramp-ev', { nil: clean(result.ev) === 0 }]">{{ evText(result.ev) }}</span>
                 </template>
@@ -728,8 +748,11 @@ async function exportImage() {
       </div>
       </div>
 
-      <div style="display:flex; justify-content:center; padding:0.875rem 0 0.25rem;">
-        <button class="btn secondary" @click="emit('back')">{{ t('common.back') }}</button>
+      <!-- 兩條退路分開給：看完一隻想換下一隻看，跟看完想回去改骰子，是兩件不同的事，
+           以前共用一顆「返回」等於每次都要多繞一層選單。 -->
+      <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap; padding:0.875rem 0 0.25rem;">
+        <button class="btn secondary" @click="selectedCharacterId = null">{{ t('diceBuilder.moveOdds.backToCharacters') }}</button>
+        <button class="btn secondary" @click="emit('back')">{{ t('diceBuilder.moveOdds.backToBuilder') }}</button>
       </div>
     </template>
   </div>
@@ -800,6 +823,14 @@ async function exportImage() {
 .odds-card :deep(.mc-name-big) { font-size: 0.8125rem; }
 .odds-card :deep(.mc-name-ja) { font-size: 0.5625rem; }
 
+/* 照哪一組骰排。長得跟旁邊那兩個勾選項同一個分量 —— 它是同一排的設定，不是主按鈕。 */
+.odds-sort-select {
+  padding: 0.0625rem 0.25rem;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: #fff; color: var(--ink);
+  font: inherit; font-size: 0.625rem; font-weight: 800; cursor: pointer;
+}
+
 /* 骰子階梯。欄位對齊成一張小表，三行要能用掃的看出「第二顆加了多少」—— 數字各自
    靠左擺的話，就得一行一行讀。 */
 .odds-ramp {
@@ -810,7 +841,8 @@ async function exportImage() {
   font-size: 0.5625rem; font-weight: 700; color: var(--sub);
 }
 .odds-ramp-row { display: flex; align-items: baseline; gap: 0.25rem; }
-.odds-ramp-label { flex: 1; min-width: 0; white-space: nowrap; }
+/* 讀數比預期長的時候讓標題先讓位 —— 被切掉半個「全部骰子」還讀得出來，數字被壓住就不行。 */
+.odds-ramp-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .odds-ramp-set { flex: none; font-weight: 800; }
 .odds-ramp-pct, .odds-ramp-ev {
   flex: none; text-align: right; color: var(--ink);
@@ -819,6 +851,16 @@ async function exportImage() {
 .odds-ramp-pct { min-width: 2.75rem; }
 .odds-ramp-ev { min-width: 2rem; }
 .odds-ramp-pct.nil, .odds-ramp-ev.nil { color: var(--line); }
+
+/* 顯示次數時一個讀數就是「66/216（30.6%）・198/1296（15.3%）」那麼長，三欄排不回一行。
+   標題自己一行、數字接在下面 —— 跟上方主讀數在同一個開關下改成直排是同一個決定。 */
+.odds-ramp.wide .odds-ramp-row { flex-wrap: wrap; }
+.odds-ramp.wide .odds-ramp-label { flex: 1 1 100%; }
+.odds-ramp.wide .odds-ramp-pct {
+  flex: 1 1 auto; min-width: 0; text-align: left; white-space: normal;
+}
+/* 換行後期望效益會自己落成一行，推到右邊才看得出它是那一階的另一欄，而不是被遺忘的數字。 */
+.odds-ramp.wide .odds-ramp-ev { margin-left: auto; }
 .odds-card :deep(.cost-dot) { width: 0.8125rem; height: 0.8125rem; }
 .odds-card :deep(.mc-dmg) { font-size: 1rem; }
 .odds-card :deep(.mc-dmg .orig) { font-size: 0.5rem; }

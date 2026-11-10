@@ -90,8 +90,12 @@ function onToggleSame(setIndex, dieIndex, checked) {
 
 // No cap: a player comparing more than two builds at once just gets more rows, same as
 // deciding to compare two did.
-function addCompareSet() {
-  sets.value.push(cloneDiceSet(sets.value[0]))
+//
+// 複製的是「按下按鈕的那一組」，不是永遠的 A —— 每張卡上都有自己的新增鍵，在 B 上面按
+// 卻長出一份 A 的拷貝，那顆按鈕就是在說謊。新的一組接在最後面而不是插在來源後面：A/B/C
+// 是位置標籤，插隊會讓畫面上既有的骰組集體換名字，連同別處記著的骰組編號一起對不上。
+function addCompareSet(fromIndex = 0) {
+  sets.value.push(cloneDiceSet(sets.value[fromIndex] || sets.value[0]))
   // A previous roll didn't cover the new set, so it would render as a short row under a
   // header that now promises one more. Clear it and let the player roll them all together.
   rollResults.value = null
@@ -786,7 +790,7 @@ async function exportDiceImage() {
           <div v-if="hasCompare" style="font-size:0.875rem; font-weight:800; color:var(--ink);">{{ t('diceBuilder.set', { label: SET_LABELS[si] }) }}</div>
           <div v-else></div>
           <div style="display:flex; gap:0.375rem; flex-shrink:0;">
-            <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="addCompareSet">{{ t('diceBuilder.addCompare') }}</button>
+            <button class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="addCompareSet(si)">{{ t('diceBuilder.addCompare') }}</button>
             <button v-if="si > 0" class="btn secondary" style="padding:0.1875rem 0.5rem; font-size:0.625rem;" @click="removeSet(si)">{{ t('diceBuilder.removeSet') }}</button>
           </div>
         </div>

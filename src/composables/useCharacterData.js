@@ -141,6 +141,18 @@ const CHARACTERS_BASE = charaRaw.map(c => {
   }
 })
 
+/**
+ * 中文名 → 角色 id。
+ *
+ * 秘笈手冊是中文寫的，章節標題永遠是中文名；`characters` 的 `name` 則跟著介面語言走。
+ * 兩者要接得起來，中間就得有一份不隨語言改變的對照 —— 書架的封面圖與屬性底色都靠它。
+ *
+ * 沒有中文譯名的角色退回原名，對照表因此一定涵蓋整份名冊。
+ */
+export const CHARACTER_ID_BY_ZH_NAME = new Map(
+  CHARACTERS_BASE.map(c => [TRANSLATIONS['zh-TW']?.chara?.[c.id]?.name || c.name, c.id])
+)
+
 function localizedMoves(locale) {
   const overlay = TRANSLATIONS[locale] && TRANSLATIONS[locale].waza
   if (!overlay) return MOVES_BASE

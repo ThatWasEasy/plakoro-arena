@@ -16,12 +16,13 @@ const props = defineProps({
   code: { type: String, default: '' },
   // Units of the same bundle, when this is a bundle rather than a single volume.
   members: { type: Array, default: () => [] },
-  // The plan that opens this volume — { name, usd } — and where to go and get it.
+  // The plan that opens this volume — { name, usd }.
   plan: { type: Object, default: null },
-  join: { type: String, default: '' },
   group: { type: String, default: '' }
 })
-const emit = defineEmits(['close', 'read', 'preview'])
+import { ladderIsLive } from '../../data/handbookTiers'
+
+const emit = defineEmits(['close', 'read', 'preview', 'plans'])
 const { t } = useI18n()
 
 const toc = computed(() => props.unit.toc || [])
@@ -84,17 +85,13 @@ const pages = computed(() =>
         </ul>
       </template>
 
-      <h3 class="hd-label">{{ t('handbook.sample') }}</h3>
-      <!-- Wired to the preview catalogue rather than to the first pages of the real file: the
-           sample is a separate, shorter book the authors prepare, so showing paid pages here
-           would be giving away exactly what the lock is for. -->
-      <p class="hd-note">{{ t('handbook.samplePending') }}</p>
-
       <div class="hd-foot">
         <button v-if="owned" class="hd-cta" @click="emit('read')">{{ t('handbook.startReading') }}</button>
         <template v-else>
           <div class="hd-plan">
-            <template v-if="plan">
+            <!-- 方案名與月費都來自同一份設定。讀不到的時候那份退路帶的是原型價格，
+                 所以寧可只說「需要訂閱」，也不要標一個會跟實際收款不一樣的數字。 -->
+            <template v-if="plan && ladderIsLive">
               <div class="hd-planlabel">{{ t('handbook.needPlan') }}</div>
               <div class="hd-planname">
                 {{ planName }}
@@ -104,11 +101,11 @@ const pages = computed(() =>
             </template>
             <span v-else class="hd-plansub">{{ t('handbook.planUnknown') }}</span>
           </div>
-          <!-- A link, not a button: subscribing happens on Patreon, and the control should say
-               where it takes you rather than pretending the payment is ours. -->
-          <a v-if="plan && join" class="hd-cta" :href="join" target="_blank" rel="noopener">
-            {{ t('handbook.join') }}
-          </a>
+          <!-- 收款改在站內（綠界），所以這裡回到按鈕：它開的是方案頁，不是離站連結。
+               方案頁要回答的是「這一檔總共解鎖哪些」，而那是單一本書的說明頁答不了的。 -->
+          <button v-if="plan" class="hd-cta" @click="emit('plans')">
+            {{ t('handbook.seePlans') }}
+          </button>
         </template>
       </div>
     </div>
@@ -125,23 +122,23 @@ const pages = computed(() =>
 .hd-sheet {
   position: relative;
   width: 100%; max-height: 88%; overflow-y: auto;
-  padding: 18px 18px calc(22px + env(safe-area-inset-bottom));
+  padding: 36px 36px calc(44px + env(safe-area-inset-bottom));
   background: #EFE9DC;
   border-top: 3px solid var(--wood);
-  font-family: "Noto Serif TC", "Songti TC", "Hiragino Mincho ProN", serif;
+  font-family: var(--ui-cjk);
 }
 .hd-x {
-  position: absolute; right: 12px; top: 12px;
-  width: 28px; height: 28px; border: 1px solid rgba(122,86,54,.45);
-  background: none; color: var(--ink); font-size: 13px; cursor: pointer;
+  position: absolute; right: 24px; top: 24px;
+  width: 56px; height: 56px; border: 1px solid rgba(122,86,54,.45);
+  background: none; color: var(--ink); font-size: 26px; cursor: pointer;
 }
 
-.hd-head { display: flex; gap: 16px; align-items: flex-start; padding-right: 36px; }
+.hd-head { display: flex; gap: 32px; align-items: flex-start; padding-right: 72px; }
 .hd-cover {
   position: relative; flex: none;
-  width: 104px; height: 149px;
+  width: 208px; height: 298px;
   background-size: 100% 100%; background-color: #DCD3C2;
-  box-shadow: 2px 3px 8px rgba(60,40,22,.4);
+  box-shadow: 4px 6px 16px rgba(60,40,22,.4);
 }
 .hd-cover img {
   position: absolute; left: 17%; width: 66%; top: 20%; height: 54%;
@@ -152,61 +149,61 @@ const pages = computed(() =>
   position: absolute; left: 4%; width: 92%; top: 79%; height: 11%;
   display: grid; place-items: center;
   font-family: 'CorporateLogoBold', 'Noto Sans TC', 'PingFang TC', sans-serif;
-  font-size: 16px; font-weight: 700; line-height: 1; letter-spacing: .02em;
+  font-size: 32px; font-weight: 700; line-height: 1; letter-spacing: .02em;
   color: #231C14; white-space: nowrap;
 }
 .hd-covercode {
-  position: absolute; right: 1px; bottom: 26%;
+  position: absolute; right: 2px; bottom: 26%;
   writing-mode: vertical-rl; transform: rotate(180deg);
-  font-size: 9px; font-weight: 700; letter-spacing: .12em;
+  font-size: 18px; font-weight: 700; letter-spacing: .12em;
   color: #3A2F22; font-family: ui-monospace, "SFMono-Regular", monospace;
 }
 .hd-cover.main { background-color: #1C1510; display: grid; place-items: center; }
 .hd-cover-title {
-  padding: 0 10px; text-align: center; color: #F2E8D6;
-  font-family: 'CorporateLogoBold', 'Noto Sans TC', 'PingFang TC', sans-serif; font-size: 15px; line-height: 1.3;
+  padding: 0 20px; text-align: center; color: #F2E8D6;
+  font-family: 'CorporateLogoBold', 'Noto Sans TC', 'PingFang TC', sans-serif; font-size: 30px; line-height: 1.3;
 }
 .hd-meta { flex: 1; min-width: 0; }
-.hd-group { font-size: 11px; letter-spacing: .18em; color: var(--ink-soft); }
+.hd-group { font-size: 22px; letter-spacing: .18em; color: var(--ink-soft); }
 .hd-title {
-  margin: 4px 0 8px; font-size: 24px; line-height: 1.2;
+  margin: 8px 0 16px; font-size: 48px; line-height: 1.2;
   font-family: 'CorporateLogoBold', 'Noto Sans TC', 'PingFang TC', sans-serif; font-weight: 400;
 }
-.hd-facts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ink-soft); }
+.hd-facts { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 24px; color: var(--ink-soft); }
 
 .hd-label {
-  margin: 22px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .26em;
-  color: var(--ink-soft); padding-bottom: 7px; border-bottom: 1px solid rgba(122,86,54,.35);
+  margin: 44px 0 16px; font-size: 22px; font-weight: 700; letter-spacing: .26em;
+  color: var(--ink-soft); padding-bottom: 14px; border-bottom: 1px solid rgba(122,86,54,.35);
 }
 .hd-list { list-style: none; margin: 0; padding: 0; }
 .hd-list li {
-  display: flex; justify-content: space-between; gap: 14px;
-  padding: 9px 2px; border-bottom: 1px solid rgba(122,86,54,.2); font-size: 15px;
+  display: flex; justify-content: space-between; gap: 28px;
+  padding: 18px 4px; border-bottom: 1px solid rgba(122,86,54,.2); font-size: 30px;
 }
-.hd-pg { flex: none; color: var(--ink-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
-.hd-note { font-size: 13px; color: var(--ink-soft); margin: 10px 0 0; }
+.hd-pg { flex: none; color: var(--ink-soft); font-size: 24px; font-variant-numeric: tabular-nums; }
+.hd-note { font-size: 26px; color: var(--ink-soft); margin: 20px 0 0; }
 
 .hd-foot {
-  display: flex; align-items: center; gap: 14px;
-  margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(122,86,54,.35);
+  display: flex; align-items: center; gap: 28px;
+  margin-top: 48px; padding-top: 32px; border-top: 1px solid rgba(122,86,54,.35);
 }
 .hd-plan { flex: 1; min-width: 0; }
 .hd-planlabel {
-  font-size: 10px; font-weight: 700; letter-spacing: .22em; color: var(--ink-soft);
+  font-size: 20px; font-weight: 700; letter-spacing: .22em; color: var(--ink-soft);
 }
 .hd-planname {
-  margin-top: 3px; font-size: 17px; line-height: 1.2;
+  margin-top: 6px; font-size: 34px; line-height: 1.2;
   font-family: 'CorporateLogoBold', 'Noto Sans TC', 'PingFang TC', sans-serif;
 }
 .hd-planfee {
-  margin-left: 6px; font-size: 13px; color: var(--ink-soft);
+  margin-left: 12px; font-size: 26px; color: var(--ink-soft);
   font-family: inherit; font-variant-numeric: tabular-nums;
 }
-.hd-plansub { margin-top: 2px; font-size: 12px; color: var(--ink-soft); }
+.hd-plansub { margin-top: 4px; font-size: 24px; color: var(--ink-soft); }
 .hd-cta {
-  flex: none; padding: 13px 22px; border: 0;
+  flex: none; padding: 26px 44px; border: 0;
   background: var(--wood-dark); color: #F2E8D6; text-decoration: none; white-space: nowrap;
-  font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  font: inherit; font-size: 30px; font-weight: 700; cursor: pointer;
 }
 .hd-cta:not(:disabled):active { transform: translate(1px, 1px); }
 </style>

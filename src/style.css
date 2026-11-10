@@ -1,8 +1,16 @@
 /* 介面的中日文字型。日文版維持 Hiragino —— 日文字形才對；中文版把思源黑體放到最前面，
    因為 Hiragino 在前的時候「骨、直、海、角」這些中日寫法不同的字會拿到日文字形，
    一句話裡混兩套寫法就是中文看起來髒的原因。切換靠 <html lang>，i18n 會跟著改。 */
-:root{ --ui-cjk:'Hiragino Sans','Noto Sans JP',-apple-system,BlinkMacSystemFont,sans-serif; }
-:root:lang(zh){ --ui-cjk:'Noto Sans TC','PingFang TC',sans-serif; }
+:root{
+  /* 手冊的縮放。手冊是全螢幕、走在 #stage 之外的一個 mode，它的尺寸全部寫成 px
+     （見 HandbookApp 的註解），所以整體大小由這一個數字決定，不必一格一格改。
+     1 = 當初照著設計稿排的大小；在手機上那個大小一排只放得下兩本書。 */
+  --hb-scale: .75;
+ --ui-cjk:'Hiragino Sans','Noto Sans JP',-apple-system,BlinkMacSystemFont,sans-serif; }
+/* 蘋方在前、微軟正黑次之：兩者都是繁體字形，而且分別是 Apple 與 Windows 上一定裝得到
+   的那一套。Noto Sans TC 留在後面當其他平台的退路 —— 把它放第一順位的話，裝了它的
+   機器會蓋掉系統原本更合適的字。 */
+:root:lang(zh){ --ui-cjk:'PingFang TC','Microsoft JhengHei','Noto Sans TC',sans-serif; }
 
 @font-face{
   font-family:'851Gkktt';
@@ -30,6 +38,16 @@
      buttons already use; the line is the same ink as the ticker and the dark pills. */
   --accent:#EDF7D6;
   --accent-strong:#1F1F1D;
+  /* 方案的金屬色階：銅、銀、金。
+     階梯由低到高對應金屬，所以「哪一檔比較高」不必讀字就看得出來 —— 這是這組顏色
+     唯一的工作，不要拿它來表示狀態（已解鎖、試閱中那些是另一回事）。
+     漸層而不是單色：單色的金看起來只是黃色，金屬感來自同一個色相上的明暗差。 */
+  --metal-bronze:linear-gradient(160deg,#EDBF77,#C28A53);
+  --metal-bronze-ink:#2A1A08;
+  --metal-silver:linear-gradient(160deg,#F2F2F2,#A8A8A8);
+  --metal-silver-ink:#1F1F1F;
+  --metal-gold:linear-gradient(160deg,#FFE9A8,#F0B400);
+  --metal-gold-ink:#2E1F00;
   --danger:#F3A8A8;
   --heal:#9FD6B5;
   --amp:#B6E28E;
@@ -62,8 +80,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 
 /* No drop shadow: the stage already separates itself from the surround by being much
    lighter than it, and a glow around a full-bleed rectangle only muddies that edge. */
-#stage{position:fixed; top:50%; left:50%; transform-origin:center center;
-  background:var(--bg); overflow:hidden;}
+/* 整個視窗，不是一個置中的 16:9 盒子。
+   以前它是一個固定尺寸的盒子（還會替直握的手機把畫面轉 90°），所以每個畫面都被關在
+   一個算好的高度裡，`overflow:hidden` 一路往下傳，誰都捲不動。 */
+#stage{position:fixed; inset:0; background:var(--bg); overflow:hidden;}
 
 #app{position:relative; width:100%; height:100%; margin:0 auto;
   background:var(--bg); overflow:hidden; display:flex; flex-direction:column;}
@@ -73,7 +93,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
    — so "fill the screen" means "fill what is left", not "cover the chrome below me too". */
 .duel-content{position:relative; flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden;}
 
-.board{flex:1; display:flex; flex-direction:column; gap:0.25rem; padding:0.125rem 0.5rem 0.375rem; min-height:0; overflow:hidden;}
+/* 內容比畫面高就自己捲。這一行是上面那段的另一半 —— 不關在固定高度裡，是為了讓
+   捲動發生在該發生的地方，而不是把超出去的東西直接切掉。 */
+.board{flex:1; display:flex; flex-direction:column; gap:0.25rem; padding:0.125rem 0.5rem 0.375rem; min-height:0; overflow-y:auto;}
 .player-row{flex:1; display:flex; gap:0.5rem; min-height:0;}
 .player-card{flex:1; border-radius:var(--radius); box-shadow:var(--shadow);
   position:relative; transition:transform .15s ease;
@@ -341,6 +363,19 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
 }
 .move-disable-badge.lastused{ background:#FF8A2B; }
 .move-disable-badge.bind{ background:#E5342A; }
+
+/* 卡片編號。印刷卡把它印在右下角，這裡也放右下角 —— 要跟實體卡對照、或是在群裡講
+   「哪一張」的時候，眼睛找的是同一個位置。編號不隨語言改變，所以不走 i18n。
+   自帶一塊與下半部同色的底，蓋到角色效果那幾行字時才不會糊在一起。 */
+.mc-code{
+  position:absolute; right:0.3125rem; bottom:0.1875rem; z-index:4;
+  padding:0 0.1875rem; border-radius:0.1875rem;
+  background:rgba(38,36,32,0.85);
+  font-size:0.5rem; font-weight:700; letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;
+  color:rgba(255,255,255,0.62);
+  pointer-events:none;
+}
 
 .dice-mod-badges{position:absolute; top:0.125rem; left:0.125rem; z-index:5;
   display:flex; flex-wrap:wrap; gap:0.1875rem; max-width:calc(100% - 0.25rem); pointer-events:none;}

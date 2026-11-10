@@ -57,3 +57,13 @@ export function claimGifts(token) {
     headers: { Authorization: `Bearer ${token}` }
   })
 }
+
+// 領一件。信箱把每一份禮物列成一封信，一封信上的「領取」就該只領那一封；上面那支
+// 「全部領取」還在，信箱的頁腳用它。回的形狀跟 claimGifts 一樣（claimed 陣列 + 餘額），
+// 所以呼叫端不必為「一件」寫另一條路。
+export function claimGift(token, id) {
+  return request(`/api/players/me/gifts/${encodeURIComponent(id)}/claim`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  })
+}

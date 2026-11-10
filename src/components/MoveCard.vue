@@ -107,5 +107,6 @@ function onClick() {
       </div>
     </div>
     <div v-if="disableBadge" class="move-disable-badge" :class="disableBadge.kind">{{ disableBadge.label }}</div>
+    <div class="mc-code">{{ mv.id }}</div>
   </div>
 </template>

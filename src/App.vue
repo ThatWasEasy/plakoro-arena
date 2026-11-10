@@ -30,11 +30,19 @@ import PlayerChip from './components/PlayerChip.vue'
 import PlayerProfileApp from './components/PlayerProfileApp.vue'
 import GiftRevealApp from './components/GiftRevealApp.vue'
 import LoginApp from './components/auth/LoginApp.vue'
+import NoticeBoard from './components/notice/NoticeBoard.vue'
+import NoticeSplash from './components/notice/NoticeSplash.vue'
+import { splashNotices } from './data/announcements'
 import AdminSwitchApp from './components/admin/AdminSwitchApp.vue'
 import AdminRewardsApp from './components/admin/AdminRewardsApp.vue'
 import AdminHandbookApp from './components/admin/AdminHandbookApp.vue'
+import AdminCouponsApp from './components/admin/AdminCouponsApp.vue'
+import AdminSalesApp from './components/admin/AdminSalesApp.vue'
+import AdminNoticeApp from './components/admin/AdminNoticeApp.vue'
+import AdminTickerApp from './components/admin/AdminTickerApp.vue'
 import { isSignedIn } from './data/currentPlayer'
 import { tapVersion } from './data/betaMode'
+import { refreshHandbookShop } from './data/handbookTiers'
 import ModeSelect from './components/ModeSelect.vue'
 import SoloApp from './components/solo/SoloApp.vue'
 import DiceBuilderApp from './components/dice/DiceBuilderApp.vue'
@@ -84,6 +92,21 @@ function leaveMode() {
   mode.value = back || null
 }
 
+// 綠界付完款會把人導回根網址加 ?ecpay=<訂單編號>。這裡認出來，直接開到手冊並把單號
+// 交給它去查狀態。
+//
+// 參數讀完就從網址上拿掉：留著的話重新整理會再跑一次結帳結果，而那筆訂單早就結束了。
+// replaceState 而不是導頁 —— 這時 App 已經在跑了，再導一次等於整個重載。
+// 參數只讀得到一次，所以之後整個流程就靠這個 ref 記著。手冊看完那張收據會回報一聲，
+// 這裡才把它清掉 —— 中途若要去登入，手冊會被卸載再掛回來，單號得活過那一趟。
+const ecpayOrder = ref((() => {
+  const no = new URLSearchParams(location.search).get('ecpay')
+  if (!no) return ''
+  history.replaceState(null, '', location.pathname + location.hash)
+  return no
+})())
+if (ecpayOrder.value) mode.value = 'handbook'
+
 // The duel and solo modes fill the screen and have no back button of their own (unlike the
 // dice builder and store info, which each end their own flow), so they get a shared one here.
 // It asks first: both modes hold real progress, and the button sits near the screen edge where
@@ -99,6 +122,42 @@ function exitToHome() {
   battle.resetGame()
   showExitConfirm.value = false
   leaveMode()
+}
+
+// 公告。兩件事分開：列表是人主動點開的，蓋板是自己跳出來的。
+const noticeBoard = ref(false)
+// 從信箱去拆禮：拆完要回得來。空字串＝整疊一起拆，有值＝只拆那一件。
+const giftOnly = ref('')
+const fromMailbox = ref(false)
+
+function openGifts(id = '') {
+  giftOnly.value = id
+  fromMailbox.value = noticeBoard.value
+  noticeBoard.value = false
+  openMode('gifts')
+}
+
+function closeGifts() {
+  leaveMode()
+  giftOnly.value = ''
+  // 從信箱來的就回信箱 —— 一疊信領到一半被丟回主畫面，剩下的那幾封就得重新找一次。
+  if (fromMailbox.value) {
+    fromMailbox.value = false
+    noticeBoard.value = true
+  }
+}
+// 蓋板只在主畫面出現，有幾則就一則一則接著跳，每則都要自己按掉；按掉過的不會因為
+// 從某個模式返回主畫面又跳一次。「今日不再顯示」是更強的一層，跨重新整理。
+//
+// 記的是「按掉過哪幾則」而不是排到第幾個：按掉的那一則如果同時被「今日不再顯示」
+// 收走，整疊會當場少一個，用序號的話就會跳過下一則。
+const splashDone = ref([])
+const splashNow = computed(() => (mode.value === null
+  ? splashNotices.value.find(a => !splashDone.value.includes(a.id)) || null
+  : null))
+
+function closeSplash(id) {
+  splashDone.value = [...splashDone.value, id]
 }
 
 const stageRef = ref(null)
@@ -121,6 +180,8 @@ const activeModalKey = computed(() => {
 
 onMounted(() => {
   characterData.loadData()
+  // 首頁那張「秘笈手冊」卡片要不要顯示「即將上線」，由伺服器說了算。
+  refreshHandbookShop()
 })
 
 const uninstallButtonSfx = installButtonSfx()
@@ -154,7 +215,12 @@ onBeforeUnmount(uninstallButtonSfx)
         <button class="btn" @click="characterData.loadData()">{{ t('app.retry') }}</button>
       </div>
 
-      <ModeSelect v-else-if="mode === null" @pick="openMode($event)" @gifts="openMode('gifts')" />
+      <ModeSelect
+        v-else-if="mode === null"
+        @pick="openMode($event)"
+        @gifts="openGifts()"
+        @notices="noticeBoard = true"
+      />
 
       <template v-else-if="mode === 'duel'">
         <OnlineRoomPanel :online="online" />
@@ -200,14 +266,20 @@ onBeforeUnmount(uninstallButtonSfx)
       />
 
       <TypeChartApp v-else-if="mode === 'typeChart'" @back="leaveMode()" />
-      <HandbookApp v-else-if="mode === 'handbook'" @back="leaveMode()" />
+      <HandbookApp
+        v-else-if="mode === 'handbook'"
+        :ecpay-order="ecpayOrder"
+        @back="leaveMode()"
+        @sign-in="openMode('login', { from: 'handbook' })"
+        @order-seen="ecpayOrder = ''"
+      />
 
       <TierMakerApp v-else-if="mode === 'tierMaker'" @back="leaveMode()" />
 
       <TraitChartApp v-else-if="mode === 'traitChart'" @back="leaveMode()" />
 
       <PlayerProfileApp v-else-if="mode === 'profile'" @back="leaveMode()" />
-      <GiftRevealApp v-else-if="mode === 'gifts'" @back="leaveMode()" />
+      <GiftRevealApp v-else-if="mode === 'gifts'" :only="giftOnly" @back="closeGifts()" />
       <OnlineApp v-else-if="mode === 'online'" @back="leaveMode()" />
       <LeaderboardApp v-else-if="mode === 'leaderboard'" @back="leaveMode()" />
 
@@ -221,6 +293,10 @@ onBeforeUnmount(uninstallButtonSfx)
       <AdminRewardsApp v-else-if="mode === 'adminRewards'" @back="leaveMode()" />
 
       <AdminHandbookApp v-else-if="mode === 'adminHandbook'" @back="leaveMode()" />
+      <AdminSalesApp v-else-if="mode === 'adminSales'" @back="leaveMode()" />
+      <AdminCouponsApp v-else-if="mode === 'adminCoupons'" @back="leaveMode()" />
+      <AdminNoticeApp v-else-if="mode === 'adminNotice'" @back="leaveMode()" />
+      <AdminTickerApp v-else-if="mode === 'adminTicker'" @back="leaveMode()" />
 
       <SoloApp v-else />
 
@@ -240,6 +316,14 @@ onBeforeUnmount(uninstallButtonSfx)
           </div>
         </div>
       </div>
+
+      <NoticeSplash v-if="splashNow" :key="splashNow.id" :notice="splashNow" @close="closeSplash" />
+      <NoticeBoard
+        v-if="noticeBoard"
+        @close="noticeBoard = false"
+        @gifts="openGifts()"
+        @gift="openGifts($event)"
+      />
 
     </div>
   </div>

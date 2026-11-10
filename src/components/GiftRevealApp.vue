@@ -10,12 +10,16 @@
 // one — see reasonFor().
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { claimAllGifts } from '../data/gifts'
+import { claimAllGifts, claimOneGift } from '../data/gifts'
 import { describeAsset } from '../data/assetCatalogue'
 import { pointReason } from '../data/pointReason'
 import { avatarUrl, backgroundUrl, hasArtwork } from '../data/nameplateAssets'
 import { playGetItemSound } from '../data/buttonSfx'
 
+// 只拆某一件時給它的 id（信箱裡一封一封領走的那條路）；空字串＝整疊一起拆。
+// 領取仍然發生在這個畫面裡，不在呼叫端 —— 拆禮的那一下就是交易本身，拆開在兩個地方
+// 的話，「領了但沒看到」跟「看到了但沒領到」就各有一條路能發生。
+const props = defineProps({ only: { type: String, default: '' } })
 const emit = defineEmits(['back'])
 const { t } = useI18n()
 
@@ -30,7 +34,7 @@ const remaining = computed(() => items.value.length - index.value - 1)
 
 onMounted(async () => {
   try {
-    items.value = await claimAllGifts()
+    items.value = props.only ? [await claimOneGift(props.only)].filter(Boolean) : await claimAllGifts()
   } catch (e) {
     error.value = e.message
   } finally {

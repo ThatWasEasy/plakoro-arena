@@ -4,19 +4,30 @@ import logoIcon from '../assets/logo.png'
 import { bundled } from '../data/assetPath'
 import { useI18n } from 'vue-i18n'
 
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { isAdminAccount, isAdminMode } from '../data/adminSession'
 import { isBeta } from '../data/betaMode'
+import { shopOpen } from '../data/handbookTiers'
 import { giftCount, hasGifts, refreshGifts } from '../data/gifts'
+import { refreshAnnouncements, unreadCount } from '../data/announcements'
+import { refreshTicker, tickerText } from '../data/ticker'
 import { refreshPoints } from '../data/points'
 import Icon from './Icon.vue'
 
-const emit = defineEmits(['pick', 'gifts'])
+const emit = defineEmits(['pick', 'gifts', 'notices'])
+
+// 信封上的數字：沒讀的公告，加上沒領的禮物。兩種都是「有東西在等你」，分成兩個數字
+// 只是要人自己加起來。
+const waiting = computed(() => unreadCount.value + giftCount.value)
 const { t } = useI18n()
 
 // Two things on this screen open the group — the menu card and the mark in the corner. Held in
 // one place so they can never end up pointing somewhere different.
 const LINE_URL = 'https://line.me/ti/g2/nX4Wb5UHJR9vy573jqGe_Q_q2Rd6JsruabTKVw'
+
+// 書店開了沒。值由後台決定（見 data/handbookTiers.js 的 shopOpen），伺服器讀的是同一個
+// 值 —— 以前這是 build 時的旗標，要跟後端的環境變數一起翻，少翻一邊就會變成「點得進去
+// 但拿到 404」或「伺服器開了但卡片是死的」。現在只有一個值，不可能只翻一半。
 
 // Adding a mode should never mean re-tuning the layout, so the grid is driven off this list
 // rather than hand-written cards.
@@ -44,11 +55,12 @@ const MODES = [
   // Paid content, so the card is always shown and the chapters behind it are not: what a
   // player owns is checked when a chapter is opened, never by hiding the shelf.
   //
-  // `comingSoon` while the subscription billing is still being wired up: the shelf itself is
-  // ready enough to test on production, but the server answers 404 to everyone except the
-  // organiser (HANDBOOK_ADMIN_ONLY), so letting players in would only show them an empty
-  // shelf. The card stays visible because 即將上線 is the announcement — see 'online' above.
-  { key: 'handbook', comingSoon: true },
+  // 書店沒開的時候標成 `comingSoon`：書架本身早就能在正式環境實測，但伺服器對非管理員
+  // 一律回 404，放人進去只會看到一個空書架。卡片仍然顯示，因為「即將上線」就是公告
+  // 本身 —— 見上面的 'online'。
+  // comingSoon 寫成函式而不是值：這一格要等伺服器答覆才知道，而 MODES 是模組層級的
+  // 常數，寫成 `!shopOpen.value` 只會在載入那一刻算一次，之後開賣了卡片也不會活過來。
+  { key: 'handbook', comingSoon: () => !shopOpen.value },
   { key: 'typeChart' },
   // A link out, not a mode. `url` is what tells the menu to render an anchor instead of a
   // button — the card looks the same either way, but one changes screen and one leaves.
@@ -58,15 +70,20 @@ const MODES = [
   // up front pushed the front page past the point where every card still fit.
   { key: 'tournament', group: 'tools' },
   { key: 'tierMaker', group: 'tools' },
-  // Admin-only: the trait numbers are hand-maintained and incomplete, so publishing them as
-  // a player-facing chart would present guesses as data.
-  { key: 'traitChart', group: 'tools', adminOnly: true },
+  // 所有人都看得到，數值只有後台改得動（調整鍵長在那張圖上，見 TraitChartApp）。
+  { key: 'traitChart', group: 'tools' },
   // Only ever shown once admin mode is on (see App.vue's triple-tap-the-version-number entry
   // point) — hidden rather than just inert, so its existence isn't a hint to someone poking
   // around the menu who hasn't passed the PIN check.
   { key: 'adminSwitch', group: 'tools', adminOnly: true },
   { key: 'adminRewards', group: 'tools', adminOnly: true },
-  { key: 'adminHandbook', group: 'tools', adminOnly: true }
+  { key: 'adminHandbook', group: 'tools', adminOnly: true },
+  { key: 'adminSales', group: 'tools', adminOnly: true },
+  // 折扣碼跟營收分開：營收那幾頁在看已經發生的事，折扣碼是在設定接下來要發生的事。
+  { key: 'adminCoupons', group: 'tools', adminOnly: true },
+  { key: 'adminNotice', group: 'tools', adminOnly: true },
+  // 跑馬燈跟公告分開：一個是一則一則要讀完的，一個是一行一直在跑的字。
+  { key: 'adminTicker', group: 'tools', adminOnly: true }
 ]
 
 const GROUPS = [{ key: 'tools' }]
@@ -79,7 +96,8 @@ function visible(m) {
 
 // Visible but inert until it is finished — and never inert for the person building it.
 function locked(m) {
-  return !!m.comingSoon && !isAdminAccount.value
+  const soon = typeof m.comingSoon === 'function' ? m.comingSoon() : !!m.comingSoon
+  return soon && !isAdminAccount.value
 }
 
 const topLevel = computed(() => [
@@ -136,6 +154,13 @@ function measureTicker() {
   tickerCopies.value = Math.max(2, Math.ceil(bandW / copyW) + 1)
 }
 
+// 字是公告拿回來才有的，而且後台改一句話就會換一次長度 —— 量一次不夠，要跟著字重量。
+// nextTick 是因為要量的是渲染之後的寬度。
+watch(tickerText, async () => {
+  await nextTick()
+  measureTicker()
+})
+
 onMounted(() => {
   measureTicker()
   window.addEventListener('resize', measureTicker)
@@ -144,6 +169,10 @@ onMounted(() => {
   // avatar moves for the same reasons, so it is re-read on the same trigger.
   refreshGifts()
   refreshPoints()
+  // 公告不需要登入，所以跟禮物不同 —— 它每次回到主畫面都重讀，不管有沒有人登入。
+  refreshAnnouncements()
+  // 跑馬燈同理，而且它是這個畫面上唯一會自己變的東西。
+  refreshTicker()
 })
 onBeforeUnmount(() => window.removeEventListener('resize', measureTicker))
 
@@ -205,9 +234,18 @@ const rows = computed(() => {
       <!-- Bottom left, opposite the Line mark, and only when something is waiting. An unopened
            prize should be the hardest thing on this screen to miss — tucked into a dot on the
            avatar it would go unnoticed for weeks. -->
-      <button v-if="hasGifts" class="mode-gift" @click="emit('gifts')">
-        <Icon class="mode-gift-icon" name="gift" />
-        <span class="mode-gift-label">{{ t('gift.waiting', { n: giftCount }) }}</span>
+      <!-- 公告與禮物同一個入口。分成兩顆的話，這個角落要同時回答「有沒有新消息」跟
+           「有沒有東西可以拿」，而玩家問的其實是同一個問題：有沒有新的東西。
+           信封永遠在 —— 它是一個隨時能回去翻的地方，不是只有有新東西時才出現的通知。
+           有禮物在等的時候它會跳動，那是原本那顆禮物鈕唯一不能失去的東西。 -->
+      <button
+        class="mode-mail"
+        :class="{ nudge: hasGifts }"
+        :aria-label="t('mailbox.title')"
+        @click="emit('notices')"
+      >
+        <Icon class="mode-mail-icon" name="mail" />
+        <span v-if="waiting" class="mode-mail-badge">{{ waiting > 99 ? '99+' : waiting }}</span>
       </button>
       <!-- Stacked above the Line mark rather than placed beside it: both are marks in the
            same corner, and a second one on the same line would read as a pair of equals. -->
@@ -232,14 +270,14 @@ const rows = computed(() => {
     <!-- Announcements. The track holds as many copies as it takes to stay covered, and slides
          by exactly one of them, so at the loop point a copy is standing where the one before it
          started and the seam never shows. -->
-    <div ref="tickerEl" class="mode-ticker" aria-live="off">
+    <div v-if="tickerText" ref="tickerEl" class="mode-ticker" aria-live="off">
       <div class="mt-track" :style="{ '--shift': tickerShift }">
         <span
           v-for="i in tickerCopies"
           :key="i"
           class="mt-text"
           :aria-hidden="i > 1 ? 'true' : undefined"
-        >{{ t('notice.current') }}</span>
+        >{{ tickerText }}</span>
       </div>
     </div>
 
@@ -480,7 +518,9 @@ const rows = computed(() => {
      credit line beneath it; the marks sit in the empty band between the cards and the ticker,
      which is space the grid was never using. */
   position: absolute;
-  left: 0;
+  /* 跟左上角的頭像切齊（PlayerChip 的 left 也是 0.5rem）。貼著邊的話，同一個畫面上
+     會有兩條不一樣的左緣。 */
+  left: 0.5rem;
   /* Inset from the edge rather than flush against it — the board's own side padding stops at
      the flow content, and an absolutely positioned strip would otherwise sit tight to the
      screen edge while everything else breathes. */
@@ -499,8 +539,43 @@ const rows = computed(() => {
 
 /* Loud on purpose, and animated until it is opened — the reason grants moved out of the
    profile screen is that nobody noticed them there. */
-.mode-gift {
+.mode-mail {
   margin-right: auto;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.125rem;
+  height: 2.125rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(26, 26, 24, 0.08);
+  color: #1A1A18;
+  cursor: pointer;
+}
+.mode-mail:active { transform: scale(.96); }
+/* 有禮物沒領時才動。公告不跳 —— 會跳的東西多了就沒有東西在跳了。 */
+.mode-mail.nudge { animation: mode-gift-pulse 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .mode-mail.nudge { animation: none; }
+}
+.mode-mail-icon { font-size: 1.0625rem; }
+.mode-mail-badge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  min-width: 1.0625rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: #D0401F;
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mode-gift {
   display: flex;
   align-items: center;
   gap: 0.375rem;

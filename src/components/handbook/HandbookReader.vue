@@ -1,5 +1,5 @@
 <script setup>
-// One chapter, rendered page by page.
+// The book, read continuously.
 //
 // Teleported to <body> and sized in viewport units, which makes it the one screen in this app
 // that is not inside #stage. That is deliberate and it is the whole reason this component
@@ -16,20 +16,31 @@
 // Canvas rather than <iframe>: iOS Safari renders PDFs in iframes badly — blank, or only the
 // first page — and an iframe brings the browser's own toolbar, which includes a download
 // button. A download button on paid content undoes the entitlement check that fetched it.
+//
+// It takes the whole ordered book rather than one chapter, because a 450-page book cut into
+// 27 files should not make someone close the reader, find the shelf, and find their place
+// again 26 times. Reaching the end of a chapter loads the next one under it; the ☰ sheet
+// switches to any chapter directly.
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { fetchUnit } from '../../data/handbookSource'
 import { pageOf, setProgress } from '../../data/handbookProgress'
 
 const props = defineProps({
-  unit: { type: Object, required: true },
+  // The whole book in reading order, each entry carrying `owned` and, when it is not,
+  // `planName` — what it would take to open it. Locked chapters are listed, never loaded.
+  // `freeUntil` is set on a chapter opened to everyone for a while, and only on the copy
+  // handed to someone whose own plan does not already cover it.
+  units: { type: Array, required: true },
+  // Which one to open at.
+  startId: { type: String, required: true },
   // Tiled faintly across every page. Not a lock — a reader can still photograph the screen —
   // but it makes a leaked copy say who leaked it, which is the part that actually changes
   // behaviour. Tiled and diagonal rather than tucked in a corner, because a corner mark is
   // removed by cropping or by trimming the margin off a printout.
   watermark: { type: String, default: '' }
 })
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'locked'])
 const { t } = useI18n()
 
 // Zoom is applied as display width, not by re-rendering: pages are rasterised once at
@@ -64,29 +75,246 @@ function stepZoom(dir) {
 const canZoomOut = computed(() => zoom.value > ZOOM_STEPS[0])
 const canZoomIn = computed(() => zoom.value < ZOOM_STEPS[ZOOM_STEPS.length - 1])
 
-const pages = shallowRef([])
-const loading = ref(true)
-const error = ref('')
-const scrollerRef = ref(null)
-const currentPage = ref(1)
-const showToc = ref(false)
-
-// Straight from the manifest, which takes it from the book's own outline — so a chapter that
-// gains a section gains it here without anyone retyping a list.
-const toc = computed(() => props.unit.toc || [])
-
-function goTo(page) {
-  showToc.value = false
-  const el = scrollerRef.value?.querySelectorAll('.hr-page')[page - 1]
-  el?.scrollIntoView({ block: 'start' })
-}
-
-let doc = null
-let cancelled = false
+// How many chapters keep their rasterised pages at once.
+//
+// The images are the expensive part by an order of magnitude: an A4 page at 1600px is roughly
+// half a megabyte as a JPEG data URL, so an 18-page chapter is about 9 MB and a book chained
+// end to end would be hundreds. iOS reloads a tab that asks for that. The source PDFs are
+// kept instead — the whole 27-chapter book is about 14 MB of them — so a chapter scrolled
+// back into re-rasterises without going near the network, which on venue wifi is the
+// difference between instant and unusable.
+const LIVE_CHAPTERS = 3
 
 // Capped because a canvas that large is slow to paint and, on iOS, can fail outright — the
 // same ceiling the image export ran into.
 const MAX_CANVAS_WIDTH = 1600
+
+const scrollerRef = ref(null)
+const showToc = ref(false)
+const tocTab = ref('contents')
+
+/**
+ * The chapters currently stacked in the scroller, in reading order.
+ *
+ * Each is `{ unit, data, pages, status }` where `pages` is `[{ n, ratio, url }]`. A released
+ * chapter keeps its page list and its ratios — so the boxes keep their exact heights and
+ * nothing jumps — and only drops the `url`s.
+ */
+const chapters = shallowRef([])
+const error = ref('')
+const busy = ref(false)
+const currentId = ref('')
+const currentPage = ref(1)
+
+const index = computed(() => props.units.findIndex(u => u.id === props.startId))
+const current = computed(() => props.units.find(u => u.id === currentId.value) || props.units[index.value] || null)
+const currentTotal = computed(() => {
+  const c = chapters.value.find(c => c.unit.id === currentId.value)
+  return c?.pages.length || current.value?.pages || 0
+})
+const toc = computed(() => current.value?.toc || [])
+
+// The chapter after the last one stacked — what the foot of the book offers next.
+const nextUnit = computed(() => {
+  const last = chapters.value[chapters.value.length - 1]
+  if (!last) return null
+  const i = props.units.findIndex(u => u.id === last.unit.id)
+  return i >= 0 ? props.units[i + 1] || null : null
+})
+
+let token = 0
+
+/** Fetch a chapter's PDF once and keep the bytes; rasterising can then happen repeatedly. */
+async function bytesFor(entry) {
+  if (entry.data) return entry.data
+  const data = await fetchUnit(entry.unit.id)
+  // pdf.js detaches the buffer it is handed, so the retained copy has to be a separate one —
+  // otherwise re-rasterising a chapter scrolled back into finds an empty ArrayBuffer.
+  entry.data = data
+  return data
+}
+
+async function rasterise(entry, mine) {
+  const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist')
+  // Vite bundles the worker from the package rather than a CDN: the artifact CSP aside,
+  // this app has to keep working offline-ish on venue wifi.
+  const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+  GlobalWorkerOptions.workerSrc = worker.default
+
+  const data = await bytesFor(entry)
+  if (mine !== token) return
+  const doc = await getDocument({ data: data.slice(0) }).promise
+  try {
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n)
+      if (mine !== token) return
+      const base = page.getViewport({ scale: 1 })
+      const target = Math.min(window.innerWidth * (window.devicePixelRatio || 1), MAX_CANVAS_WIDTH)
+      const viewport = page.getViewport({ scale: target / base.width })
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.floor(viewport.width)
+      canvas.height = Math.floor(viewport.height)
+      const ctx = canvas.getContext('2d')
+      await page.render({ canvasContext: ctx, viewport }).promise
+      stamp(ctx, canvas.width, canvas.height, props.watermark)
+      const url = canvas.toDataURL('image/jpeg', 0.86)
+      const ratio = viewport.height / viewport.width
+      const existing = entry.pages[n - 1]
+      if (existing) Object.assign(existing, { url, ratio })
+      else entry.pages.push({ n, url, ratio })
+      chapters.value = [...chapters.value]
+    }
+    entry.status = 'ready'
+  } finally {
+    doc.destroy?.()
+  }
+}
+
+/**
+ * Drop the images of chapters far enough from the one being read.
+ *
+ * Only the `url`s go. The page boxes stay, at their measured ratios, so releasing a chapter
+ * above the viewport does not shorten the document under the reader's thumb.
+ */
+function trim() {
+  const live = chapters.value.findIndex(c => c.unit.id === currentId.value)
+  chapters.value.forEach((c, i) => {
+    const far = Math.abs(i - live) >= LIVE_CHAPTERS
+    if (far && c.status === 'ready') {
+      c.pages.forEach(p => { p.url = null })
+      c.status = 'released'
+    }
+  })
+}
+
+async function load(entry) {
+  if (busy.value) return
+  busy.value = true
+  const mine = token
+  try {
+    entry.status = 'loading'
+    chapters.value = [...chapters.value]
+    await rasterise(entry, mine)
+    if (mine === token) trim()
+  } catch (e) {
+    if (mine !== token) return
+    entry.status = 'error'
+    error.value = e.message === 'locked' ? t('handbook.locked') : t('handbook.loadFailed')
+  } finally {
+    busy.value = false
+  }
+}
+
+function entryFor(unit) {
+  return { unit, data: null, pages: [], status: 'idle' }
+}
+
+/** Open at one chapter, discarding whatever was stacked before. */
+async function openAt(unit) {
+  token++
+  error.value = ''
+  showToc.value = false
+  currentId.value = unit.id
+  currentPage.value = 1
+  const entry = entryFor(unit)
+  chapters.value = [entry]
+  await load(entry)
+  restore(unit.id)
+}
+
+/** Append the next chapter under the current stack. Locked chapters are never loaded. */
+async function loadNext() {
+  const u = nextUnit.value
+  if (!u || !u.owned || busy.value) return
+  const entry = entryFor(u)
+  chapters.value = [...chapters.value, entry]
+  await load(entry)
+}
+
+function onScroll() {
+  const el = scrollerRef.value
+  if (!el) return
+  const mid = el.scrollTop + el.clientHeight / 2
+
+  // Which chapter the reader is in, and which page of it — read off the DOM rather than
+  // tracked, because the heights differ per page and per zoom.
+  let seen = 0
+  for (const c of chapters.value) {
+    const kids = [...el.querySelectorAll(`[data-ch="${c.unit.id}"] .hr-page`)]
+    if (!kids.length) continue
+    const top = kids[0].offsetTop
+    const bottom = kids[kids.length - 1].offsetTop + kids[kids.length - 1].offsetHeight
+    if (mid >= top && mid < bottom) {
+      const i = kids.findIndex(k => k.offsetTop + k.offsetHeight > mid)
+      currentPage.value = (i === -1 ? kids.length : i + 1) || 1
+      if (currentId.value !== c.unit.id) {
+        currentId.value = c.unit.id
+        trim()
+      }
+      setProgress(c.unit.id, currentPage.value, kids.length)
+      break
+    }
+    seen++
+  }
+
+  // A chapter scrolled back into has to come back. Re-rasterised from the retained bytes,
+  // so this costs no network.
+  const here = chapters.value.find(c => c.unit.id === currentId.value)
+  if (here && here.status === 'released' && !busy.value) load(here)
+
+  // Near the foot: pull the next chapter in. One viewport of lead time, which at reading
+  // speed is far enough ahead that the join is not noticed.
+  if (el.scrollHeight - (el.scrollTop + el.clientHeight) < el.clientHeight) loadNext()
+}
+
+function goTo(page) {
+  showToc.value = false
+  const el = scrollerRef.value?.querySelector(`[data-ch="${currentId.value}"]`)
+  el?.querySelectorAll('.hr-page')[page - 1]?.scrollIntoView({ block: 'start' })
+}
+
+/** Pick up where this chapter was left off. */
+function restore(unitId) {
+  const page = pageOf(unitId)
+  if (page <= 1) return
+  requestAnimationFrame(() => {
+    const el = scrollerRef.value?.querySelector(`[data-ch="${unitId}"]`)
+    el?.querySelectorAll('.hr-page')[page - 1]?.scrollIntoView({ block: 'start' })
+  })
+}
+
+function pickChapter(u) {
+  if (!u.owned) {
+    showToc.value = false
+    emit('locked', u)
+    return
+  }
+  openAt(u)
+}
+
+function onKey(e) {
+  if (e.key === 'Escape') {
+    if (showToc.value) showToc.value = false
+    else emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', onKey)
+  // The page behind must not scroll while a full-screen reader is open.
+  document.body.style.overflow = 'hidden'
+  const start = props.units[index.value]
+  if (start) openAt(start)
+})
+onBeforeUnmount(() => {
+  token++
+  document.removeEventListener('keydown', onKey)
+  document.body.style.overflow = ''
+})
+watch(() => props.startId, id => {
+  const u = props.units.find(x => x.id === id)
+  if (u && u.id !== currentId.value) openAt(u)
+})
 
 // How the mark is inked.
 //
@@ -165,86 +393,6 @@ function stamp(ctx, width, height, text) {
   }
   ctx.restore()
 }
-
-async function render() {
-  loading.value = true
-  error.value = ''
-  pages.value = []
-  try {
-    const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist')
-    // Vite bundles the worker from the package rather than a CDN: the artifact CSP aside,
-    // this app has to keep working offline-ish on venue wifi.
-    const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-    GlobalWorkerOptions.workerSrc = worker.default
-
-    const data = await fetchUnit(props.unit.id)
-    if (cancelled) return
-    doc = await getDocument({ data }).promise
-
-    const out = []
-    for (let n = 1; n <= doc.numPages; n++) {
-      const page = await doc.getPage(n)
-      if (cancelled) return
-      const base = page.getViewport({ scale: 1 })
-      const target = Math.min(window.innerWidth * (window.devicePixelRatio || 1), MAX_CANVAS_WIDTH)
-      const viewport = page.getViewport({ scale: target / base.width })
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.floor(viewport.width)
-      canvas.height = Math.floor(viewport.height)
-      const ctx = canvas.getContext('2d')
-      await page.render({ canvasContext: ctx, viewport }).promise
-      stamp(ctx, canvas.width, canvas.height, props.watermark)
-      out.push({ n, url: canvas.toDataURL('image/jpeg', 0.86), ratio: viewport.height / viewport.width })
-      pages.value = [...out]
-      if (out.length === 1) restore()
-    }
-  } catch (e) {
-    error.value = e.message === 'locked' ? t('handbook.locked') : t('handbook.loadFailed')
-  } finally {
-    loading.value = false
-  }
-}
-
-function onScroll() {
-  const el = scrollerRef.value
-  if (!el) return
-  const mid = el.scrollTop + el.clientHeight / 2
-  const kids = [...el.querySelectorAll('.hr-page')]
-  const i = kids.findIndex(k => k.offsetTop + k.offsetHeight > mid)
-  currentPage.value = (i === -1 ? kids.length : i + 1) || 1
-  setProgress(props.unit.id, currentPage.value, total.value)
-}
-
-// Pick up where this chapter was left off. Done once the pages exist, since there is nothing
-// to scroll to before then.
-function restore() {
-  const page = pageOf(props.unit.id)
-  if (page <= 1) return
-  requestAnimationFrame(() => {
-    const el = scrollerRef.value?.querySelectorAll('.hr-page')[page - 1]
-    el?.scrollIntoView({ block: 'start' })
-  })
-}
-
-function onKey(e) {
-  if (e.key === 'Escape') emit('close')
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', onKey)
-  // The page behind must not scroll while a full-screen reader is open.
-  document.body.style.overflow = 'hidden'
-  render()
-})
-onBeforeUnmount(() => {
-  cancelled = true
-  document.removeEventListener('keydown', onKey)
-  document.body.style.overflow = ''
-  doc?.destroy?.()
-})
-watch(() => props.unit.id, render)
-
-const total = computed(() => doc?.numPages || props.unit.pages || 0)
 </script>
 
 <template>
@@ -252,9 +400,15 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
     <div class="hr">
       <header class="hr-bar">
         <button class="hr-close" :aria-label="t('common.back')" @click="emit('close')">✕</button>
-        <div class="hr-title">{{ unit.title }}</div>
+        <div class="hr-titlebox">
+          <div class="hr-title">{{ current?.title }}</div>
+          <!-- 只對「自己方案沒涵蓋這一章」的人顯示。對已經買到的人來說這不是優惠，
+               講了只會讓人覺得自己付的錢買到了別人免費就有的東西。 -->
+          <div v-if="current?.freeUntil" class="hr-free">
+            {{ t('handbook.freeRead') }} · {{ t('handbook.freeUntil', { date: current.freeUntil }) }}
+          </div>
+        </div>
         <button
-          v-if="toc.length"
           class="hr-tocbtn"
           :class="{ on: showToc }"
           :aria-label="t('handbook.contents')"
@@ -265,29 +419,64 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
           <span class="hr-zoom-val">{{ Math.round(zoom * 100) }}%</span>
           <button :disabled="!canZoomIn" :aria-label="t('handbook.zoomIn')" @click="stepZoom(1)">＋</button>
         </div>
-        <div class="hr-count">{{ pages.length ? `${currentPage} / ${total}` : '' }}</div>
+        <div class="hr-count">{{ currentTotal ? `${currentPage} / ${currentTotal}` : '' }}</div>
       </header>
 
       <!-- A sheet rather than a side panel: it is a jump list used for a second and
-           dismissed, and on a phone there is no side to put it on. -->
+           dismissed, and on a phone there is no side to put it on.
+
+           Two tabs rather than two icons in the bar. The bar already carries close, title,
+           zoom and a page count; a seventh control there is a control nobody can hit. -->
       <div v-if="showToc" class="hr-toc" @click.self="showToc = false">
         <div class="hr-toc-sheet">
-          <div class="hr-toc-head">{{ t('handbook.contents') }}</div>
-          <button
-            v-for="(e, i) in toc"
-            :key="i"
-            class="hr-toc-row"
-            :class="{ on: currentPage >= e.page && (!toc[i + 1] || currentPage < toc[i + 1].page) }"
-            @click="goTo(e.page)"
-          >
-            <span>{{ e.title }}</span>
-            <span class="hr-toc-pg">{{ e.page }}</span>
-          </button>
+          <div class="hr-tabs">
+            <button
+              class="hr-tab"
+              :class="{ on: tocTab === 'contents' }"
+              :disabled="!toc.length"
+              @click="tocTab = 'contents'"
+            >{{ t('handbook.contents') }}</button>
+            <button
+              class="hr-tab"
+              :class="{ on: tocTab === 'chapters' }"
+              @click="tocTab = 'chapters'"
+            >{{ t('handbook.chapters') }}</button>
+          </div>
+
+          <template v-if="tocTab === 'contents'">
+            <button
+              v-for="(e, i) in toc"
+              :key="i"
+              class="hr-toc-row"
+              :class="{ on: currentPage >= e.page && (!toc[i + 1] || currentPage < toc[i + 1].page) }"
+              @click="goTo(e.page)"
+            >
+              <span>{{ e.title }}</span>
+              <span class="hr-toc-pg">{{ e.page }}</span>
+            </button>
+          </template>
+
+          <!-- The whole book, locks included. A list that hid what is not owned would be a
+               list that cannot say what the subscription is for. -->
+          <template v-else>
+            <button
+              v-for="u in units"
+              :key="u.id"
+              class="hr-toc-row"
+              :class="{ on: u.id === currentId, locked: !u.owned }"
+              @click="pickChapter(u)"
+            >
+              <span class="hr-ch-title">{{ u.title }}</span>
+              <span v-if="u.freeUntil" class="hr-ch-free">{{ t('handbook.freeRead') }}</span>
+              <span v-else-if="!u.owned" class="hr-ch-lock">{{ u.planName || t('handbook.lockedShort') }}</span>
+              <span v-else class="hr-toc-pg">{{ t('handbook.pages', { n: u.pages }) }}</span>
+            </button>
+          </template>
         </div>
       </div>
 
-      <div v-if="loading && !pages.length" class="hr-state">{{ t('handbook.loading') }}</div>
-      <div v-else-if="error" class="hr-state">{{ error }}</div>
+      <div v-if="error && !chapters.length" class="hr-state">{{ error }}</div>
+      <div v-else-if="!chapters.length" class="hr-state">{{ t('handbook.loading') }}</div>
 
       <div
         v-else
@@ -296,10 +485,33 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
         :style="{ '--z': zoom }"
         @scroll.passive="onScroll"
       >
-        <div v-for="p in pages" :key="p.n" class="hr-page">
-          <img :src="p.url" :alt="`${unit.title} ${p.n}`" draggable="false">
+        <section v-for="c in chapters" :key="c.unit.id" :data-ch="c.unit.id">
+          <!-- Named at the join. Without it a chapter boundary in a continuous scroll is
+               invisible, and the reader cannot tell which book the page belongs to. -->
+          <div class="hr-join">{{ c.unit.title }}</div>
+          <div v-for="p in c.pages" :key="p.n" class="hr-page" :style="{ aspectRatio: `1 / ${p.ratio}` }">
+            <img v-if="p.url" :src="p.url" :alt="`${c.unit.title} ${p.n}`" draggable="false">
+          </div>
+          <div v-if="c.status === 'loading'" class="hr-more">{{ t('handbook.loadingMore') }}</div>
+          <div v-else-if="c.status === 'error'" class="hr-more">{{ error }}</div>
+        </section>
+
+        <!-- The foot of the book. Three answers, and the locked one is the only place in the
+             reader that mentions a plan — mid-scroll is the moment the next chapter is worth
+             something, so it is the one place the ask is not an interruption. -->
+        <div class="hr-foot">
+          <template v-if="nextUnit && nextUnit.owned">
+            <div class="hr-foot-label">{{ t('handbook.nextUp') }}</div>
+            <button class="hr-foot-cta" @click="loadNext">{{ nextUnit.title }}</button>
+          </template>
+          <template v-else-if="nextUnit">
+            <div class="hr-foot-label">{{ t('handbook.nextLocked', { n: nextUnit.title }) }}</div>
+            <button class="hr-foot-cta" @click="emit('locked', nextUnit)">
+              {{ nextUnit.planName || t('handbook.needPlanShort') }}
+            </button>
+          </template>
+          <div v-else class="hr-foot-label">{{ t('handbook.lastChapter') }}</div>
         </div>
-        <div v-if="loading" class="hr-more">{{ t('handbook.loadingMore') }}</div>
       </div>
     </div>
   </Teleport>
@@ -309,6 +521,7 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
 /* Viewport units, not rem — see the note at the top: this screen is outside #stage, and the
    root font-size belongs to the stage. */
 .hr {
+  zoom: var(--hb-scale, 1);
   position: fixed;
   inset: 0;
   z-index: 10000;
@@ -320,36 +533,54 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+/* 六樣東西（關閉、書名、目錄、縮放、頁碼）在一支手機的寬度裡排不下一行 —— 排不下時
+   書名會被擠成一個字一行的直書。讓它換行：書名佔滿第一行，操作鍵退到第二行，兩邊都
+   還讀得到。 */
 .hr-bar {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: max(16px, calc(env(safe-area-inset-top) / var(--hb-scale, 1))) 24px 16px;
   background: #1F1F1D;
   color: #fff;
 }
 .hr-close {
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 64px;
+  height: 64px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
-  font-size: 16px;
+  font-size: 32px;
   cursor: pointer;
 }
-.hr-title { flex: 1; font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hr-titlebox { flex: 1 1 220px; min-width: 0; }
+.hr-title { font-size: 30px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hr-free {
+  font-size: 20px; font-weight: 700; letter-spacing: 0.04em; color: #E8B57A;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hr-ch-free {
+  flex: none;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: #A8571F;
+  color: #FFF;
+  font-size: 20px;
+  font-weight: 700;
+}
 .hr-tocbtn {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 60px;
+  height: 60px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
-  font-size: 14px;
+  font-size: 28px;
   cursor: pointer;
 }
 .hr-tocbtn.on { background: #F0E4CC; color: #2C2117; }
@@ -366,61 +597,61 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
   width: 100%;
   max-height: 70%;
   overflow-y: auto;
-  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  padding: 28px 32px calc(36px + calc(env(safe-area-inset-bottom) / var(--hb-scale, 1)));
   background: #EDE0C8;
   color: #3E2F22;
-  font-family: "Noto Serif TC", "Songti TC", "Hiragino Mincho ProN", serif;
+  font-family: var(--ui-cjk);
 }
 .hr-toc-head {
-  font-size: 11px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.26em;
   color: #7A6753;
-  padding-bottom: 8px;
+  padding-bottom: 16px;
   border-bottom: 1px solid #C3A77F;
 }
 .hr-toc-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 24px;
   width: 100%;
-  padding: 11px 2px;
+  padding: 22px 4px;
   border: 0;
   border-bottom: 1px solid rgba(195, 167, 127, 0.45);
   background: none;
   color: inherit;
   font: inherit;
-  font-size: 15px;
+  font-size: 30px;
   text-align: left;
   cursor: pointer;
 }
 /* Which section the reader is actually in — the thing a jump list is usually missing. */
 .hr-toc-row.on { font-weight: 700; }
-.hr-toc-row.on::before { content: "❯"; font-size: 9px; margin-right: 6px; }
-.hr-toc-pg { flex: none; font-size: 12px; color: #7A6753; font-variant-numeric: tabular-nums; }
+.hr-toc-row.on::before { content: "❯"; font-size: 18px; margin-right: 12px; }
+.hr-toc-pg { flex: none; font-size: 24px; color: #7A6753; font-variant-numeric: tabular-nums; }
 
-.hr-zoom { flex: none; display: flex; align-items: center; gap: 2px; }
+.hr-zoom { flex: none; display: flex; align-items: center; gap: 4px; }
 .hr-zoom button {
-  width: 30px;
-  height: 30px;
+  width: 60px;
+  height: 60px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
-  font-size: 15px;
+  font-size: 30px;
   line-height: 1;
   cursor: pointer;
 }
 .hr-zoom button:disabled { opacity: .35; cursor: default; }
 .hr-zoom-val {
-  min-width: 42px;
+  min-width: 84px;
   text-align: center;
-  font-size: 11px;
+  font-size: 22px;
   color: rgba(255, 255, 255, 0.75);
   font-variant-numeric: tabular-nums;
 }
-.hr-count { flex: none; font-size: 12px; color: rgba(255, 255, 255, 0.7); font-variant-numeric: tabular-nums; }
+.hr-count { flex: none; font-size: 24px; color: rgba(255, 255, 255, 0.7); font-variant-numeric: tabular-nums; }
 
 /* Horizontal scrolling appears only once zoomed past the frame. */
 .hr-scroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
@@ -428,15 +659,88 @@ const total = computed(() => doc?.numPages || props.unit.pages || 0)
    nothing on a wide screen — which is exactly what it did the first time. */
 .hr-page {
   position: relative;
-  margin: 0 auto 10px;
+  margin: 0 auto 20px;
   width: calc(100% * var(--z, 1));
-  max-width: calc(900px * var(--z, 1));
+  max-width: calc(1800px * var(--z, 1));
 }
 .hr-page img { display: block; width: 100%; height: auto; }
 .hr-state, .hr-more {
-  padding: 32px 20px;
+  padding: 64px 40px;
   text-align: center;
   color: rgba(255, 255, 255, 0.75);
-  font-size: 14px;
+  font-size: 28px;
+}
+
+/* Two tabs, because the sheet now answers both "where am I in this chapter" and "take me to
+   another one". */
+.hr-tabs { display: flex; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid #C3A77F; }
+.hr-tab {
+  flex: 1;
+  padding: 14px 20px;
+  border: 1px solid #C3A77F;
+  border-radius: 14px;
+  background: none;
+  color: #7A6753;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.hr-tab.on { background: #3E2F22; border-color: #3E2F22; color: #F0E4CC; }
+.hr-tab:disabled { opacity: .4; cursor: default; }
+
+.hr-ch-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hr-toc-row.locked { color: #9A8771; }
+.hr-ch-lock {
+  flex: none;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(62, 47, 34, 0.1);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Where one chapter ends and the next begins. In a continuous scroll this is the only thing
+   telling the reader the book moved on. */
+.hr-join {
+  margin: 0 auto 20px;
+  padding: 14px 24px;
+  max-width: calc(1800px * var(--z, 1));
+  width: calc(100% * var(--z, 1));
+  border-radius: 16px;
+  background: rgba(240, 228, 204, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+/* The first chapter in the stack is the one the reader opened on purpose; its name is already
+   in the bar above. */
+.hr-scroll > section:first-child .hr-join { display: none; }
+
+/* A released chapter keeps its box so nothing jumps; this is what that box looks like. */
+.hr-page { background: rgba(255, 255, 255, 0.04); }
+
+.hr-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 56px 40px calc(80px + calc(env(safe-area-inset-bottom) / var(--hb-scale, 1)));
+}
+.hr-foot-label { color: rgba(255, 255, 255, 0.6); font-size: 26px; text-align: center; }
+.hr-foot-cta {
+  padding: 20px 44px;
+  border: 0;
+  border-radius: 999px;
+  background: #F0E4CC;
+  color: #2C2117;
+  font: inherit;
+  font-size: 28px;
+  font-weight: 800;
+  cursor: pointer;
 }
 </style>

@@ -7,9 +7,11 @@
 // The shape deliberately matches a nameplate's identity fields, because that is what a signed-in
 // player will be: a row in the same records the badges are drawn from.
 import { ref, computed } from 'vue'
-import { onSessionRejected } from './session'
+import { clearProgress } from './handbookProgress'
+import { getToken, onSessionRejected, setToken } from './session'
 import { clearGifts } from './gifts'
 import { clearPoints } from './points'
+import { forgetMine } from './handbookTiers'
 
 const STORAGE_KEY = 'plakoro_current_player_v1'
 
@@ -20,6 +22,15 @@ const GUEST_AVATAR = 'safe-mascot'
 // null means "nobody is signed in", which is the only state that exists today. It is kept as a
 // ref rather than a constant so the chip re-renders the moment that stops being true.
 const player = ref(load())
+
+// 身分與憑證是同一次登入的兩半，要嘛都在、要嘛都不在。只剩一半的 localStorage 不構成一個
+// 工作階段 —— 可能是使用者手動清掉了一邊，也可能是某個舊版本留下來的。
+//
+// 這段在模組載入時跑一次，所以帶著半套狀態的瀏覽器一打開新版就自己回到乾淨的訪客。對已經
+// 散出去的版本來說，這是唯一不必等使用者做任何事就能收斂的地方。只是它治不了停在舊版不更新
+// 的瀏覽器 —— 要連那些一起處理，得從伺服器端讓舊憑證失效。
+if (!player.value) setToken(null)
+if (!getToken()) setCurrentPlayer(null)
 
 function load() {
   try {
@@ -61,10 +72,17 @@ export function setCurrentPlayer(p) {
 }
 
 export function signOut() {
+  // 憑證先收，其餘的才是畫面。一個登出的人手上不該留著任何還能用的東西。
+  setToken(null)
   setCurrentPlayer(null)
   // Whatever was in the corner belonged to whoever just left.
   clearGifts()
   clearPoints()
+  // 訂閱屬於剛才那個人，不屬於這台裝置。
+  forgetMine()
+  // 讀到哪一頁也是。它現在存在伺服器上，這裡清的是畫面上還留著的那一份 —— 不清的話，
+  // 下一個在這台裝置登入的人，書架上第一眼看到的是上一個人的「繼續閱讀」。
+  clearProgress()
 }
 
 // A token the server refuses is a session that has ended, whatever ended it — so it goes
