@@ -8,6 +8,9 @@
 # Local DATABASE_URL etc. — see .env.example for what belongs here.
 .env
 .env.*
+# 例外：正式 build 的設定要進版控。它只有 VITE_ 開頭的變數，而那些一律會被編進 bundle，
+# 上線後打開 devtools 就看得到 —— 它們從來就不是祕密，差別只在於每次 build 有沒有設對。
+!.env.production
 
 # Full-resolution nameplate artwork. The build uses the compressed copies beside it; these are
 # 14 MB of source that git has no reason to carry.
@@ -28,3 +31,7 @@
 # never through the frontend bundle.
 /temp
 /handbook-build
+
+# Claude Code 的本機設定與裝進來的 skill。前者是這台機器的權限允許清單（檔名自己就寫著
+# local），後者是別人的專案 vendor 進來的文件集 —— 兩個都不是這個專案的程式碼。
+.claude/
