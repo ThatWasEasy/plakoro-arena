@@ -47,7 +47,11 @@ const { t } = useI18n()
 // MAX_CANVAS_WIDTH, which is wider than any phone, so enlarging up to that ceiling only uses
 // detail the canvas already holds. Re-rendering 31 pages on every tap of + would be the
 // obvious implementation and a much worse one.
-const ZOOM_STEPS = [0.8, 1, 1.25, 1.5, 2, 2.5]
+//
+// 往下縮比往上放寬鬆得多：放大吃的是 canvas 已經有的細節，所以上限頂到
+// MAX_CANVAS_WIDTH 就停；縮小只是把同一張圖畫小，沒有畫質問題，所以下面幾階是純粹的
+// 「我想一眼看到整頁」。固定版面的 PDF 在手機上最常要的就是這個。
+const ZOOM_STEPS = [0.5, 0.6, 0.7, 0.8, 1, 1.25, 1.5, 2, 2.5]
 const ZOOM_KEY = 'plakoro_handbook_zoom_v1'
 
 function loadZoom() {
