@@ -166,12 +166,25 @@ function planTag(u) {
     // 整套的門檻取「還沒解鎖的那幾本裡最高的那一檔」—— 已經讀得到一半的人，要的是
     // 開啟剩下一半的那一檔（跟 bundleTier 同一個理由）。
     const need = bundleTier(u.bundle)
-    return need ? (metaOf(need)?.name || need).split('｜')[0] : t('handbook.tagFree')
+    // need 是 null 只剩「這本裡面一冊都沒有」一種情況（bundleTier 全部解鎖時會改答
+    // 它屬於哪一檔）。那種時候不標，而不是標「免費」—— 標錯價比不標貴。
+    return need ? (metaOf(need)?.name || need).split('｜')[0] : ''
   }
   // 當週試閱蓋過原本的門檻：這幾天它就是不用訂閱也讀得到。
+  //
+  // 「免費」與「試閱中」是兩種狀態，不是同一件事的兩種寫法：免費是這一冊的門檻就在
+  // free 這一檔（永久，沒有到期日），試閱是有期限地蓋過原本的門檻。同一冊兩個都設的
+  // 時候先答試閱 —— 那是會過期的那一個，先講它比較誠實。
   if (showsFreeBadge(u)) return t('handbook.tagTrial')
   const key = tierFor(u)
-  if (rankOf(key) <= 0) return t('handbook.tagFree')
+  const r = rankOf(key)
+  // rankOf 找不到時回 -1，而那跟「第一檔（免費）」是兩回事。-1 表示這一冊沒有任何方案
+  // 對應得上 —— 切書的 grants 漏了它，或階梯上那一檔被刪了。covers() 對這種情況一律
+  // 鎖住，所以它絕對不能標成「免費」：那會變成畫面寫著免費、點下去打不開。
+  //
+  // 不標而不是標個「？」：標籤的用途是回答「要哪一檔」，答不出來的時候沉默比猜好。
+  if (r < 0) return ''
+  if (r === 0) return t('handbook.tagFree')
   return (metaOf(key)?.name || key).split('｜')[0]
 }
 
@@ -549,10 +562,17 @@ onBeforeUnmount(() => {
                 </span>
                 <!-- 左上角：要哪一檔才讀得到。右上角是鎖，兩個角各答一個問題 ——
                      「我現在能不能讀」跟「這本屬於哪一檔」不是同一件事。 -->
-                <span class="hb-tag" :class="tagMetal(u)">{{ planTag(u) }}</span>
+                <span v-if="planTag(u)" class="hb-tag" :class="tagMetal(u)">{{ planTag(u) }}</span>
                 <!-- 下架中：橫過封面的一條帶子。不是角落的小標 —— 這本現在誰都讀不到，
                      包含已經買到那一檔的人，所以它要蓋在書上，不是躲在角落。 -->
                 <span v-if="u.kind !== 'bundle' && holdLabel(u)" class="hb-hold">{{ holdLabel(u) }}</span>
+                <!-- 已經上架、只是還沒解鎖。跟「監修中」同一個位置、不同顏色：一個是
+                     「買得到」，一個是「現在誰都拿不到」。角落那顆鎖只說得出「不能讀」，
+                     說不出是哪一種。 -->
+                <span
+                  v-else-if="u.kind !== 'bundle' && !owns(u)"
+                  class="hb-hold unlockable"
+                >{{ t('handbook.tagUnlockable') }}</span>
                 <template v-if="u.kind !== 'bundle'">
                   <span v-if="!owns(u)" class="hb-locked" aria-hidden="true"><Icon name="lock" /></span>
                   <span v-else-if="startedOf(u.id)" class="hb-ribbon" aria-hidden="true"></span>
@@ -949,6 +969,10 @@ onBeforeUnmount(() => {
 
 /* 監修中的帶子。橫過書腰的位置（約三分之二高），而不是蓋住封面正中央 —— 書還要認得出
    是哪一本，帶子是加在上面的一句話，不是替代品。 */
+.hb-hold.unlockable {
+  background: rgba(168, 87, 31, 0.9);
+  color: #FFF4E6;
+}
 .hb-hold {
   position: absolute;
   left: 0;

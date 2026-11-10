@@ -1087,6 +1087,7 @@
     "freeUntil": "until {date}",
     "tagFree": "Free",
     "tagTrial": "Free now",
+    "tagUnlockable": "Unlockable",
     "plansEntry": "Plans",
     "freeThisWeek": "Open free for 7 days (including today)",
     "freeOn": "Free now",
