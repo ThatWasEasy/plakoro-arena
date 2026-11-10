@@ -99,6 +99,14 @@ const F = {
   avatarRadius: 0.25 / 3.75
 }
 
+// How far the avatar's frame overhangs the picture inside it. Measured from the artwork: the
+// clear window is 80.5% of the frame's width, so the frame is drawn ~1.24x the avatar for the
+// opening to line up with the picture's edge.
+//
+// Must stay in step with PlayerBanner.vue's `--frame-scale` — the sheet and the on-screen
+// nameplate are two drawings of one design, and this is one of the numbers they share.
+const FRAME_SCALE = 1.24
+
 function drawPlate(ctx, plate, x, y, images, t) {
   const H = PLATE_H
   const border = H * F.border
