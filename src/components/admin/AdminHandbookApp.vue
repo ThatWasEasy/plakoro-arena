@@ -58,10 +58,23 @@ const dirty = computed(() => current.value !== snapshot)
  *
  * until 是最後一天、當天仍然有效，所以七天是 +6 而不是 +7。
  */
+/**
+ * 'YYYY-MM-DD'，照按下去的人所在地的日期算。
+ *
+ * 不用 toISOString()：那是 UTC 的日期。台灣是 UTC+8，所以凌晨零點到八點之間，UTC 還
+ * 停在前一天 —— 那段時間按下去會少給一天。試閱的到期日是會被人記在行事曆上的東西。
+ */
+function localDate(d) {
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+const today = localDate(new Date())
+
 function sevenDays() {
   const d = new Date()
   d.setDate(d.getDate() + 6)
-  return d.toISOString().slice(0, 10)
+  return localDate(d)
 }
 
 async function toggleFree(u) {
@@ -114,6 +127,23 @@ async function toggleHold(u) {
       ? await adminApi.releaseHandbookUnit(adminToken.value, u.id)
       : await adminApi.holdHandbookUnit(adminToken.value, u.id, '', 'admin')
     holds.value = cfg.holds || {}
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    saving.value = false
+  }
+}
+
+/** 改試閱的到期日。空字串代表關掉試閱。 */
+async function setFreeUntil(u, until) {
+  if (saving.value) return
+  saving.value = true
+  error.value = ''
+  try {
+    const cfg = until
+      ? await adminApi.setHandbookFree(adminToken.value, u.id, until, 'admin')
+      : await adminApi.clearHandbookFree(adminToken.value, u.id)
+    freeUntil.value = cfg.freeUntil || {}
   } catch (e) {
     error.value = e.message
   } finally {
@@ -408,6 +438,17 @@ async function save() {
             >{{ t('admin.handbookHold') }}</button>
             <span class="ah-unit-name" :class="{ held: holds[u.id] }">{{ u.title }}</span>
             <!-- 沿用預設時把預設值寫在選項裡，不然「預設」兩個字沒有告訴任何人它是哪一檔。 -->
+            <!-- 試閱開著的時候才出現。到期日要能改 —— 「按一下給七天」只是個預設，
+                 真正要回答的是「開放到哪一天」。 -->
+            <input
+              v-if="freeUntil[u.id]"
+              class="ah-in ah-trial-date"
+              type="date"
+              :value="freeUntil[u.id]"
+              :min="today"
+              :disabled="saving"
+              @change="setFreeUntil(u, $event.target.value)"
+            >
             <select
               class="ah-in sel"
               :value="access[u.id] || INHERIT"
@@ -608,7 +649,10 @@ async function save() {
 .ah-unit {
   display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
   padding: 0.1875rem 0.375rem; border-bottom: 0.0625rem solid var(--line);
+  /* 試閱的日期欄出現時讓它換行，不要跟冊名擠在同一行把名字壓扁。 */
+  flex-wrap: wrap;
 }
+.ah-trial-date { flex: none; width: 8.5rem; font-size: 0.625rem; }
 /* 等級下拉的左邊，窄到不會跟冊名搶位置。開啟時整顆翻成實心，因為這是個會花錢的狀態
    （這一冊現在不收錢了），掃過一排時要一眼看得出哪幾冊正開著。 */
 .ah-trial {
