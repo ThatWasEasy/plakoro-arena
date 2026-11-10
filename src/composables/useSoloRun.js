@@ -357,7 +357,10 @@ export function useSoloRun(charactersRef, movesRef) {
     runEffects()
   }
 
-  // Same shape as duel mode's — see useBattleState for why none of this is held in closures.
+  // 跟對戰模式同一套流程（見 useBattleState：為什麼這些不放在 closure 裡），但**狀態的
+  // 形狀不一樣**：那邊兩位對戰者放在 state.players 這個表裡，這邊是 state.player 與
+  // state.ai 兩個獨立的鍵。所以這裡要用 combatant()，不能照抄 state.players[key] ——
+  // 那會讀到 undefined，而且要等效果佇列真的跑起來（也就是玩家點下招式之後）才會炸。
   function hydrateEffectCtx() {
     const c = state.effectCtx
     if (!c) return null
@@ -365,8 +368,8 @@ export function useSoloRun(charactersRef, movesRef) {
     const chara = (mv && mv.chara) || []
     return {
       ...c,
-      mover: state.players[c.moverKey],
-      opp: state.players[c.oppKey],
+      mover: combatant(c.moverKey),
+      opp: combatant(c.oppKey),
       mv,
       ce: c.ceIndex === null || c.ceIndex < 0 ? null : chara[c.ceIndex]
     }

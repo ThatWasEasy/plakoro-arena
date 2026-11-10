@@ -113,6 +113,19 @@ export function useBattleState(movesRef) {
     return k === "A" ? "B" : "A"
   }
 
+  /**
+   * 用一方的代號拿到那一方。
+   *
+   * 存在的理由不是省字，是讓這個檔案裡的回合流程跟 useSoloRun 的那一份長得一樣 ——
+   * 兩邊的狀態形狀不同（這裡是 state.players 這張表，單人爬塔是 state.player 與
+   * state.ai 兩個鍵），而那幾個函式是一份一份對著抄的。抄到寫死形狀的那一行，就會
+   * 讀到 undefined，而且要等效果佇列真的跑起來才會炸（單人爬塔就這樣壞過一次）。
+   * 兩邊都只透過這一個函式取人，抄過去也還是對的。
+   */
+  function combatant(key) {
+    return state.players[key]
+  }
+
   function bothLocked() {
     return state.players.A.locked && state.players.B.locked
   }
@@ -166,7 +179,7 @@ export function useBattleState(movesRef) {
   function confirmCharacterMoves(key) {
     const m = state.modals[key]
     if (!m || m.tempMoves.length !== 4) return
-    const p = state.players[key]
+    const p = combatant(key)
     p.character = m.tempChar
     p.moveIds = m.tempMoves
     p.locked = true
@@ -177,7 +190,7 @@ export function useBattleState(movesRef) {
   }
 
   function onCardTap(key) {
-    const p = state.players[key]
+    const p = combatant(key)
     if (state.phase !== "select") return
     if (!p.locked) {
       openCharSelect(key)
@@ -190,7 +203,7 @@ export function useBattleState(movesRef) {
   // Online-only: marks this side ready to start; useOnlineRoom watches for both sides being
   // ready and runs the first-pick wheel, then calls startBattle() itself once it lands.
   function setReadyForFirst(key) {
-    state.players[key].readyForFirst = true
+    combatant(key).readyForFirst = true
   }
 
   // --- energy dice setup (online-only, phase: "select") ---
@@ -202,7 +215,7 @@ export function useBattleState(movesRef) {
   // char/move picking), and sharing one state.modal slot meant whoever confirmed second stole
   // or closed the other side's picker. This is the one synced step: the finished result.
   function setEnergyDice(key, dice) {
-    state.players[key].energyDice = dice
+    combatant(key).energyDice = dice
   }
 
   function startBattle(firstKey) {
@@ -229,7 +242,7 @@ export function useBattleState(movesRef) {
    */
   // Whose decision the move for `turnKey` is. そそのかす is the only thing that moves it.
   function moveActorKey(turnKey) {
-    return modOf(state.players[turnKey], STEP.MOVE_SELECT, 'pickedByOpponent')
+    return modOf(combatant(turnKey), STEP.MOVE_SELECT, 'pickedByOpponent')
       ? opponentKey(turnKey)
       : turnKey
   }
@@ -275,7 +288,7 @@ export function useBattleState(movesRef) {
 
     // Somebody made this player's dice rerollable (ほりかえす / ジュエルフラッシュ). Hand the
     // choice of which ones to the player who cast it, before this roll is allowed to settle.
-    const mover = state.players[state.turnPlayer]
+    const mover = combatant(state.turnPlayer)
     const forced = modOf(mover, STEP.DICE_ROLL, 'forcedReroll')
     if (forced && !state.diceRerollRequest) {
       state.diceRerollRequest = {
@@ -316,9 +329,9 @@ export function useBattleState(movesRef) {
   function resolveTurn(result) {
     const MOVES = movesRef.value
     const moverKey = state.turnPlayer
-    const mover = state.players[moverKey]
+    const mover = combatant(moverKey)
     const oppKey = opponentKey(moverKey)
-    const opp = state.players[oppKey]
+    const opp = combatant(oppKey)
     const mv = MOVES[state.selectedMove]
     mover.lastMoveId = state.selectedMove
     mover.lastMoveFailed = result.kind === "fail"
@@ -367,8 +380,8 @@ export function useBattleState(movesRef) {
     const chara = (mv && mv.chara) || []
     return {
       ...c,
-      mover: state.players[c.moverKey],
-      opp: state.players[c.oppKey],
+      mover: combatant(c.moverKey),
+      opp: combatant(c.oppKey),
       mv,
       ce: c.ceIndex === null || c.ceIndex < 0 ? null : chara[c.ceIndex]
     }
@@ -586,7 +599,7 @@ export function useBattleState(movesRef) {
   function playEffectOn(targetKey, type, dmg, cb, attackerKey, isMiss) {
     const isHeal = dmg < 0
     const doHit = () => {
-      const target = state.players[targetKey]
+      const target = combatant(targetKey)
       const didBlink = !isMiss && !isHeal && dmg > 0
       if (didBlink) target.hitBlink = true
       target.dmgOverlay = { text: isHeal ? `+${-dmg}` : (isMiss ? "MISS" : (dmg > 0 ? `-${dmg}` : "0")), heal: isHeal }
@@ -597,7 +610,7 @@ export function useBattleState(movesRef) {
       }, 550)
     }
     if (attackerKey) {
-      const attacker = state.players[attackerKey]
+      const attacker = combatant(attackerKey)
       attacker.attackAnim = attackerKey === "A" ? "atk-right" : "atk-left"
       setTimeout(() => {
         attacker.attackAnim = null
@@ -609,7 +622,7 @@ export function useBattleState(movesRef) {
   }
 
   function frameOutDeadMon(key, cb) {
-    state.players[key].frameOut = true
+    combatant(key).frameOut = true
     setTimeout(cb, 1000)
   }
 
@@ -638,7 +651,7 @@ export function useBattleState(movesRef) {
   }
 
   function showTurnCutIn(key) {
-    const p = state.players[key]
+    const p = combatant(key)
     const isFirstTurn = state.turnCount === 0
     const energyCount = Math.max(0, (isFirstTurn ? 2 : 3) + modSum(p, STEP.DICE_ROLL, 'diceCount'))
     const hasChara = !modOf(p, STEP.DICE_ROLL, 'charaDieBlocked')
