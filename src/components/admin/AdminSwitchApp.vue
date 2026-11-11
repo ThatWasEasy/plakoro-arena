@@ -200,6 +200,15 @@ const toggleError = ref('')
 // 出現在畫面上。
 const acctShown = ref(false)
 
+/** 這個玩家怎麼進得來。兩種都有的人是先註冊、後來才到設定頁綁 Google 的。 */
+const loginMethod = computed(() => {
+  const d = detail.value
+  if (!d) return ''
+  if (d.hasPin && d.google) return t('admin.loginBoth')
+  if (d.google) return t('admin.loginGoogle')
+  return t('admin.loginPin')
+})
+
 const newPin = ref('')
 const pinBusy = ref(false)
 const pinError = ref('')
@@ -511,6 +520,13 @@ async function toggle(kind, asset) {
             <span v-if="claimError" class="as-error">{{ claimError }}</span>
           </div>
 
+          <!-- 怎麼進來的。擺在最前面，因為它決定下面那幾塊有沒有意義：用 Google 註冊
+               的人沒有帳號名、也沒有 PIN 可以重設。 -->
+          <div v-if="detail.hasAccount" class="as-claim">
+            <span class="as-acct-label">{{ t('admin.loginMethod') }}</span>
+            <code class="as-claim-code">{{ loginMethod }}</code>
+          </div>
+
           <!-- 登入用的帳號名。忘記帳號的人在這之前無解 —— 重設 PIN 幫不上忙，因為
                登入表單的另一半他還是填不出來。
                預設遮著、點一下才顯示：擋不住蓄意的人（能進這個畫面的人本來就能重設
@@ -529,12 +545,20 @@ async function toggle(kind, asset) {
           <div v-if="detail.player?.email" class="as-claim">
             <span class="as-acct-label">{{ t('admin.emailLabel') }}</span>
             <code v-if="acctShown" class="as-claim-code">{{ detail.player.email }}</code>
-            <span v-else class="as-acct-label">••••</span>
+            <!-- 自己也要有一顆「顯示」。原本是共用上面帳號名那一顆，但用 Google 註冊的
+                 人沒有帳號名那一塊，信箱就永遠展不開了。 -->
+            <button v-else class="btn secondary as-claim-btn" @click="acctShown = true">
+              {{ t('admin.accountReveal') }}
+            </button>
           </div>
 
           <!-- 相對的那一半：已經有帳號的人忘記 PIN。認領碼對他們是拒絕的（那會變成把
-               帳號交給拿到碼的人），所以復原只能走重設 —— 帳號名不動，只換 PIN。 -->
-          <div v-if="detail.hasAccount" class="as-claim">
+               帳號交給拿到碼的人），所以復原只能走重設 —— 帳號名不動，只換 PIN。
+
+               hasPin 而不是 hasAccount：用 Google 註冊的人沒有 PIN，伺服器會拒絕
+               （'player signs in with google'），畫面上就不該留一個按下去只會出錯的欄位。
+               他們忘記的話不需要我們幫忙 —— 回 Google 重設就好。 -->
+          <div v-if="detail.hasPin" class="as-claim">
             <input
               v-model="newPin"
               class="as-input as-pin"
