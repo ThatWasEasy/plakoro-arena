@@ -20,16 +20,14 @@
 <script>
   location.replace('/' + location.search + location.hash)
 </script>
-<!-- JavaScript 關掉的時候的退路。0 秒，所以正常情況下看不到下面那行字。 -->
+<!-- JavaScript 關掉時的退路。0 秒，而且上面那行 script 正常情況下早就跑完了。 -->
 <meta http-equiv="refresh" content="0; url=/">
-<style>
-  body { margin:0; display:grid; place-items:center; min-height:100vh;
-         background:#F5F3EC; color:#3A3A3A;
-         font-family:"PingFang TC","Microsoft JhengHei",sans-serif; }
-  a { color:#A8571F; }
-</style>
+<style>body{margin:0;background:#F5F3EC}</style>
 </head>
-<body>
-  <p>網址換新了 —— <a href="/">https://plakoro.tw</a></p>
-</body>
+<!--
+  刻意不寫「網址換新了，請自行更新書籤」那類文案：這一頁在設計上不會被看到，寫了反而
+  像在要求使用者自己處理一件我們已經處理掉的事。連 script 跟 meta refresh 都失效的
+  瀏覽器才會停在這裡，那時候一個連結就夠了。
+-->
+<body><a href="/">PLAKORO ARENA</a></body>
 </html>
