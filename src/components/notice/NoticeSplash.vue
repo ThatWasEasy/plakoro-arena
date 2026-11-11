@@ -65,7 +65,7 @@ function close() {
   position: relative;
   width: 100%;
   max-width: 22rem;
-  max-height: 86vh;
+  max-height: 86vh; max-height: 86dvh;
   overflow-y: auto;
   border-radius: 0.875rem;
   background: #FFFDF7;

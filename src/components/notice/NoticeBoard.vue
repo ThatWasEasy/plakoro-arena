@@ -244,7 +244,7 @@ function takeAll() {
   width: 100%;
   /* 兩欄要有地方站。比公告只有一列時寬，但仍然放得進手機。 */
   max-width: 34rem;
-  height: 82vh;
+  height: 82vh; height: 82dvh;
   max-height: 32rem;
   border-radius: 0.875rem;
   background: #FFFDF7;

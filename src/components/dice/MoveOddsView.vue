@@ -786,7 +786,7 @@ async function exportImage() {
   border: 0.0625rem solid var(--line);
   border-radius: 0.5rem;
   display: flex; flex-direction: column; gap: 0.375rem;
-  max-height: 45vh;
+  max-height: 45vh; max-height: 45dvh;
   overflow-y: auto;
 }
 .odds-tempo { display: flex; flex-direction: column; gap: 0.1875rem; }

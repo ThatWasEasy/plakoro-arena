@@ -60,7 +60,7 @@ const doc = () => LEGAL_DOCS.find(d => d.key === which.value)
   flex-direction: column;
   width: 100%;
   max-width: 34rem;
-  max-height: 88vh;
+  max-height: 88vh; max-height: 88dvh;
   border-radius: 0.75rem;
   background: #fff;
   color: #1F1F1D;

@@ -534,7 +534,7 @@ async function save() {
 .ap-sheet {
   width: 100%;
   max-width: 26rem;
-  max-height: 86vh;
+  max-height: 86vh; max-height: 86dvh;
   overflow-y: auto;
   padding: 1rem;
   border-radius: 0.75rem;
