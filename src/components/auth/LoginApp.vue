@@ -9,6 +9,7 @@
      重設，之後接寄信）。既有玩家沒有信箱，補的路在 PlayerProfileApp.vue。 -->
 <script setup>
 import { ref } from 'vue'
+import { LINE_COMMUNITY_URL } from '../../data/community'
 import { useI18n } from 'vue-i18n'
 import * as authApi from '../../data/authApi'
 import { setCurrentPlayer } from '../../data/currentPlayer'
@@ -114,7 +115,10 @@ const doClaim = () => run(async () =>
         <input v-model="loginAccount" class="la-input" :placeholder="t('account.accountPlaceholder')" autocapitalize="none">
         <input v-model="loginPin" type="password" class="la-input" :placeholder="t('account.pinPlaceholder')">
         <button class="btn" type="submit" :disabled="busy || !agreedLegal">{{ t('account.loginSubmit') }}</button>
-        <p class="la-hint">{{ t('account.forgotPin') }}</p>
+        <p class="la-hint">
+          {{ t('account.forgotPin') }}
+          <a class="la-link" :href="LINE_COMMUNITY_URL" target="_blank" rel="noopener">{{ t('mode.line') }}</a>
+        </p>
       </form>
 
       <form v-else-if="tab === 'register'" class="la-form" @submit.prevent="doRegister">
@@ -219,6 +223,9 @@ const doClaim = () => run(async () =>
   font-family: inherit;
 }
 .la-input:focus { outline: none; border-color: var(--accent-strong); }
+
+/* 入口被斷成兩行的話就不像一個可以按的東西了。 */
+.la-link { color: inherit; font-weight: 800; text-decoration: underline; white-space: nowrap; }
 
 .la-hint { margin: 0; font-size: 0.6875rem; color: var(--sub); line-height: 1.6; }
 

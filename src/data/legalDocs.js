@@ -9,11 +9,13 @@
 //
 // 改這三個值等於改一份已經生效的文件。動它的時候，生效日要一起往後推並公告 ——
 // 條款上的聯絡方式是個資法第 3 條那些權利唯一的行使管道。
+import { LINE_COMMUNITY_URL as LINE_URL } from './community.js'
+
 export const OPERATOR = '尚恩數位'
 export const CONTACT_EMAIL = 'plakorotaiwan@gmail.com'
 export const EFFECTIVE_FROM = '2026 年 11 月 11 日'
 
-const LINE_URL = 'https://line.me/ti/g2/nX4Wb5UHJR9vy573jqGe_Q_q2Rd6JsruabTKVw'
+
 
 export const TERMS = {
   key: 'terms',

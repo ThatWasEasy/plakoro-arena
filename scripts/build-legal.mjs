@@ -7,12 +7,16 @@
 // 其中一邊而另一邊沒改，是只有在出事那天才會被逐字比對出來的那種錯。這裡跟站內浮層讀
 // 的是同一個 src/data/legalDocs.js。
 //
+// dev 看不到產生出來的檔案（它們在 docs/，而 dev server 服務的是原始碼），所以這支把
+// render 匯出去給 vite.config.js 的 middleware 現場畫 —— 同一支程式、同一份來源，
+// 本機開 /terms/ 看到的就是上線後的那一頁。
+//
 // 為什麼寫進 docs/ 而不是 public/：public/ 的東西會被原封不動複製進 docs/，等於同一份
 // 檔案在 git 裡存兩次。vite 建置會清空 docs/，所以這支一定要排在 vite build 之後 ——
 // 見 package.json 的 build 指令。
 import { mkdir, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 
 import { LEGAL_DOCS, CONTACT_EMAIL, OPERATOR } from '../src/data/legalDocs.js'
 
@@ -40,6 +44,15 @@ function linkify(escaped) {
   return escaped.replace(LINK_RE, (m, url, mail) =>
     url ? `<a href="${url}" rel="noopener">${url}</a>` : `<a href="mailto:${mail}">${mail}</a>`)
 }
+
+/** 這份文件要畫成哪一頁。給 vite 的 middleware 用，正式輸出也走同一條。 */
+export function renderLegalPage(key) {
+  const doc = LEGAL_DOCS.find(d => d.key === key)
+  return doc ? render(doc, LEGAL_DOCS.filter(d => d.key !== key)) : null
+}
+
+/** 有哪幾頁。middleware 用它決定要不要接手這個路徑。 */
+export const LEGAL_KEYS = LEGAL_DOCS.map(d => d.key)
 
 function render(doc, others) {
   const nav = others
@@ -108,11 +121,18 @@ ${body}
 `
 }
 
-for (const doc of LEGAL_DOCS) {
-  // 目錄而不是 terms.html：網址是要貼進 Google 審核表單跟條款本身的，/terms/ 比
-  // /terms.html 乾淨，而且之後換任何靜態主機都不會變。
-  const dir = join(OUT, doc.key)
-  await mkdir(dir, { recursive: true })
-  await writeFile(join(dir, 'index.html'), render(doc, LEGAL_DOCS.filter(d => d.key !== doc.key)), 'utf-8')
-  console.log(`legal: docs/${doc.key}/index.html  →  ${SITE}/${doc.key}/`)
+/** 寫進 docs/。只有被直接執行時才跑 —— 被 vite.config.js 匯入時不該有副作用。 */
+export async function writeLegalPages() {
+  for (const doc of LEGAL_DOCS) {
+    // 目錄而不是 terms.html：網址是要貼進 Google 審核表單跟條款本身的，/terms/ 比
+    // /terms.html 乾淨，而且之後換任何靜態主機都不會變。
+    const dir = join(OUT, doc.key)
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, 'index.html'), renderLegalPage(doc.key), 'utf-8')
+    console.log(`legal: docs/${doc.key}/index.html  →  ${SITE}/${doc.key}/`)
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await writeLegalPages()
 }

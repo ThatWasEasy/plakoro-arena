@@ -7,6 +7,8 @@ import { useI18n } from 'vue-i18n'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { isAdminAccount, isAdminMode } from '../data/adminSession'
 import { isBeta } from '../data/betaMode'
+// 這個畫面有兩個地方會開社群（選單卡片與角落的標記），條款第八條也用同一個網址。
+import { LINE_COMMUNITY_URL as LINE_URL } from '../data/community'
 import { shopOpen } from '../data/handbookTiers'
 import { giftCount, hasGifts, refreshGifts } from '../data/gifts'
 import { refreshAnnouncements, unreadCount } from '../data/announcements'
@@ -20,10 +22,6 @@ const emit = defineEmits(['pick', 'gifts', 'notices'])
 // 只是要人自己加起來。
 const waiting = computed(() => unreadCount.value + giftCount.value)
 const { t } = useI18n()
-
-// Two things on this screen open the group — the menu card and the mark in the corner. Held in
-// one place so they can never end up pointing somewhere different.
-const LINE_URL = 'https://line.me/ti/g2/nX4Wb5UHJR9vy573jqGe_Q_q2Rd6JsruabTKVw'
 
 // 書店開了沒。值由後台決定（見 data/handbookTiers.js 的 shopOpen），伺服器讀的是同一個
 // 值 —— 以前這是 build 時的旗標，要跟後端的環境變數一起翻，少翻一邊就會變成「點得進去

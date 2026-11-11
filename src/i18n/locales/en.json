@@ -893,7 +893,7 @@
     "loginSubmit": "Log in",
     "registerSubmit": "Create account",
     "claimSubmit": "Claim and set up account",
-    "forgotPin": "Forgot your PIN or account? Ask the organiser for a new claim code to reset it.",
+    "forgotPin": "Forgot your PIN or account? Contact the organiser in the official LINE community.",
     "errorGeneric": "Something went wrong, try again",
     "errorWrongCredentials": "Wrong account or PIN",
     "errorAccountRequired": "Enter an account",

@@ -892,7 +892,7 @@
     "loginSubmit": "登入",
     "registerSubmit": "建立帳號",
     "claimSubmit": "認領並設定帳號",
-    "forgotPin": "忘記 PIN 或帳號？跟主辦要一組新的認領碼就能重設。",
+    "forgotPin": "忘記 PIN 或帳號？請到官方 LINE 社群聯絡管理員協助處理。",
     "errorGeneric": "發生錯誤，請稍後再試",
     "errorWrongCredentials": "帳號或 PIN 不正確",
     "errorAccountRequired": "請輸入帳號",

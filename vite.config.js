@@ -3,6 +3,25 @@ import { fileURLToPath, URL } from 'url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
+import { LEGAL_KEYS, renderLegalPage } from './scripts/build-legal.mjs'
+
+// 條款與隱私權政策的那兩頁在 docs/，是 build 之後才產生的 —— dev server 服務的是原始碼，
+// 所以本機開 /terms/ 本來只會拿到首頁。這裡用同一支產生器現場畫，而不是把檔案複製進
+// public/：複製的話又變成兩份來源，而 dev 看到的會是上一次 build 的舊內容。
+function legalPages() {
+  return {
+    name: 'plakoro-legal-pages',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const key = (req.url || '').split('?')[0].replace(/^\/|\/$/g, '')
+        if (!LEGAL_KEYS.includes(key)) return next()
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.end(renderLegalPage(key))
+      })
+    }
+  }
+}
+
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf-8'))
 
 export default defineConfig({
@@ -13,7 +32,7 @@ export default defineConfig({
   //
   // 專案文件原本也住在 docs/，已經搬去 design/ —— 建置會清空輸出目錄，兩者不能共存。
   build: { outDir: 'docs' },
-  plugins: [vue()],
+  plugins: [vue(), legalPages()],
   server: {
     // Online duel needs two devices, so the dev server gets reached through a tunnel. Vite
     // rejects unknown Host headers by default (a DNS-rebinding guard), which is what blocks an

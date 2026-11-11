@@ -893,7 +893,7 @@
     "loginSubmit": "ログイン",
     "registerSubmit": "アカウント作成",
     "claimSubmit": "引き継いでアカウントを設定",
-    "forgotPin": "PINやアカウントを忘れた場合は、主催者に新しい引き継ぎコードをもらってください。",
+    "forgotPin": "PIN やアカウントを忘れた場合は、公式 LINE コミュニティで管理者にご連絡ください。",
     "errorGeneric": "エラーが発生しました。もう一度お試しください",
     "errorWrongCredentials": "アカウントまたはPINが正しくありません",
     "errorAccountRequired": "アカウントを入力してください",
