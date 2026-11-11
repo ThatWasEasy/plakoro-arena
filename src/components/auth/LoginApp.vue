@@ -10,6 +10,7 @@
 <script setup>
 import { ref } from 'vue'
 import { LINE_COMMUNITY_URL } from '../../data/community'
+import { translateApiError } from '../../data/apiErrors'
 import { useI18n } from 'vue-i18n'
 import * as authApi from '../../data/authApi'
 import { setCurrentPlayer } from '../../data/currentPlayer'
@@ -45,26 +46,6 @@ const agreedLegal = ref(false)
 // '' | 'terms' | 'privacy'
 const showLegal = ref('')
 
-// The API's error strings are plain English (see server/index.mjs) — translated here rather
-// than there, so the server stays free of i18n concerns. Anything not in this list (a network
-// failure, a 500) falls back to a generic message rather than showing raw English.
-const KNOWN_ERRORS = {
-  'wrong account or pin': 'errorWrongCredentials',
-  'account is required': 'errorAccountRequired',
-  'account already taken': 'errorAccountTaken',
-  'name is required': 'errorNameRequired',
-  'claimCode is required': 'errorClaimCodeRequired',
-  'claim code not found': 'errorClaimNotFound',
-  'claim code already used': 'errorClaimUsed',
-  'claim code expired': 'errorClaimExpired'
-}
-
-function translateError(message) {
-  if (KNOWN_ERRORS[message]) return t(`account.${KNOWN_ERRORS[message]}`)
-  if (message?.startsWith('pin must be at least')) return t('account.errorPinTooShort')
-  return t('account.errorGeneric')
-}
-
 async function afterAuth(result) {
   setToken(result.token)
   const profile = await authApi.me(result.token)
@@ -84,7 +65,7 @@ async function run(action) {
   try {
     await action()
   } catch (e) {
-    error.value = translateError(e.message)
+    error.value = translateApiError(e.message, t)
   } finally {
     busy.value = false
   }

@@ -16,6 +16,7 @@ import { currentIdentity, setCurrentPlayer, signOut } from '../data/currentPlaye
 import { isAdminAccount, isAdminMode, setAdminMode } from '../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, isSecretAsset, tierOfAsset } from '../data/nameplateAssets'
 import { getToken } from '../data/session'
+import { translateApiError } from '../data/apiErrors'
 import { TITLE_GROUPS, resolveTitle } from '../data/assetCatalogue'
 import { pointReason } from '../data/pointReason'
 import PlayerBanner from './tournament/PlayerBanner.vue'
@@ -45,7 +46,7 @@ async function submitEmail() {
     emailDraft.value = saved.email
     emailDone.value = true
   } catch (e) {
-    emailError.value = e.message
+    emailError.value = translateApiError(e.message, t)
   } finally {
     emailBusy.value = false
   }
@@ -74,7 +75,7 @@ async function submitPin() {
     pinCurrent.value = ''
     pinNext.value = ''
   } catch (e) {
-    pinError.value = e.message
+    pinError.value = translateApiError(e.message, t)
   } finally {
     pinBusy.value = false
   }
