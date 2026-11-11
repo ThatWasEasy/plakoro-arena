@@ -64,8 +64,6 @@ const emailDirty = computed(() => {
    打的，我們不寄驗證信（理由見後端 server/index.mjs）。
    ──────────────────────────────────────────────────────────────────────── */
 const googleLinked = ref(false)
-// 解除綁定之後還有沒有路進得來。用 Google 註冊、從來沒設過 PIN 的人不能解除。
-const hasPin = ref(false)
 const googleSlot = ref(null)
 const googleBusy = ref(false)
 const googleError = ref('')
@@ -97,20 +95,6 @@ async function linkGoogle(credential) {
   try {
     await authApi.linkGoogle(getToken(), credential)
     googleLinked.value = true
-  } catch (e) {
-    googleError.value = translateApiError(e.message, t)
-  } finally {
-    googleBusy.value = false
-  }
-}
-
-async function unlinkGoogle() {
-  if (googleBusy.value) return
-  googleBusy.value = true
-  googleError.value = ''
-  try {
-    await authApi.unlinkGoogle(getToken())
-    googleLinked.value = false
   } catch (e) {
     googleError.value = translateApiError(e.message, t)
   } finally {
@@ -189,7 +173,6 @@ onMounted(async () => {
     emailSaved.value = profile.email || ''
     emailDraft.value = emailSaved.value
     googleLinked.value = Boolean(profile.google)
-    hasPin.value = Boolean(profile.hasPin)
     googleReady.value = true
     drawGoogleButton()
     ownedAvatars.value = new Set(profile.unlocks.filter(u => u.kind === 'avatar').map(u => u.asset))
@@ -505,10 +488,10 @@ function handleSignOut() {
       <!-- 信箱。既有玩家沒有（那一欄是後來加的），而那正是「忘記密碼只能找管理員」
            的根源 —— 所以補的路開在這裡，由他們自己來。
 
-           用 Google 註冊的人看不到這塊：他們的信箱是 Google 給的，而且那組信箱才是他
-           下次進得來的依據。放一個可以改的欄位在這裡，改了也不會變成新的登入方式 ——
-           只會讓人以為自己改掉了什麼。 -->
-      <div v-if="hasPin" class="pp-form">
+           綁過 Google 的人看不到這塊（包含用 Google 註冊的）：他們的信箱是 Google 給的，
+           而往後希望他們一律走 Google 登入。留一個可以改的欄位在這裡，改了也不會變成新的
+           登入方式，只會讓人以為自己改掉了什麼。 -->
+      <div v-if="!googleLinked" class="pp-form">
         <div class="pp-form-title">{{ t('profile.email') }}</div>
         <p class="pp-form-note">{{ t('profile.emailHint') }}</p>
         <label class="pp-form-row">
@@ -532,20 +515,14 @@ function handleSignOut() {
         <div class="pp-form-title">{{ t('profile.googleTitle') }}</div>
         <p class="pp-form-note">{{ t('profile.googleNote') }}</p>
 
+        <!-- 綁好之後這裡只剩狀態。不放解除的按鈕，是因為往後希望大家都走 Google ——
+             這是介面上的選擇，伺服器那支 API 還在。 -->
         <template v-if="googleLinked">
           <div class="pp-form-row">
             <span class="pp-form-label">{{ t('profile.googleState') }}</span>
             <span class="pp-form-value">{{ t('profile.googleLinked') }}</span>
           </div>
-          <div class="pp-form-foot">
-            <button
-              class="btn secondary"
-              :disabled="googleBusy || !hasPin"
-              @click="unlinkGoogle"
-            >{{ t('profile.googleUnlink') }}</button>
-          </div>
-          <!-- 沒有 PIN 的人按鈕是死的，要講清楚為什麼，不然看起來只是壞掉。 -->
-          <p v-if="!hasPin" class="pp-form-note">{{ t('profile.googleNeedPin') }}</p>
+          <p class="pp-form-note">{{ t('profile.googleOnward') }}</p>
         </template>
 
         <div v-show="!googleLinked" ref="googleSlot" class="pp-google-slot"></div>
@@ -556,9 +533,9 @@ function handleSignOut() {
       <!-- 改 PIN。要先給現在這組，所以撿到別人開著的手機也改不掉。
            忘記的人改不了這裡 —— 那條路是到 Line 社群報代號，由管理員重設。
 
-           用 Google 註冊的人沒有 PIN，整塊不出現。留著的話他會對著兩個空欄位猜自己的
-           密碼是什麼，而那個東西從來不存在。 -->
-      <div v-if="hasPin" class="pp-form">
+           綁過 Google 的人整塊不出現。用 Google 註冊的從來沒有 PIN，會對著兩個空欄位猜
+           一個不存在的密碼；本來有 PIN 的也不需要再維護它了。 -->
+      <div v-if="!googleLinked" class="pp-form">
         <div class="pp-form-title">{{ t('profile.changePin') }}</div>
         <label class="pp-form-row">
           <span class="pp-form-label">{{ t('profile.pinCurrent') }}</span>

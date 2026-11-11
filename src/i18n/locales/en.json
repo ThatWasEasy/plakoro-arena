@@ -909,7 +909,6 @@
     "errorGoogleFailed": "Google sign-in didn't go through. Please try again.",
     "errorGoogleOff": "Google sign-in is not available right now.",
     "errorGoogleLinkedElsewhere": "That Google account is already linked to another player.",
-    "errorGoogleOnlyWayIn": "You'd have no other way to sign in. Set a PIN first.",
     "errorPlayerUsesGoogle": "This player signs in with Google — there is no PIN to reset.",
     "errorNameRequired": "Enter a nickname",
     "errorPinTooShort": "PIN must be at least 8 characters",
@@ -956,8 +955,7 @@
     "googleNote": "Link it and you can sign in with Google next time, no PIN to remember.",
     "googleState": "Status",
     "googleLinked": "Linked",
-    "googleUnlink": "Unlink",
-    "googleNeedPin": "Google is currently your only way in. Set a PIN before unlinking."
+    "googleOnward": "You can just sign in with Google from now on."
   },
   "notice": {},
   "mailbox": {

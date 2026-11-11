@@ -19,7 +19,6 @@ const KNOWN = {
   'google sign-in failed': 'errorGoogleFailed',
   'google sign-in is not configured': 'errorGoogleOff',
   'google account already linked': 'errorGoogleLinkedElsewhere',
-  'no other way to sign in': 'errorGoogleOnlyWayIn',
   'player signs in with google': 'errorPlayerUsesGoogle',
   'name is required': 'errorNameRequired',
   'claimCode is required': 'errorClaimCodeRequired',

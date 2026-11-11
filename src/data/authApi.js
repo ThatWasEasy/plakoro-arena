@@ -93,20 +93,17 @@ export function googleSignIn(credential, createNew = false) {
   })
 }
 
-/** 把 Google 帳號綁到現在登入的這個玩家身上。要帶 token —— 那就是「本人」的證明。 */
+/**
+ * 把 Google 帳號綁到現在登入的這個玩家身上。要帶 token —— 那就是「本人」的證明。
+ *
+ * 單行道：綁完就不能解除，PIN 與信箱也不再給改（伺服器會擋）。所以呼叫端在送出之前
+ * 要先問清楚。
+ */
 export function linkGoogle(token, credential) {
   return request('/api/auth/google/link', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ credential })
-  })
-}
-
-/** 解除綁定。後端只在他還留著帳號 + PIN 的時候才准。 */
-export function unlinkGoogle(token) {
-  return request('/api/auth/google/link', {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` }
   })
 }
 
