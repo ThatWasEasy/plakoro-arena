@@ -126,10 +126,6 @@ const doClaim = () => run(async () =>
         <input v-model="loginAccount" class="la-input" :placeholder="t('account.accountPlaceholder')" autocapitalize="none">
         <input v-model="loginPin" type="password" class="la-input" :placeholder="t('account.pinPlaceholder')">
         <button class="btn" type="submit" :disabled="busy || !agreedLegal">{{ t('account.loginSubmit') }}</button>
-        <p class="la-hint">
-          {{ t('account.forgotPin') }}
-          <a class="la-link" :href="LINE_COMMUNITY_URL" target="_blank" rel="noopener">{{ t('mode.line') }}</a>
-        </p>
       </form>
 
       <form v-else-if="tab === 'register'" class="la-form" @submit.prevent="doRegister">
@@ -158,16 +154,24 @@ const doClaim = () => run(async () =>
       <div
         v-show="tab !== 'claim' && !googleFailed"
         class="la-google"
-        :class="{ off: !agreedLegal || busy }"
+        :class="{ off: !agreedLegal || busy, above: tab === 'register' }"
       >
         <div class="la-or"><span>{{ t('account.or') }}</span></div>
         <div ref="googleSlot" class="la-google-slot"></div>
       </div>
 
-      <!-- 一份，三個分頁共用。放在表單外面是因為它問的不是「你要做哪一件事」，而是
-           「你同不同意這份條款」—— 那個答案在登入、註冊、認領之間不會改變。 -->
+      <!-- 忘記 PIN 的求助落在最底下。它不是表單的一部分，是「這幾種方式都不行的時候
+           去找誰」—— 擺在送出鈕中間會打斷填表，擺在最後才是它該在的位置。 -->
+      <p v-if="tab === 'login'" class="la-hint la-foot-hint">
+        {{ t('account.forgotPin') }}
+        <a class="la-link" :href="LINE_COMMUNITY_URL" target="_blank" rel="noopener">{{ t('mode.line') }}</a>
+      </p>
 
-      <!-- 欄位填完、按下去之前，就是同意的位置。
+      <!-- 一份，三個分頁共用。放在表單外面是因為它問的不是「你要做哪一件事」，而是
+           「你同不同意這份條款」—— 那個答案在登入、註冊、認領之間不會改變。
+
+           位置在最上面（排序由 CSS 的 order 決定，不是 DOM 順序）：同意這件事是進這個
+           畫面要做的第一個決定，而不是填完才補的一道手續。
            連結直接寫在句子裡 —— 條款一律中文、不走 i18n（見 data/legalDocs.js），所以
            沒有語序問題，不必把一句話拆成四個 key 再拼回去。多個 label 指向同一個 id 是
            合法的：按文字會打勾，按書名號會開文件。 -->
@@ -197,6 +201,11 @@ const doClaim = () => run(async () =>
 <style scoped>
 .la-board { display: flex; flex-direction: column; align-items: center; }
 
+/* 版面順序由 order 決定，不是 DOM 順序 —— 因為 Google 按鈕只能畫一次（它是 Google 自己
+   塞進來的 iframe），用 DOM 搬動就等於每次切分頁都要重畫。排法：
+     條款 → （註冊才有的 Google）→ 表單 → （登入才有的 Google）→ 忘記 PIN → 錯誤
+   註冊把 Google 放在最前面，是因為那是最快的一條路；登入放在表單底下，因為登入的人
+   多半是來打帳號的。 */
 .la-panel {
   width: 100%;
   max-width: 24rem;
@@ -205,7 +214,16 @@ const doClaim = () => run(async () =>
   border: 0.0625rem solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--card);
+  display: flex;
+  flex-direction: column;
 }
+.la-panel > .la-tabs { order: 0; }
+.la-panel > .la-legal { order: 1; }
+.la-panel > .la-google { order: 4; }
+.la-panel > .la-google.above { order: 2; }
+.la-panel > .la-form { order: 3; }
+.la-panel > .la-foot-hint { order: 5; }
+.la-panel > .la-error { order: 6; }
 
 /* One joined bar rather than separate pills — see PlayerProfileApp.vue's .pp-tabs for the same
    treatment and why. */
@@ -263,6 +281,10 @@ const doClaim = () => run(async () =>
 /* Google 自己畫的按鈕是一個 iframe，樣式碰不到，所以只能從外面壓。 */
 .la-google-slot { display: flex; justify-content: center; width: 100%; min-height: 2.5rem; }
 .la-google.off { opacity: 0.45; pointer-events: none; }
+/* 按鈕在表單上面的時候，分隔線要跟著翻到按鈕底下 —— 它分隔的是「Google」與「表單」，
+   不是永遠在最上面的一條裝飾。 */
+.la-google.above .la-or { order: 1; margin: 0.5rem 0 0.25rem; }
+.la-foot-hint { margin-top: 0.75rem; }
 
 .la-link { color: inherit; font-weight: 800; text-decoration: underline; white-space: nowrap; }
 
@@ -273,7 +295,7 @@ const doClaim = () => run(async () =>
   display: flex;
   align-items: flex-start;
   gap: 0.4375rem;
-  margin-top: 0.75rem;
+  margin: 0 0 0.75rem;
 }
 .la-legal > input {
   flex: none;
