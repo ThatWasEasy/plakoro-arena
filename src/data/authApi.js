@@ -77,6 +77,33 @@ export function claimGift(token, id) {
   })
 }
 
+/**
+ * 用 Google 登入。`credential` 是 Google 給的 ID token，由後端驗章。
+ *
+ * 信箱已經有帳號時會回 409（錯誤字串 'email already registered'）—— 那不是失敗，是請
+ * 他先用帳號 + PIN 登入再綁定。不自動接的理由見 server/index.mjs。
+ */
+export function googleSignIn(credential) {
+  return request('/api/auth/google', { method: 'POST', body: JSON.stringify({ credential }) })
+}
+
+/** 把 Google 帳號綁到現在登入的這個玩家身上。要帶 token —— 那就是「本人」的證明。 */
+export function linkGoogle(token, credential) {
+  return request('/api/auth/google/link', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ credential })
+  })
+}
+
+/** 解除綁定。後端只在他還留著帳號 + PIN 的時候才准。 */
+export function unlinkGoogle(token) {
+  return request('/api/auth/google/link', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  })
+}
+
 /** 自己改 PIN。要先給現在這組。 */
 export function changePin(token, current, pin) {
   return request('/api/auth/pin', {

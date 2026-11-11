@@ -8,8 +8,9 @@
      註冊要留信箱，不是拿來登入的 —— 是忘記 PIN 時唯一能認回帳號的線索（現在由管理員代為
      重設，之後接寄信）。既有玩家沒有信箱，補的路在 PlayerProfileApp.vue。 -->
 <script setup>
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { LINE_COMMUNITY_URL } from '../../data/community'
+import { googleAvailable, renderGoogleButton } from '../../data/googleSignIn'
 import { translateApiError } from '../../data/apiErrors'
 import { useI18n } from 'vue-i18n'
 import * as authApi from '../../data/authApi'
@@ -19,7 +20,7 @@ import { setToken } from '../../data/session'
 import LegalView from '../legal/LegalView.vue'
 
 const emit = defineEmits(['back', 'done'])
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const TABS = ['login', 'register', 'claim']
 const tab = ref('login')
@@ -36,6 +37,8 @@ const claimPin = ref('')
 
 const busy = ref(false)
 const error = ref('')
+// Google 的 script 載不進來時，整塊就不要出現 —— 一個畫不出按鈕的空框比沒有更糟。
+const googleFailed = ref(false)
 
 // 條款的同意。三個分頁共用一份，登入、註冊、認領都要勾了才送得出去。
 //
@@ -70,6 +73,33 @@ async function run(action) {
     busy.value = false
   }
 }
+
+/* ── Google 登入 ──────────────────────────────────────────────────────────
+   登入與註冊共用同一顆按鈕：對玩家來說「用 Google 進來」就是一件事，第一次按是註冊、
+   之後按是登入，他不需要先選自己是哪一種。認領那一頁不放，因為那條路一定要有 PIN。
+
+   按鈕本體由 Google 畫（品牌規範要求），所以這裡只給一個容器。容器常駐在 DOM 裡用
+   v-show 切換 —— 用 v-if 的話切分頁會把它毀掉重建，而 Google 只在我們呼叫 renderButton
+   的那一刻畫一次。
+   ──────────────────────────────────────────────────────────────────────── */
+const googleSlot = ref(null)
+let stopGoogle = () => {}
+
+const onGoogleCredential = credential =>
+  run(async () => afterAuth(await authApi.googleSignIn(credential)))
+
+onMounted(async () => {
+  if (!googleAvailable || !googleSlot.value) return
+  try {
+    stopGoogle = await renderGoogleButton(googleSlot.value, onGoogleCredential, { locale: locale.value })
+  } catch (e) {
+    // 載不進來（擋廣告的擴充套件、公司網路擋 Google、離線）就當作沒有這個選項。
+    // 帳號 + PIN 那條路不受影響，不該因為畫不出一顆按鈕就讓人登不進來。
+    googleFailed.value = true
+  }
+})
+
+onBeforeUnmount(() => stopGoogle())
 
 const doLogin = () => run(async () => afterAuth(await authApi.login(loginAccount.value.trim(), loginPin.value)))
 const doRegister = () => run(async () =>
@@ -121,6 +151,18 @@ const doClaim = () => run(async () =>
         <input v-model="claimPin" type="password" class="la-input" :placeholder="t('account.pinPlaceholder')">
         <button class="btn" type="submit" :disabled="busy || !agreedLegal">{{ t('account.claimSubmit') }}</button>
       </form>
+
+      <!-- Google 按鈕。登入與註冊共用，認領那一頁不放（那條路一定要有 PIN）。
+           沒勾條款時整塊變淡並關掉點擊，跟旁邊那顆送出鈕是同一個規矩 —— 同意必須先於
+           任何一種建立帳號的動作，換成 Google 也不例外。 -->
+      <div
+        v-show="tab !== 'claim' && !googleFailed"
+        class="la-google"
+        :class="{ off: !agreedLegal || busy }"
+      >
+        <div class="la-or"><span>{{ t('account.or') }}</span></div>
+        <div ref="googleSlot" class="la-google-slot"></div>
+      </div>
 
       <!-- 一份，三個分頁共用。放在表單外面是因為它問的不是「你要做哪一件事」，而是
            「你同不同意這份條款」—— 那個答案在登入、註冊、認領之間不會改變。 -->
@@ -206,6 +248,22 @@ const doClaim = () => run(async () =>
 .la-input:focus { outline: none; border-color: var(--accent-strong); }
 
 /* 入口被斷成兩行的話就不像一個可以按的東西了。 */
+/* 分隔線中間放一個「或」。線用 border 畫在前後兩個 ::before/::after 上，比塞兩個空
+   div 乾淨，也不會在換行時斷掉。 */
+.la-or {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin: 0.75rem 0 0.5rem;
+  font-size: 0.6875rem; font-weight: 700; color: var(--sub);
+}
+.la-or::before, .la-or::after {
+  content: ''; flex: 1; height: 0.0625rem; background: var(--line);
+}
+
+.la-google { display: flex; flex-direction: column; align-items: center; }
+/* Google 自己畫的按鈕是一個 iframe，樣式碰不到，所以只能從外面壓。 */
+.la-google-slot { display: flex; justify-content: center; width: 100%; min-height: 2.5rem; }
+.la-google.off { opacity: 0.45; pointer-events: none; }
+
 .la-link { color: inherit; font-weight: 800; text-decoration: underline; white-space: nowrap; }
 
 .la-hint { margin: 0; font-size: 0.6875rem; color: var(--sub); line-height: 1.6; }

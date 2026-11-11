@@ -12,6 +12,14 @@ const KNOWN = {
   'account already taken': 'errorAccountTaken',
   'a valid email is required': 'errorEmailInvalid',
   'email already taken': 'errorEmailTaken',
+  // Google 登入那條路的幾種結果。'email already registered' 不是失敗，是「這個信箱已經
+  // 有帳號了，請先用帳號 + PIN 登入再綁定」—— 不自動接的理由見後端。
+  'email already registered': 'errorEmailRegistered',
+  'google sign-in failed': 'errorGoogleFailed',
+  'google sign-in is not configured': 'errorGoogleOff',
+  'google account already linked': 'errorGoogleLinkedElsewhere',
+  'no other way to sign in': 'errorGoogleOnlyWayIn',
+  'player signs in with google': 'errorPlayerUsesGoogle',
   'name is required': 'errorNameRequired',
   'claimCode is required': 'errorClaimCodeRequired',
   'claim code not found': 'errorClaimNotFound',

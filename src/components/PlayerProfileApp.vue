@@ -6,7 +6,7 @@
 // would make every badge in the app worthless. Avatars and flags are a softer version of the
 // same rule: picking is free, but only among tiers this record has actually reached — the
 // pickers below are gated by live stats, not left wide open the way a mock account would be.
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import * as authApi from '../data/authApi'
 import { audioSettings, setVolume } from '../data/audioSettings'
@@ -17,6 +17,7 @@ import { isAdminAccount, isAdminMode, setAdminMode } from '../data/adminSession'
 import { AVATAR_IDS, BACKGROUND_IDS, avatarUrl, backgroundUrl, isSecretAsset, tierOfAsset } from '../data/nameplateAssets'
 import { getToken } from '../data/session'
 import { translateApiError } from '../data/apiErrors'
+import { googleAvailable, renderGoogleButton } from '../data/googleSignIn'
 import { TITLE_GROUPS, resolveTitle } from '../data/assetCatalogue'
 import { pointReason } from '../data/pointReason'
 import PlayerBanner from './tournament/PlayerBanner.vue'
@@ -25,7 +26,7 @@ import VolumeBar from './VolumeBar.vue'
 // Reached only while signed in — the chip sends a guest to LoginApp instead, and signing out
 // below leaves this screen immediately rather than reverting it to a guest state in place.
 const emit = defineEmits(['back'])
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const emailDraft = ref('')
 // 伺服器上現在存的那一組。按鈕靠它判斷「有沒有改」，沒改就不給送。
@@ -56,6 +57,66 @@ const emailDirty = computed(() => {
   const next = emailDraft.value.trim()
   return !!next && next !== emailSaved.value
 })
+
+/* ── Google 綁定 ──────────────────────────────────────────────────────────
+   綁定要在這裡做，不是在登入畫面自動完成：這支畫面只有登入後進得來，所以按下去的人
+   已經用帳號 + PIN 證明過自己是誰。信箱比對不能當作證明 —— players.email 是玩家自己
+   打的，我們不寄驗證信（理由見後端 server/index.mjs）。
+   ──────────────────────────────────────────────────────────────────────── */
+const googleLinked = ref(false)
+// 解除綁定之後還有沒有路進得來。用 Google 註冊、從來沒設過 PIN 的人不能解除。
+const hasPin = ref(false)
+const googleSlot = ref(null)
+const googleBusy = ref(false)
+const googleError = ref('')
+let stopGoogle = () => {}
+// 兩件事都備齊才畫得出來：伺服器說了綁沒綁（不然可能畫在已經綁好的人面前），而且設定
+// 分頁真的被畫出來了（它是 v-else，停在其他分頁時那個容器根本不存在）。
+const googleReady = ref(false)
+let googleDrawn = false
+
+async function drawGoogleButton() {
+  if (!googleAvailable || googleDrawn || !googleReady.value) return
+  if (googleLinked.value || tab.value !== 'settings') return
+  await nextTick()
+  if (!googleSlot.value) return
+  googleDrawn = true
+  try {
+    stopGoogle = await renderGoogleButton(googleSlot.value, linkGoogle, { locale: locale.value })
+  } catch (e) {
+    // 載不進來（擋廣告的擴充套件、公司網路擋 Google、離線）就當作沒有這個選項，
+    // 設定頁其他東西照常用。
+    googleDrawn = false
+  }
+}
+
+async function linkGoogle(credential) {
+  if (googleBusy.value) return
+  googleBusy.value = true
+  googleError.value = ''
+  try {
+    await authApi.linkGoogle(getToken(), credential)
+    googleLinked.value = true
+  } catch (e) {
+    googleError.value = translateApiError(e.message, t)
+  } finally {
+    googleBusy.value = false
+  }
+}
+
+async function unlinkGoogle() {
+  if (googleBusy.value) return
+  googleBusy.value = true
+  googleError.value = ''
+  try {
+    await authApi.unlinkGoogle(getToken())
+    googleLinked.value = false
+  } catch (e) {
+    googleError.value = translateApiError(e.message, t)
+  } finally {
+    googleBusy.value = false
+  }
+}
 
 const pinCurrent = ref('')
 const pinNext = ref('')
@@ -127,6 +188,10 @@ onMounted(async () => {
     // 已經留過的信箱要帶出來 —— 欄位空白會讓人以為自己沒留過，然後重打一次。
     emailSaved.value = profile.email || ''
     emailDraft.value = emailSaved.value
+    googleLinked.value = Boolean(profile.google)
+    hasPin.value = Boolean(profile.hasPin)
+    googleReady.value = true
+    drawGoogleButton()
     ownedAvatars.value = new Set(profile.unlocks.filter(u => u.kind === 'avatar').map(u => u.asset))
     ownedBackgrounds.value = new Set(profile.unlocks.filter(u => u.kind === 'background').map(u => u.asset))
     ownedTitles.value = new Set(profile.unlocks.filter(u => u.kind === 'title').map(u => u.asset))
@@ -141,6 +206,11 @@ onMounted(async () => {
     // Same stance: leave the tab saying it couldn't read rather than claiming a balance.
   }
 })
+
+// 切到設定分頁的那一刻才有容器可畫。
+watch(tab, drawGoogleButton)
+
+onBeforeUnmount(() => stopGoogle())
 
 function entryReason(e) {
   return pointReason(e, t)
@@ -451,6 +521,34 @@ function handleSignOut() {
         <p v-if="emailError" class="pp-form-err">{{ emailError }}</p>
       </div>
 
+      <!-- Google 綁定。擺在信箱與改 PIN 中間，因為這三塊講的是同一件事：你下次怎麼
+           進得來。綁定只有這裡做得到，而不是在登入畫面用信箱自動接 —— 這支畫面進得來
+           本身就是「本人」的證明。 -->
+      <div v-if="googleAvailable" class="pp-form">
+        <div class="pp-form-title">{{ t('profile.googleTitle') }}</div>
+        <p class="pp-form-note">{{ t('profile.googleNote') }}</p>
+
+        <template v-if="googleLinked">
+          <div class="pp-form-row">
+            <span class="pp-form-label">{{ t('profile.googleState') }}</span>
+            <span class="pp-form-value">{{ t('profile.googleLinked') }}</span>
+          </div>
+          <div class="pp-form-foot">
+            <button
+              class="btn secondary"
+              :disabled="googleBusy || !hasPin"
+              @click="unlinkGoogle"
+            >{{ t('profile.googleUnlink') }}</button>
+          </div>
+          <!-- 沒有 PIN 的人按鈕是死的，要講清楚為什麼，不然看起來只是壞掉。 -->
+          <p v-if="!hasPin" class="pp-form-note">{{ t('profile.googleNeedPin') }}</p>
+        </template>
+
+        <div v-show="!googleLinked" ref="googleSlot" class="pp-google-slot"></div>
+
+        <p v-if="googleError" class="pp-form-err">{{ googleError }}</p>
+      </div>
+
       <!-- 改 PIN。要先給現在這組，所以撿到別人開著的手機也改不掉。
            忘記的人改不了這裡 —— 那條路是到 Line 社群報代號，由管理員重設。 -->
       <div class="pp-form">
@@ -538,6 +636,9 @@ function handleSignOut() {
   cursor: pointer;
 }
 .pp-form-label { font-size: 0.6875rem; font-weight: 800; color: var(--sub); line-height: 1.3; }
+.pp-form-value { font-size: 0.8125rem; font-weight: 700; color: var(--ink); }
+/* Google 自己畫的按鈕是一個 iframe，樣式碰不到，只能從外面壓。 */
+.pp-google-slot { display: flex; justify-content: center; width: 100%; min-height: 2.5rem; }
 .pp-form-foot { display: flex; justify-content: flex-end; }
 .pp-form-foot .btn { padding: 0.4375rem 1.5rem; font-size: 0.75rem; }
 .pp-form-ok { margin: 0; font-size: 0.6875rem; font-weight: 700; color: #2E7D4F; }
