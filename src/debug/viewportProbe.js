@@ -74,6 +74,16 @@ export function installViewportProbe() {
     const stage = document.getElementById('stage')
     const sr = stage?.getBoundingClientRect()
 
+    // 跑馬燈：真機上量到「底還在、字不見了」。底在表示 tickerText 有值（樣板是
+    // v-if），所以字是畫出來了但看不到 —— 要知道是寬度為 0、字級變成 0、還是被推到
+    // 可視範圍外，只能把這幾個數字攤開來看。
+    const band = document.querySelector('.mode-ticker')
+    const track = document.querySelector('.mt-track')
+    const copy = document.querySelector('.mt-text')
+    const br = band?.getBoundingClientRect()
+    const tr = track?.getBoundingClientRect()
+    const cr = copy?.getBoundingClientRect()
+
     box.textContent = [
       `win   ${window.innerWidth}x${window.innerHeight}`,
       `vv    ${Math.round(vp?.width || 0)}x${Math.round(vp?.height || 0)} @${Math.round(vp?.offsetLeft || 0)},${Math.round(vp?.offsetTop || 0)} s${(vp?.scale || 1).toFixed(2)}`,
@@ -83,6 +93,9 @@ export function installViewportProbe() {
       `scroll ${Math.round(window.scrollY || 0)},${Math.round(window.pageYOffset || 0)}  deTop ${de.scrollTop}`,
       `rem   ${getComputedStyle(de).fontSize}  chg ${changes}  quiet ${Math.round(now - lastChangeAt)}ms`,
       `rot   ${rotatedAt ? Math.round(now - rotatedAt) + 'ms ago' : '-'}`,
+      band ? `band  ${Math.round(br.left)},${Math.round(br.top)} ${Math.round(br.width)}x${Math.round(br.height)}` : 'band  none',
+      track ? `track ${Math.round(tr.left)},${Math.round(tr.top)} ${Math.round(tr.width)}x${Math.round(tr.height)} n=${document.querySelectorAll('.mt-text').length} shift=${getComputedStyle(track).getPropertyValue('--shift').trim()}` : 'track none',
+      copy ? `copy  ${Math.round(cr.left)},${Math.round(cr.top)} ${Math.round(cr.width)}x${Math.round(cr.height)} fs=${getComputedStyle(copy).fontSize} "${(copy.textContent || '').slice(0, 8)}"` : 'copy  none',
       // standalone 才代表工具列真的不在了。false 的話這個圖示是用一般 Safari 開的，
       // 要重新「加入主畫面」一次。
       `stand ${navigator.standalone === true || matchMedia('(display-mode: standalone)').matches}  safe ${getComputedStyle(de).getPropertyValue('--probe-sat') || '?'}`,

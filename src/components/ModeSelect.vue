@@ -159,6 +159,26 @@ watch(tickerText, async () => {
   measureTicker()
 })
 
+// 用 ResizeObserver 而不是 window 的 resize：要重量的時機是「帶子的寬度變了」，而那
+// 跟 resize 事件何時送達是兩件事 —— iOS 轉向時 resize 來得比尺寸更新早，量到的還是轉
+// 之前的寬度，而且之後不保證再來一次。結果就是橫向時份數還停在直向算出來的 2，一份字
+// 鋪不滿變寬的帶子，捲到一半會露出大片空白（看起來就像字不見了）。
+//
+// ResizeObserver 是元素自己說「我變了」，不會早也不會漏。
+//
+// 要等元素真的存在才裝得上去：帶子是 v-if="tickerText"，而字是公告拿回來之後才有的，
+// 掛載當下那個 ref 還是 null。
+let tickerObserver = null
+
+watch(tickerEl, el => {
+  tickerObserver?.disconnect()
+  tickerObserver = null
+  if (el && window.ResizeObserver) {
+    tickerObserver = new ResizeObserver(measureTicker)
+    tickerObserver.observe(el)
+  }
+}, { immediate: true })
+
 onMounted(() => {
   measureTicker()
   window.addEventListener('resize', measureTicker)
@@ -172,7 +192,10 @@ onMounted(() => {
   // 跑馬燈同理，而且它是這個畫面上唯一會自己變的東西。
   refreshTicker()
 })
-onBeforeUnmount(() => window.removeEventListener('resize', measureTicker))
+onBeforeUnmount(() => {
+  tickerObserver?.disconnect()
+  window.removeEventListener('resize', measureTicker)
+})
 
 // The track is `copies` wide; sliding by one copy is 100/copies percent of it.
 const tickerShift = computed(() => `-${(100 / tickerCopies.value).toFixed(4)}%`)
