@@ -212,6 +212,8 @@
     "claimMinting": "Issuing…",
     "claimHint": "Send it to them; they enter it under \"Claim an existing record\" on the login page. Expires in 14 days.",
     "pinReset": "Reset PIN",
+    "accountName": "Account",
+    "accountReveal": "Show",
     "pinResetting": "Resetting…",
     "pinResetPlaceholder": "New PIN (8+ characters)",
     "pinResetDone": "Reset — ask them to change it themselves after signing in",

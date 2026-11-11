@@ -212,6 +212,8 @@
     "claimMinting": "発行中…",
     "claimHint": "本人に渡し、ログイン画面の「既存記録の引き継ぎ」で入力。14日で失効。",
     "pinReset": "PIN を再設定",
+    "accountName": "ログイン ID",
+    "accountReveal": "表示",
     "pinResetting": "再設定中…",
     "pinResetPlaceholder": "新しい PIN（8 文字以上）",
     "pinResetDone": "再設定しました。ログイン後に本人が変更してください",

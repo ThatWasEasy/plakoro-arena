@@ -60,6 +60,11 @@ async function select(code) {
   // whoever is shown now, and handing the wrong person's code over gives them that account.
   claimCode.value = ''
   claimError.value = ''
+  // 同一個理由：上一個人的帳號名留在畫面上，會被讀成現在這個人的。
+  acctShown.value = false
+  newPin.value = ''
+  pinError.value = ''
+  pinDone.value = false
   inheritOpen.value = false
   inheritFrom.value = ''
   inheritError.value = ''
@@ -191,6 +196,10 @@ const toggleError = ref('')
 // Issued on demand rather than in advance. A player who never wants an account never needs a
 // code, and a code that sits around unused is a credential waiting to be found — it can set
 // the account handle and PIN for the player it names, with nothing else asked for.
+// 帳號名預設遮著。換一個玩家就收回去 —— 不然看完一個人之後，下一個人的帳號會直接
+// 出現在畫面上。
+const acctShown = ref(false)
+
 const newPin = ref('')
 const pinBusy = ref(false)
 const pinError = ref('')
@@ -502,6 +511,18 @@ async function toggle(kind, asset) {
             <span v-if="claimError" class="as-error">{{ claimError }}</span>
           </div>
 
+          <!-- 登入用的帳號名。忘記帳號的人在這之前無解 —— 重設 PIN 幫不上忙，因為
+               登入表單的另一半他還是填不出來。
+               預設遮著、點一下才顯示：擋不住蓄意的人（能進這個畫面的人本來就能重設
+               PIN），但能避免截圖或共享螢幕的時候不小心把它一起送出去。 -->
+          <div v-if="detail.account" class="as-claim">
+            <span class="as-acct-label">{{ t('admin.accountName') }}</span>
+            <code v-if="acctShown" class="as-claim-code">{{ detail.account }}</code>
+            <button v-else class="btn secondary as-claim-btn" @click="acctShown = true">
+              {{ t('admin.accountReveal') }}
+            </button>
+          </div>
+
           <!-- 相對的那一半：已經有帳號的人忘記 PIN。認領碼對他們是拒絕的（那會變成把
                帳號交給拿到碼的人），所以復原只能走重設 —— 帳號名不動，只換 PIN。 -->
           <div v-if="detail.hasAccount" class="as-claim">
@@ -765,6 +786,7 @@ async function toggle(kind, asset) {
 .as-claim { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .as-claim-btn { padding: 0.3125rem 0.625rem; font-size: 0.6875rem; }
 .as-pin { flex: 1; min-width: 7rem; }
+.as-acct-label { font-size: 0.6875rem; font-weight: 700; color: var(--sub); }
 /* Monospace and spaced out, because this gets read aloud or retyped from a screenshot and
    O/0 and I/1 have to be told apart. */
 .as-claim-code {
