@@ -523,6 +523,15 @@ async function toggle(kind, asset) {
             </button>
           </div>
 
+          <!-- 信箱。認人的時候多一個對得上的東西：來要重設的人如果講得出註冊時留的
+               信箱，那比只報代號可信得多（代號是半公開的 —— 它要打在 Line 暱稱上）。
+               跟帳號名一樣預設遮著。 -->
+          <div v-if="detail.player?.email" class="as-claim">
+            <span class="as-acct-label">{{ t('admin.emailLabel') }}</span>
+            <code v-if="acctShown" class="as-claim-code">{{ detail.player.email }}</code>
+            <span v-else class="as-acct-label">••••</span>
+          </div>
+
           <!-- 相對的那一半：已經有帳號的人忘記 PIN。認領碼對他們是拒絕的（那會變成把
                帳號交給拿到碼的人），所以復原只能走重設 —— 帳號名不動，只換 PIN。 -->
           <div v-if="detail.hasAccount" class="as-claim">

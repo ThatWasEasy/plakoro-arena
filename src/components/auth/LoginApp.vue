@@ -1,9 +1,12 @@
-<!-- A standalone login/register/claim screen — talks to server/index.mjs. No OAuth, no email: a
+<!-- A standalone login/register/claim screen — talks to server/index.mjs. No OAuth: a
      player logs in with an account handle they pick (not their P###### code — nobody remembers
      that) plus a PIN, kept separate from their display nickname (not unique, shown on banners —
      see design/data-model.md「登入與註冊流程」). Deliberately just the forms: no nameplate preview,
      no avatar/flag/title editor, no save button — that's PlayerProfileApp.vue, reached only once
-     an account exists. -->
+     an account exists.
+
+     註冊要留信箱，不是拿來登入的 —— 是忘記 PIN 時唯一能認回帳號的線索（現在由管理員代為
+     重設，之後接寄信）。既有玩家沒有信箱，補的路在 PlayerProfileApp.vue。 -->
 <script setup>
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -24,6 +27,7 @@ const loginPin = ref('')
 const registerAccount = ref('')
 const registerName = ref('')
 const registerPin = ref('')
+const registerEmail = ref('')
 const claimAccount = ref('')
 const claimCode = ref('')
 const claimPin = ref('')
@@ -87,7 +91,7 @@ async function run(action) {
 
 const doLogin = () => run(async () => afterAuth(await authApi.login(loginAccount.value.trim(), loginPin.value)))
 const doRegister = () => run(async () =>
-  afterAuth(await authApi.register(registerAccount.value.trim(), registerName.value.trim(), registerPin.value)))
+  afterAuth(await authApi.register(registerAccount.value.trim(), registerName.value.trim(), registerPin.value, registerEmail.value.trim())))
 const doClaim = () => run(async () =>
   afterAuth(await authApi.claim(claimAccount.value.trim(), claimCode.value.trim(), claimPin.value)))
 </script>
@@ -117,6 +121,11 @@ const doClaim = () => run(async () =>
         <input v-model="registerAccount" class="la-input" :placeholder="t('account.accountPlaceholder')" autocapitalize="none" maxlength="20">
         <input v-model="registerName" class="la-input" :placeholder="t('account.namePlaceholder')" maxlength="20">
         <input v-model="registerPin" type="password" class="la-input" :placeholder="t('account.pinPlaceholder')">
+        <!-- 信箱是找回帳號的唯一自動管道。沒有它，忘記 PIN 或忘記帳號名的人只能到
+             Line 社群報代號、等人工重設。 -->
+        <input v-model="registerEmail" type="email" class="la-input" inputmode="email"
+               autocapitalize="none" :placeholder="t('account.emailPlaceholder')" maxlength="254">
+        <p class="la-hint">{{ t('account.emailHint') }}</p>
         <button class="btn" type="submit" :disabled="busy || !agreedLegal">{{ t('account.registerSubmit') }}</button>
       </form>
 

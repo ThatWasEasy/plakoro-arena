@@ -357,7 +357,8 @@
     "noticeGroupDraft": "下書き",
     "noticeGroupEnded": "終了",
     "noticeEmpty": "お知らせはありません",
-    "noticeEnded": "終了"
+    "noticeEnded": "終了",
+    "emailLabel": "メール"
   },
   "priceLog": {
     "title": {
@@ -902,7 +903,9 @@
     "errorClaimCodeRequired": "引き継ぎコードを入力してください",
     "errorClaimNotFound": "その引き継ぎコードが見つかりません。入力内容を確認してください",
     "errorClaimUsed": "その引き継ぎコードは使用済みです。主催者に新しいものをもらってください",
-    "errorClaimExpired": "その引き継ぎコードは期限切れです。主催者に新しいものをもらってください"
+    "errorClaimExpired": "その引き継ぎコードは期限切れです。主催者に新しいものをもらってください",
+    "emailPlaceholder": "メールアドレス",
+    "emailHint": "ID や PIN を忘れたときに復旧できる唯一の手段です。"
   },
   "profile": {
     "avatar": "アバター",
@@ -930,12 +933,15 @@
     "lowData": "低通信モード",
     "changePin": "PIN を変更",
     "pinCurrent": "現在の PIN",
-    "pinNew": "新しい PIN（8 文字以上）",
+    "pinNewField": "新しい PIN",
+    "pinNewHint": "8 文字以上",
     "pinSaving": "保存中…",
-    "pinDone": "更新しました"
+    "pinDone": "更新しました",
+    "email": "メールアドレス",
+    "emailField": "アドレス",
+    "emailHint": "ID や PIN を忘れたときのために登録してください。"
   },
-  "notice": {
-  },
+  "notice": {},
   "mailbox": {
     "title": "メール",
     "empty": "メールはありません。",

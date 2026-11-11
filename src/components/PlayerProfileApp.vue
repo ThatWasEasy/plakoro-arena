@@ -26,6 +26,36 @@ import VolumeBar from './VolumeBar.vue'
 const emit = defineEmits(['back'])
 const { t } = useI18n()
 
+const emailDraft = ref('')
+// 伺服器上現在存的那一組。按鈕靠它判斷「有沒有改」，沒改就不給送。
+const emailSaved = ref('')
+const emailBusy = ref(false)
+const emailError = ref('')
+const emailDone = ref(false)
+
+/** 留下或換掉信箱。不寄驗證信 —— 這一步只是先把聯絡方式收進來。 */
+async function submitEmail() {
+  if (emailBusy.value) return
+  emailBusy.value = true
+  emailError.value = ''
+  emailDone.value = false
+  try {
+    const saved = await authApi.setEmail(getToken(), emailDraft.value.trim())
+    emailSaved.value = saved.email
+    emailDraft.value = saved.email
+    emailDone.value = true
+  } catch (e) {
+    emailError.value = e.message
+  } finally {
+    emailBusy.value = false
+  }
+}
+
+const emailDirty = computed(() => {
+  const next = emailDraft.value.trim()
+  return !!next && next !== emailSaved.value
+})
+
 const pinCurrent = ref('')
 const pinNext = ref('')
 const pinBusy = ref(false)
@@ -93,6 +123,9 @@ onMounted(async () => {
   if (!token) return
   try {
     const profile = await authApi.me(token)
+    // 已經留過的信箱要帶出來 —— 欄位空白會讓人以為自己沒留過，然後重打一次。
+    emailSaved.value = profile.email || ''
+    emailDraft.value = emailSaved.value
     ownedAvatars.value = new Set(profile.unlocks.filter(u => u.kind === 'avatar').map(u => u.asset))
     ownedBackgrounds.value = new Set(profile.unlocks.filter(u => u.kind === 'background').map(u => u.asset))
     ownedTitles.value = new Set(profile.unlocks.filter(u => u.kind === 'title').map(u => u.asset))
@@ -398,21 +431,47 @@ function handleSignOut() {
         <span>{{ t('profile.adminMode') }}</span>
       </label>
 
+      <!-- 信箱。既有玩家沒有（那一欄是後來加的），而那正是「忘記密碼只能找管理員」
+           的根源 —— 所以補的路開在這裡，由他們自己來。 -->
+      <div class="pp-form">
+        <div class="pp-form-title">{{ t('profile.email') }}</div>
+        <p class="pp-form-note">{{ t('profile.emailHint') }}</p>
+        <label class="pp-form-row">
+          <span class="pp-form-label">{{ t('profile.emailField') }}</span>
+          <input v-model="emailDraft" class="pp-input" type="email" inputmode="email"
+                 autocapitalize="none" maxlength="254">
+        </label>
+        <div class="pp-form-foot">
+          <button class="btn secondary" :disabled="emailBusy || !emailDirty" @click="submitEmail">
+            {{ emailBusy ? t('profile.pinSaving') : t('common.save') }}
+          </button>
+        </div>
+        <p v-if="emailDone" class="pp-form-ok">{{ t('profile.pinDone') }}</p>
+        <p v-if="emailError" class="pp-form-err">{{ emailError }}</p>
+      </div>
+
       <!-- 改 PIN。要先給現在這組，所以撿到別人開著的手機也改不掉。
            忘記的人改不了這裡 —— 那條路是到 Line 社群報代號，由管理員重設。 -->
-      <div class="pp-pin">
-        <div class="pp-pin-title">{{ t('profile.changePin') }}</div>
-        <input v-model="pinCurrent" class="pp-input" type="password" autocomplete="current-password"
-               :placeholder="t('profile.pinCurrent')">
-        <input v-model="pinNext" class="pp-input" type="password" autocomplete="new-password"
-               :placeholder="t('profile.pinNew')">
-        <button
-          class="btn secondary"
-          :disabled="pinBusy || !pinCurrent || pinNext.length < 8"
-          @click="submitPin"
-        >{{ pinBusy ? t('profile.pinSaving') : t('common.save') }}</button>
-        <p v-if="pinDone" class="pp-pin-ok">{{ t('profile.pinDone') }}</p>
-        <p v-if="pinError" class="pp-pin-err">{{ pinError }}</p>
+      <div class="pp-form">
+        <div class="pp-form-title">{{ t('profile.changePin') }}</div>
+        <label class="pp-form-row">
+          <span class="pp-form-label">{{ t('profile.pinCurrent') }}</span>
+          <input v-model="pinCurrent" class="pp-input" type="password" autocomplete="current-password">
+        </label>
+        <label class="pp-form-row">
+          <span class="pp-form-label">{{ t('profile.pinNewField') }}</span>
+          <input v-model="pinNext" class="pp-input" type="password" autocomplete="new-password"
+                 :placeholder="t('profile.pinNewHint')">
+        </label>
+        <div class="pp-form-foot">
+          <button
+            class="btn secondary"
+            :disabled="pinBusy || !pinCurrent || pinNext.length < 8"
+            @click="submitPin"
+          >{{ pinBusy ? t('profile.pinSaving') : t('common.save') }}</button>
+        </div>
+        <p v-if="pinDone" class="pp-form-ok">{{ t('profile.pinDone') }}</p>
+        <p v-if="pinError" class="pp-form-err">{{ pinError }}</p>
       </div>
 
       <button class="btn secondary" @click="handleSignOut">{{ t('account.signOut') }}</button>
@@ -458,15 +517,36 @@ function handleSignOut() {
 </template>
 
 <style scoped>
-/* 改 PIN 的那一區。跟上面那些開關隔開：它是一次性的動作，不是一個狀態。 */
-.pp-pin {
-  display: flex; flex-direction: column; gap: 0.375rem;
-  padding: 0.625rem; margin: 0.25rem 0;
+/* 信箱與改 PIN 的那兩區。跟上面那些開關隔開：它們是一次性的動作，不是一個狀態。
+   寬度跟音量那幾列一樣撐滿，欄位是「標籤在左、輸入在右」—— 窄一格的卡片會讓人以為
+   這裡只是個附註，但它是帳號唯一的復原手段。 */
+.pp-form {
+  width: 100%; max-width: 30rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  padding: 0.75rem; margin: 0.25rem 0;
   border: 0.0625rem solid var(--line); border-radius: var(--radius-sm);
 }
-.pp-pin-title { font-size: 0.75rem; font-weight: 800; color: var(--ink); }
-.pp-pin-ok { margin: 0; font-size: 0.6875rem; font-weight: 700; color: #2E7D4F; }
-.pp-pin-err { margin: 0; font-size: 0.6875rem; font-weight: 700; color: #C0392B; }
+.pp-form-title { font-size: 0.75rem; font-weight: 800; color: var(--ink); }
+.pp-form-note { margin: 0; font-size: 0.625rem; color: var(--sub); line-height: 1.6; }
+
+/* 標籤欄固定寬度而不是跟著字長：兩張卡片的輸入框要對齊在同一條線上，否則一格一格
+   凸進凸出，看起來就不像同一份表單。 */
+.pp-form-row {
+  display: grid; grid-template-columns: 5.5rem 1fr;
+  align-items: center; gap: 0.5rem;
+  cursor: pointer;
+}
+.pp-form-label { font-size: 0.6875rem; font-weight: 800; color: var(--sub); line-height: 1.3; }
+.pp-form-foot { display: flex; justify-content: flex-end; }
+.pp-form-foot .btn { padding: 0.4375rem 1.5rem; font-size: 0.75rem; }
+.pp-form-ok { margin: 0; font-size: 0.6875rem; font-weight: 700; color: #2E7D4F; }
+.pp-form-err { margin: 0; font-size: 0.6875rem; font-weight: 700; color: #C0392B; }
+
+/* 真的很窄的機子（iPhone SE 直向以下）才疊回去 —— 橫排擠到輸入框只剩兩個字寬，
+   那比疊起來更難用。 */
+@media (max-width: 22rem) {
+  .pp-form-row { grid-template-columns: 1fr; gap: 0.25rem; }
+}
 
 .pp-board { display: flex; flex-direction: column; min-height: 0; }
 

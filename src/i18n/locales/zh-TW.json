@@ -357,7 +357,8 @@
     "noticeGroupDraft": "草稿",
     "noticeGroupEnded": "已結束",
     "noticeEmpty": "沒有公告",
-    "noticeEnded": "已結束"
+    "noticeEnded": "已結束",
+    "emailLabel": "信箱"
   },
   "priceLog": {
     "title": {
@@ -901,7 +902,9 @@
     "errorClaimCodeRequired": "請輸入認領碼",
     "errorClaimNotFound": "找不到這組認領碼，確認有沒有打錯",
     "errorClaimUsed": "這組認領碼已經用過了，跟主辦要一組新的",
-    "errorClaimExpired": "這組認領碼已過期，跟主辦要一組新的"
+    "errorClaimExpired": "這組認領碼已過期，跟主辦要一組新的",
+    "emailPlaceholder": "電子信箱",
+    "emailHint": "忘記帳號或 PIN 的時候，這是唯一能找回來的方式。"
   },
   "profile": {
     "avatar": "頭像",
@@ -929,12 +932,15 @@
     "lowData": "低流量模式",
     "changePin": "修改 PIN",
     "pinCurrent": "目前的 PIN",
-    "pinNew": "新的 PIN（至少 8 碼）",
+    "pinNewField": "新的 PIN",
+    "pinNewHint": "至少 8 碼",
     "pinSaving": "儲存中…",
-    "pinDone": "已更新"
+    "pinDone": "已更新",
+    "email": "電子信箱",
+    "emailField": "信箱",
+    "emailHint": "留下信箱，忘記帳號或 PIN 的時候才找得回來。"
   },
-  "notice": {
-  },
+  "notice": {},
   "mailbox": {
     "title": "信件",
     "empty": "目前沒有信件。",

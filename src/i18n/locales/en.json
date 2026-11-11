@@ -357,7 +357,8 @@
     "noticeGroupDraft": "Drafts",
     "noticeGroupEnded": "Ended",
     "noticeEmpty": "Nothing here",
-    "noticeEnded": "Ended"
+    "noticeEnded": "Ended",
+    "emailLabel": "Email"
   },
   "priceLog": {
     "title": {
@@ -902,7 +903,9 @@
     "errorClaimCodeRequired": "Enter the claim code",
     "errorClaimNotFound": "That claim code wasn't found — check it for typos",
     "errorClaimUsed": "That claim code has already been used — ask the organiser for a new one",
-    "errorClaimExpired": "That claim code has expired — ask the organiser for a new one"
+    "errorClaimExpired": "That claim code has expired — ask the organiser for a new one",
+    "emailPlaceholder": "Email",
+    "emailHint": "The only way to recover your account if you forget your handle or PIN."
   },
   "profile": {
     "avatar": "Avatar",
@@ -930,12 +933,15 @@
     "lowData": "Low data mode",
     "changePin": "Change PIN",
     "pinCurrent": "Current PIN",
-    "pinNew": "New PIN (8+ characters)",
+    "pinNewField": "New PIN",
+    "pinNewHint": "8+ characters",
     "pinSaving": "Saving…",
-    "pinDone": "Updated"
+    "pinDone": "Updated",
+    "email": "Email",
+    "emailField": "Address",
+    "emailHint": "Leave an email so you can recover your account if you forget your handle or PIN."
   },
-  "notice": {
-  },
+  "notice": {},
   "mailbox": {
     "title": "Mail",
     "empty": "No mail right now.",

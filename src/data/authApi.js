@@ -6,8 +6,17 @@ import { request } from './apiRequest'
 // A brand new player — no history to protect, so no claim code needed. `account` is the login
 // handle (unique, picked here); `name` is just the display nickname (not unique, shown on
 // banners) — kept separate, see server/index.mjs.
-export function register(account, name, pin) {
-  return request('/api/auth/register', { method: 'POST', body: JSON.stringify({ account, name, pin }) })
+export function register(account, name, pin, email) {
+  return request('/api/auth/register', { method: 'POST', body: JSON.stringify({ account, name, pin, email }) })
+}
+
+/** 自己留一個信箱，或換掉。既有玩家沒有信箱，補的路就在這裡。 */
+export function setEmail(token, email) {
+  return request('/api/players/me/email', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ email })
+  })
 }
 
 // An existing numbered player linking an account for the first time (or resetting a forgotten
