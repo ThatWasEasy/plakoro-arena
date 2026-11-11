@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-legal.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -13,7 +13,8 @@
     "fetch-product-images": "node scripts/fetch-product-images.mjs",
     "make-emblem-tile": "python3 scripts/make-emblem-tile.py",
     "build-handbook": "python3 scripts/build-handbook.py",
-    "split-handbook": "python3 scripts/split-handbook-pdf.py"
+    "split-handbook": "python3 scripts/split-handbook-pdf.py",
+    "build-legal": "node scripts/build-legal.mjs"
   },
   "dependencies": {
     "cannon-es": "^0.20.0",
