@@ -7,6 +7,12 @@ const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', impo
 
 export default defineConfig({
   base: './',
+  // 輸出到 docs/，因為 GitHub Pages 的「從分支部署」只服務得了根目錄或 /docs ——
+  // 指定不了 dist。放根目錄的話會跟原始碼混在一起（而根目錄那支 index.html 是開發用
+  // 的，指向未編譯的 /src/main.js），所以站的網址只能是 .../dist/。
+  //
+  // 專案文件原本也住在 docs/，已經搬去 design/ —— 建置會清空輸出目錄，兩者不能共存。
+  build: { outDir: 'docs' },
   plugins: [vue()],
   server: {
     // Online duel needs two devices, so the dev server gets reached through a tunnel. Vite

@@ -130,7 +130,7 @@ npm run fetch-data   # 從 Supabase 重新抓取角色與招式資料到 src/dat
 
 ## 本機資料庫
 
-選手資料／賽事紀錄要搬上資料庫（規劃見 `docs/data-model.md`）之前的本機開發環境，與現在上線的靜態網站完全無關，純粹是本機驗證用。
+選手資料／賽事紀錄要搬上資料庫（規劃見 `design/data-model.md`）之前的本機開發環境，與現在上線的靜態網站完全無關，純粹是本機驗證用。
 
 ```bash
 cp .env.example .env   # 第一次使用時

@@ -1,7 +1,7 @@
 <!-- A standalone login/register/claim screen — talks to server/index.mjs. No OAuth, no email: a
      player logs in with an account handle they pick (not their P###### code — nobody remembers
      that) plus a PIN, kept separate from their display nickname (not unique, shown on banners —
-     see docs/data-model.md「登入與註冊流程」). Deliberately just the forms: no nameplate preview,
+     see design/data-model.md「登入與註冊流程」). Deliberately just the forms: no nameplate preview,
      no avatar/flag/title editor, no save button — that's PlayerProfileApp.vue, reached only once
      an account exists. -->
 <script setup>
