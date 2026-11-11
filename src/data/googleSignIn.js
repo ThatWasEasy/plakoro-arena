@@ -47,7 +47,7 @@ function loadScript() {
  * 回傳一個取消函式，元件卸載時呼叫 —— 不取消的話，離開畫面之後按鈕的 callback 還會對著
  * 已經不存在的元件跑。
  */
-export async function renderGoogleButton(el, onCredential, { locale = 'zh-TW', width } = {}) {
+export async function renderGoogleButton(el, onCredential, { locale = 'zh-TW', width, scale = 1 } = {}) {
   if (!googleAvailable) return () => {}
   let cancelled = false
   const api = await loadScript()
@@ -67,7 +67,10 @@ export async function renderGoogleButton(el, onCredential, { locale = 'zh-TW', w
 
   // 寬度要自己量。GIS 不吃百分比，沒給的話會畫成一個固定寬度的按鈕，在手機上跟旁邊
   // 撐滿的輸入框對不齊。上限是 Google 自己訂的 400。
-  const px = width || Math.min(400, Math.round(el.clientWidth))
+  //
+  // 呼叫端用 CSS transform 放大時要先除回去：scale 之後的寬度是這個值乘以倍率，不先
+  // 縮的話按鈕會長到容器外面去。
+  const px = width || Math.min(400, Math.round(el.clientWidth / scale))
   api.renderButton(el, {
     theme: 'outline',
     size: 'large',

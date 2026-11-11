@@ -15,6 +15,7 @@ const KNOWN = {
   // Google 登入那條路的幾種結果。'email already registered' 不是失敗，是「這個信箱已經
   // 有帳號了，請先用帳號 + PIN 登入再綁定」—— 不自動接的理由見後端。
   'email already registered': 'errorEmailRegistered',
+  'google account not linked': 'errorGoogleNotLinked',
   'google sign-in failed': 'errorGoogleFailed',
   'google sign-in is not configured': 'errorGoogleOff',
   'google account already linked': 'errorGoogleLinkedElsewhere',

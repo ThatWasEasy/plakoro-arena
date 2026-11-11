@@ -1,12 +1,14 @@
-<!-- A standalone login/register/claim screen — talks to server/index.mjs. No OAuth: a
-     player logs in with an account handle they pick (not their P###### code — nobody remembers
-     that) plus a PIN, kept separate from their display nickname (not unique, shown on banners —
-     see design/data-model.md「登入與註冊流程」). Deliberately just the forms: no nameplate preview,
-     no avatar/flag/title editor, no save button — that's PlayerProfileApp.vue, reached only once
-     an account exists.
+<!-- A standalone login/register/claim screen — talks to server/index.mjs.
 
-     註冊要留信箱，不是拿來登入的 —— 是忘記 PIN 時唯一能認回帳號的線索（現在由管理員代為
-     重設，之後接寄信）。既有玩家沒有信箱，補的路在 PlayerProfileApp.vue。 -->
+     註冊一律走 Google。自己設帳號 + PIN 那條路收掉了：它製造的問題（忘記 PIN、忘記帳號
+     名，而且沒有任何自動的復原管道）比它解決的多，而那正是這一輪所有改動的起點。Google
+     進不來的人由主辦方開帳號、發認領碼 —— 那條路不碰信箱，也不受唯一值限制。
+
+     登入保留帳號 + PIN，收在「以舊系統登入」後面：一百多位既有玩家只有這一條路進得來，
+     而他們之中多數人的 players.email 是 NULL。他們該做的是登入之後到設定頁綁 Google。
+
+     刻意只有表單：沒有名牌預覽、沒有頭像／旗幟／稱號編輯、沒有儲存鍵 —— 那些在
+     PlayerProfileApp.vue，而那支畫面要有帳號才進得去。 -->
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { LINE_COMMUNITY_URL } from '../../data/community'
@@ -27,13 +29,12 @@ const tab = ref('login')
 
 const loginAccount = ref('')
 const loginPin = ref('')
-const registerAccount = ref('')
-const registerName = ref('')
-const registerPin = ref('')
-const registerEmail = ref('')
 const claimAccount = ref('')
 const claimCode = ref('')
 const claimPin = ref('')
+
+// 「以舊系統登入」展開了沒。換分頁時收回去 —— 回到登入頁看到的該是主要的那條路。
+const legacyOpen = ref(false)
 
 const busy = ref(false)
 const error = ref('')
@@ -85,13 +86,19 @@ async function run(action) {
 const googleSlot = ref(null)
 let stopGoogle = () => {}
 
+// 同一顆按鈕，兩種意圖。按鈕只畫得了一次（Google 自己塞的 iframe），所以意圖在按下去
+// 的當下由分頁決定，而不是畫兩顆。
 const onGoogleCredential = credential =>
-  run(async () => afterAuth(await authApi.googleSignIn(credential)))
+  run(async () => afterAuth(await authApi.googleSignIn(credential, tab.value === 'register')))
 
 onMounted(async () => {
   if (!googleAvailable || !googleSlot.value) return
   try {
-    stopGoogle = await renderGoogleButton(googleSlot.value, onGoogleCredential, { locale: locale.value })
+    stopGoogle = await renderGoogleButton(googleSlot.value, onGoogleCredential, {
+      locale: locale.value,
+      // 跟 .la-google-slot 的 transform 是同一個數字，改一邊就要改另一邊。
+      scale: 1.22
+    })
   } catch (e) {
     // 載不進來（擋廣告的擴充套件、公司網路擋 Google、離線）就當作沒有這個選項。
     // 帳號 + PIN 那條路不受影響，不該因為畫不出一顆按鈕就讓人登不進來。
@@ -102,8 +109,6 @@ onMounted(async () => {
 onBeforeUnmount(() => stopGoogle())
 
 const doLogin = () => run(async () => afterAuth(await authApi.login(loginAccount.value.trim(), loginPin.value)))
-const doRegister = () => run(async () =>
-  afterAuth(await authApi.register(registerAccount.value.trim(), registerName.value.trim(), registerPin.value, registerEmail.value.trim())))
 const doClaim = () => run(async () =>
   afterAuth(await authApi.claim(claimAccount.value.trim(), claimCode.value.trim(), claimPin.value)))
 </script>
@@ -118,29 +123,36 @@ const doClaim = () => run(async () =>
           v-for="tb in TABS"
           :key="tb"
           :class="['la-tab', { on: tab === tb }]"
-          @click="tab = tb; error = ''"
+          @click="tab = tb; error = ''; legacyOpen = false"
         >{{ t(`account.tab${tb[0].toUpperCase()}${tb.slice(1)}`) }}</button>
       </div>
 
-      <form v-if="tab === 'login'" class="la-form" @submit.prevent="doLogin">
-        <input v-model="loginAccount" class="la-input" :placeholder="t('account.accountPlaceholder')" autocapitalize="none">
-        <input v-model="loginPin" type="password" class="la-input" :placeholder="t('account.pinPlaceholder')">
-        <button class="btn" type="submit" :disabled="busy || !agreedLegal">{{ t('account.loginSubmit') }}</button>
-      </form>
+      <!-- 登入以 Google 為主，帳號 + PIN 收在按鈕後面。不是把它藏起來 —— 它仍然是一百多位
+           既有玩家唯一進得來的方式，而是讓畫面先給出那條不會再忘記密碼的路。 -->
+      <div v-if="tab === 'login'" class="la-form">
+        <!-- 跟 Google 那顆同一個規矩：沒同意條款之前，哪一條進來的路都不開。 -->
+        <button
+          v-if="!legacyOpen"
+          type="button"
+          class="la-legacy-toggle"
+          :disabled="!agreedLegal"
+          @click="legacyOpen = true"
+        >{{ t('account.legacyLogin') }}</button>
 
-      <form v-else-if="tab === 'register'" class="la-form" @submit.prevent="doRegister">
-        <input v-model="registerAccount" class="la-input" :placeholder="t('account.accountPlaceholder')" autocapitalize="none" maxlength="20">
-        <input v-model="registerName" class="la-input" :placeholder="t('account.namePlaceholder')" maxlength="20">
-        <input v-model="registerPin" type="password" class="la-input" :placeholder="t('account.pinPlaceholder')">
-        <!-- 信箱是找回帳號的唯一自動管道。沒有它，忘記 PIN 或忘記帳號名的人只能到
-             Line 社群報代號、等人工重設。 -->
-        <input v-model="registerEmail" type="email" class="la-input" inputmode="email"
-               autocapitalize="none" :placeholder="t('account.emailPlaceholder')" maxlength="254">
-        <p class="la-hint">{{ t('account.emailHint') }}</p>
-        <button class="btn" type="submit" :disabled="busy || !agreedLegal">{{ t('account.registerSubmit') }}</button>
-      </form>
+        <form v-else class="la-form" @submit.prevent="doLogin">
+          <input v-model="loginAccount" class="la-input" :placeholder="t('account.accountPlaceholder')" autocapitalize="none">
+          <input v-model="loginPin" type="password" class="la-input" :placeholder="t('account.pinPlaceholder')">
+          <button class="btn" type="submit" :disabled="busy || !agreedLegal">{{ t('account.loginSubmit') }}</button>
+        </form>
+      </div>
 
-      <form v-else class="la-form" @submit.prevent="doClaim">
+      <!-- 註冊只剩上面那顆 Google 按鈕，這裡沒有表單。自己設帳號 + PIN 那條路收掉了 ——
+           它製造的問題（忘記 PIN、忘記帳號名，而且沒有任何自動的復原管道）比它解決的多。
+           Google 進不來的人由主辦方開帳號、發認領碼。 -->
+
+      <!-- v-else-if 而不是 v-else：註冊那一頁沒有表單（只有上面那顆 Google 按鈕），
+           寫成 v-else 的話註冊頁會掉進來顯示認領表單。 -->
+      <form v-else-if="tab === 'claim'" class="la-form" @submit.prevent="doClaim">
         <p class="la-hint">{{ t('account.claimHint') }}</p>
         <input v-model="claimAccount" class="la-input" :placeholder="t('account.accountPlaceholder')" autocapitalize="none" maxlength="20">
         <input v-model="claimCode" class="la-input" :placeholder="t('account.claimCodePlaceholder')" autocapitalize="characters">
@@ -154,9 +166,8 @@ const doClaim = () => run(async () =>
       <div
         v-show="tab !== 'claim' && !googleFailed"
         class="la-google"
-        :class="{ off: !agreedLegal || busy, above: tab === 'register' }"
+        :class="{ off: !agreedLegal || busy }"
       >
-        <div class="la-or"><span>{{ t('account.or') }}</span></div>
         <div ref="googleSlot" class="la-google-slot"></div>
       </div>
 
@@ -203,9 +214,8 @@ const doClaim = () => run(async () =>
 
 /* 版面順序由 order 決定，不是 DOM 順序 —— 因為 Google 按鈕只能畫一次（它是 Google 自己
    塞進來的 iframe），用 DOM 搬動就等於每次切分頁都要重畫。排法：
-     條款 → （註冊才有的 Google）→ 表單 → （登入才有的 Google）→ 忘記 PIN → 錯誤
-   註冊把 Google 放在最前面，是因為那是最快的一條路；登入放在表單底下，因為登入的人
-   多半是來打帳號的。 */
+     Google → 表單（登入頁是「以舊系統登入」那顆）→ 同意 → 忘記 PIN → 錯誤
+   Google 在最前面，因為它現在是主要路徑；帳號 + PIN 退成次要入口。 */
 .la-panel {
   width: 100%;
   max-width: 24rem;
@@ -218,9 +228,8 @@ const doClaim = () => run(async () =>
   flex-direction: column;
 }
 .la-panel > .la-tabs { order: 0; }
-.la-panel > .la-legal { order: 1; }
-.la-panel > .la-google { order: 4; }
-.la-panel > .la-google.above { order: 2; }
+.la-panel > .la-legal { order: 4; }
+.la-panel > .la-google { order: 2; }
 .la-panel > .la-form { order: 3; }
 .la-panel > .la-foot-hint { order: 5; }
 .la-panel > .la-error { order: 6; }
@@ -266,25 +275,42 @@ const doClaim = () => run(async () =>
 .la-input:focus { outline: none; border-color: var(--accent-strong); }
 
 /* 入口被斷成兩行的話就不像一個可以按的東西了。 */
-/* 分隔線中間放一個「或」。線用 border 畫在前後兩個 ::before/::after 上，比塞兩個空
-   div 乾淨，也不會在換行時斷掉。 */
-.la-or {
-  display: flex; align-items: center; gap: 0.5rem;
-  margin: 0.75rem 0 0.5rem;
-  font-size: 0.6875rem; font-weight: 700; color: var(--sub);
-}
-.la-or::before, .la-or::after {
-  content: ''; flex: 1; height: 0.0625rem; background: var(--line);
-}
-
 .la-google { display: flex; flex-direction: column; align-items: center; }
 /* Google 自己畫的按鈕是一個 iframe，樣式碰不到，所以只能從外面壓。 */
-.la-google-slot { display: flex; justify-content: center; width: 100%; min-height: 2.5rem; }
+/* Google 的按鈕高度是它自己決定的（large 已經是最大），所以要再大只能整個放大。外層給
+   固定高度吸收放大後多出來的部分，不然底下的東西會被推開。 */
+.la-google-slot {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 3.375rem;
+}
+.la-google-slot > * { transform: scale(1.22); transform-origin: center; }
 .la-google.off { opacity: 0.45; pointer-events: none; }
-/* 按鈕在表單上面的時候，分隔線要跟著翻到按鈕底下 —— 它分隔的是「Google」與「表單」，
-   不是永遠在最上面的一條裝飾。 */
-.la-google.above .la-or { order: 1; margin: 0.5rem 0 0.25rem; }
 .la-foot-hint { margin-top: 0.75rem; }
+
+/* 黑底白字，跟站上其他次要動作一樣。
+   試過描邊的淡版本（次要入口不該跟主要那顆搶），但它看起來像是被停用的 —— 玩家不會
+   去點一顆看起來點不下去的按鈕，而這是一百多位既有玩家唯一進得來的門。能不能點比階層
+   重要。
+   不掛 .btn 再來覆蓋它：全域的 .btn.secondary 跟這支 scoped class 權重一樣，誰贏取決
+   於樣式表的載入順序，那是賭的不是寫的。 */
+.la-legacy-toggle {
+  width: 100%;
+  padding: 0.5625rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #fff;
+  background: #1F1F1D;
+  border: none;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+.la-legacy-toggle:active { transform: scale(0.96); }
+/* 沒勾條款時關起來。淡到剩下 0.45 會讓人以為壞了（那是上一版踩過的），所以只淡一點，
+   靠游標告訴他現在按不得。底下那個勾選框就是解鎖它的地方。 */
+.la-legacy-toggle:disabled { opacity: 0.6; cursor: not-allowed; }
+.la-legacy-toggle:disabled:active { transform: none; }
 
 .la-link { color: inherit; font-weight: 800; text-decoration: underline; white-space: nowrap; }
 
@@ -295,7 +321,7 @@ const doClaim = () => run(async () =>
   display: flex;
   align-items: flex-start;
   gap: 0.4375rem;
-  margin: 0 0 0.75rem;
+  margin: 0.75rem 0 0;
 }
 .la-legal > input {
   flex: none;
