@@ -27,8 +27,19 @@ export const isStagePortrait = ref(false)
 const WATCH_MS = 6000
 const QUIET_MS = 500
 
+/**
+ * 尺寸安靜下來之後，還要再低頻盯多久、隔多久看一次。
+ *
+ * 真機截圖上那一偏是在旋轉後 8.9 秒還在，比 WATCH_MS 還久。但那段時間尺寸完全沒變，
+ * 所以不需要每一幀都看 —— 用計時器每 250ms 檢查一次 #stage 有沒有回到 0 就夠，代價
+ * 可以忽略，而且一旦正了就立刻停。
+ */
+const GUARD_MS = 20000
+const GUARD_EVERY = 250
+
 export function useStageLayout(stageEl) {
   let watching = 0
+  let guard = 0
 
   function layoutStage() {
     // 舞台就是視窗（見 style.css 的 #stage），所以這裡只剩一件事：決定 1rem 有多大。
@@ -68,6 +79,16 @@ export function useStageLayout(stageEl) {
   function nudgeStage() {
     const el = stageEl?.value
     if (!el) return
+    // 先把版面視窗捲回原點。真機量到旋轉之後整個畫面被往下推 62px（見 signature 的
+    // 註解），而 html/body 是 overflow:hidden —— 看起來不可能捲動，但 iOS 在轉向時
+    // 仍然會動到版面視窗，而 fixed 元素是釘在版面視窗上的，所以它跟著跑掉。
+    //
+    // 三個都寫是因為哪一個有效視瀏覽器而定，而全部設成 0 沒有副作用：這個 App 的文件
+    // 層級本來就不該有捲動位置。
+    if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+
     el.style.position = 'absolute'
     // 讀一次版面屬性，強迫瀏覽器在這裡就重排，而不是等到這個函式跑完才一次算完 ——
     // 不讀的話兩次賦值會被合併，等於什麼都沒做。
@@ -86,8 +107,18 @@ export function useStageLayout(stageEl) {
     return [
       window.innerWidth, window.innerHeight,
       Math.round(vp?.width || 0), Math.round(vp?.height || 0),
-      document.documentElement.clientWidth, document.documentElement.clientHeight
+      document.documentElement.clientWidth, document.documentElement.clientHeight,
+      // 位移也要進簽章。真機實測（iOS standalone，橫向）量到的是：三組尺寸都正確而且
+      // 早就不再變動，但 visualViewport.offsetTop = -62、#stage 的 rect.top = 62 ——
+      // 只盯尺寸的話監看早就收工了，而偏移還在那裡。
+      Math.round(window.scrollY || 0), Math.round(vp?.offsetTop || 0), stageTop()
     ].join('x')
+  }
+
+  /** #stage 現在實際被畫在哪個高度。inset:0 的元素應該永遠是 0。 */
+  function stageTop() {
+    const el = stageEl?.value
+    return el ? Math.round(el.getBoundingClientRect().top) : 0
   }
 
   /**
@@ -114,15 +145,38 @@ export function useStageLayout(stageEl) {
         layoutStage()
         nudgeStage()
       }
-      // 安靜夠久、或盯太久了就停。停之前再做最後一次，確保收工時的狀態是對的。
+      // 偏移還在的話不算安靜。尺寸不動但畫面歪著，正是真機上量到的狀況 —— 只看尺寸
+      // 的話會在這裡提早收工，然後那 62px 就沒有人管了。
+      if (stageTop() !== 0) {
+        lastChange = now
+        nudgeStage()
+      }
+
+      // 安靜夠久、或盯太久了就停。停之前再做最後一次，確保收工時的狀態是對的，
+      // 然後交給低頻的守衛 —— 偏移可能在尺寸安靜之後很久才冒出來或還沒消。
       if (now - lastChange > QUIET_MS || now - started > WATCH_MS) {
         layoutStage()
         nudgeStage()
+        startGuard()
         return
       }
       watching = requestAnimationFrame(tick)
     }
     watching = requestAnimationFrame(tick)
+  }
+
+  /** 低頻守衛：只檢查一件事 —— #stage 有沒有被推離 0。正了就收工。 */
+  function startGuard() {
+    clearInterval(guard)
+    const until = performance.now() + GUARD_MS
+    guard = setInterval(() => {
+      if (stageTop() !== 0) {
+        layoutStage()
+        nudgeStage()
+        return
+      }
+      if (performance.now() > until) clearInterval(guard)
+    }, GUARD_EVERY)
   }
 
   onMounted(() => {
@@ -135,6 +189,7 @@ export function useStageLayout(stageEl) {
   })
   onUnmounted(() => {
     cancelAnimationFrame(watching)
+    clearInterval(guard)
     window.removeEventListener('resize', settle)
     window.removeEventListener('orientationchange', settle)
     window.visualViewport?.removeEventListener('resize', settle)

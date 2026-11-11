@@ -85,7 +85,15 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var
    一個算好的高度裡，`overflow:hidden` 一路往下傳，誰都捲不動。 */
 #stage{position:fixed; inset:0; background:var(--bg); overflow:hidden;}
 
+/* 內縮開瀏海、狀態列與 home indicator。
+   index.html 加了 viewport-fit=cover（為了讓手冊那幾處的 env() 有值，也為了讓
+   standalone 時畫面真的鋪滿），代價是內容會跑到那些東西底下 —— 橫向時瀏海在左邊，
+   正好壓住信件圖示那一帶。padding 下在 #app 而不是 #stage：#stage 要維持滿版的底色，
+   被內縮的只有會被點到的那一層。box-sizing 是 border-box（見上面的 *），所以這不會
+   把內容撐出去。 */
 #app{position:relative; width:100%; height:100%; margin:0 auto;
+  padding:env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+          env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   background:var(--bg); overflow:hidden; display:flex; flex-direction:column;}
 
 /* The part of the duel screen that the boards and overlays share. Takes the remainder of the

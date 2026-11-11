@@ -2,7 +2,20 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- viewport-fit=cover 是為了讓 env(safe-area-inset-*) 有值。沒有它的話那八處用到
+     safe-area 的 padding（手冊、信箱、書架）算出來全是 0，等於白寫。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 從主畫面圖示開啟時不要帶 Safari 的工具列。
+     沒有這一行的話，iOS 會用一般 Safari 開（含網址列與底部工具列），而橫向時 Safari
+     會自動收起工具列 —— 那段過渡期間版面視窗比視覺視窗矮 62px，`position: fixed` 的
+     #stage 釘在版面視窗上，整個畫面就跟著被推下去。真機量到的 `vv @0,-62` 與
+     `stage 0,62` 就是這個，而且要 1~5 秒才會自己對齊，那段時間玩家點不準東西。
+     工具列不存在，這整段過渡就不存在。
+
+     改了之後既有的主畫面圖示要**重新加一次**才會生效。 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PLAKORO ARENA">
 <title>PLAKORO ARENA</title>
 <link rel="icon" href="/image/ICON/favicon.png">
 <link rel="apple-touch-icon" href="/image/ICON/favicon.png">

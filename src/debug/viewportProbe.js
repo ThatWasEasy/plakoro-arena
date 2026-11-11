@@ -25,6 +25,9 @@ export function installViewportProbe() {
   ].join(';')
   document.body.appendChild(box)
 
+  // 讓面板讀得到 safe-area 的實際值：沒有 viewport-fit=cover 的話它會是 0px。
+  document.documentElement.style.setProperty('--probe-sat', 'env(safe-area-inset-top, 0px)')
+
   const taps = []
   let lastSig = ''
   let lastChangeAt = performance.now()
@@ -75,9 +78,14 @@ export function installViewportProbe() {
       `win   ${window.innerWidth}x${window.innerHeight}`,
       `vv    ${Math.round(vp?.width || 0)}x${Math.round(vp?.height || 0)} @${Math.round(vp?.offsetLeft || 0)},${Math.round(vp?.offsetTop || 0)} s${(vp?.scale || 1).toFixed(2)}`,
       `docEl ${de.clientWidth}x${de.clientHeight}`,
-      `stage ${sr ? `${Math.round(sr.left)},${Math.round(sr.top)} ${Math.round(sr.width)}x${Math.round(sr.height)}` : '-'}`,
+      // stageTop 要是 0。不是 0 就代表畫面被推開了 —— 那正是這個 bug 的本體。
+      `stage ${sr ? `${Math.round(sr.left)},${Math.round(sr.top)} ${Math.round(sr.width)}x${Math.round(sr.height)}` : '-'}  ${sr && Math.round(sr.top) !== 0 ? '<<< OFFSET' : ''}`,
+      `scroll ${Math.round(window.scrollY || 0)},${Math.round(window.pageYOffset || 0)}  deTop ${de.scrollTop}`,
       `rem   ${getComputedStyle(de).fontSize}  chg ${changes}  quiet ${Math.round(now - lastChangeAt)}ms`,
       `rot   ${rotatedAt ? Math.round(now - rotatedAt) + 'ms ago' : '-'}`,
+      // standalone 才代表工具列真的不在了。false 的話這個圖示是用一般 Safari 開的，
+      // 要重新「加入主畫面」一次。
+      `stand ${navigator.standalone === true || matchMedia('(display-mode: standalone)').matches}  safe ${getComputedStyle(de).getPropertyValue('--probe-sat') || '?'}`,
       ...taps.map(t => `tap ${t.t === null ? '--' : t.t + 'ms'} ${t.x},${t.y} ${t.match}\n  hit ${t.from}\n  tgt ${t.target}`)
     ].join('\n')
 
