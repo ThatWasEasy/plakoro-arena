@@ -26,6 +26,30 @@ import VolumeBar from './VolumeBar.vue'
 const emit = defineEmits(['back'])
 const { t } = useI18n()
 
+const pinCurrent = ref('')
+const pinNext = ref('')
+const pinBusy = ref(false)
+const pinError = ref('')
+const pinDone = ref(false)
+
+/** 改 PIN。成功之後把兩個欄位清掉 —— 留在畫面上的密碼沒有任何用處。 */
+async function submitPin() {
+  if (pinBusy.value) return
+  pinBusy.value = true
+  pinError.value = ''
+  pinDone.value = false
+  try {
+    await authApi.changePin(getToken(), pinCurrent.value, pinNext.value)
+    pinDone.value = true
+    pinCurrent.value = ''
+    pinNext.value = ''
+  } catch (e) {
+    pinError.value = e.message
+  } finally {
+    pinBusy.value = false
+  }
+}
+
 const tab = ref('badge')
 
 // Starts empty rather than waiting on the fetch below, so the pickers never flash
@@ -374,6 +398,23 @@ function handleSignOut() {
         <span>{{ t('profile.adminMode') }}</span>
       </label>
 
+      <!-- 改 PIN。要先給現在這組，所以撿到別人開著的手機也改不掉。
+           忘記的人改不了這裡 —— 那條路是到 Line 社群報代號，由管理員重設。 -->
+      <div class="pp-pin">
+        <div class="pp-pin-title">{{ t('profile.changePin') }}</div>
+        <input v-model="pinCurrent" class="pp-input" type="password" autocomplete="current-password"
+               :placeholder="t('profile.pinCurrent')">
+        <input v-model="pinNext" class="pp-input" type="password" autocomplete="new-password"
+               :placeholder="t('profile.pinNew')">
+        <button
+          class="btn secondary"
+          :disabled="pinBusy || !pinCurrent || pinNext.length < 8"
+          @click="submitPin"
+        >{{ pinBusy ? t('profile.pinSaving') : t('common.save') }}</button>
+        <p v-if="pinDone" class="pp-pin-ok">{{ t('profile.pinDone') }}</p>
+        <p v-if="pinError" class="pp-pin-err">{{ pinError }}</p>
+      </div>
+
       <button class="btn secondary" @click="handleSignOut">{{ t('account.signOut') }}</button>
     </div>
 
@@ -417,6 +458,16 @@ function handleSignOut() {
 </template>
 
 <style scoped>
+/* 改 PIN 的那一區。跟上面那些開關隔開：它是一次性的動作，不是一個狀態。 */
+.pp-pin {
+  display: flex; flex-direction: column; gap: 0.375rem;
+  padding: 0.625rem; margin: 0.25rem 0;
+  border: 0.0625rem solid var(--line); border-radius: var(--radius-sm);
+}
+.pp-pin-title { font-size: 0.75rem; font-weight: 800; color: var(--ink); }
+.pp-pin-ok { margin: 0; font-size: 0.6875rem; font-weight: 700; color: #2E7D4F; }
+.pp-pin-err { margin: 0; font-size: 0.6875rem; font-weight: 700; color: #C0392B; }
+
 .pp-board { display: flex; flex-direction: column; min-height: 0; }
 
 /* Label left, value right. The label column is sized to the longest label rather than to the

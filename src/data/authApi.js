@@ -67,3 +67,12 @@ export function claimGift(token, id) {
     headers: { Authorization: `Bearer ${token}` }
   })
 }
+
+/** 自己改 PIN。要先給現在這組。 */
+export function changePin(token, current, pin) {
+  return request('/api/auth/pin', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ current, pin })
+  })
+}

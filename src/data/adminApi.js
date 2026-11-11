@@ -318,3 +318,16 @@ export function setHandbookShopOpen(token, open) {
     body: JSON.stringify({ open })
   })
 }
+
+/**
+ * 替忘記 PIN 的玩家重設。帳號名不動 —— 這是重設，不是認領。
+ *
+ * 認領碼對已經有帳號的人是拒絕的（那等於把帳號交出去），所以忘記 PIN 的復原只能走這裡。
+ */
+export function resetPlayerPin(token, code, pin) {
+  return request(`/api/admin/players/${encodeURIComponent(code)}/pin`, {
+    method: 'PUT',
+    headers: authHeader(token),
+    body: JSON.stringify({ pin })
+  })
+}

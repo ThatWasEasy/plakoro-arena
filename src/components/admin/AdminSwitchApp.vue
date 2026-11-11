@@ -191,6 +191,11 @@ const toggleError = ref('')
 // Issued on demand rather than in advance. A player who never wants an account never needs a
 // code, and a code that sits around unused is a credential waiting to be found — it can set
 // the account handle and PIN for the player it names, with nothing else asked for.
+const newPin = ref('')
+const pinBusy = ref(false)
+const pinError = ref('')
+const pinDone = ref(false)
+
 const claimCode = ref('')
 const claimBusy = ref(false)
 const claimError = ref('')
@@ -302,6 +307,28 @@ async function adjustPoints() {
     pointsError.value = e.message
   } finally {
     pointsBusy.value = false
+  }
+}
+
+/**
+ * 重設這個玩家的 PIN。
+ *
+ * 新的 PIN 會經過你的手，所以請他登入後自己再改一次（玩家資料 → 設定）—— 那之後
+ * 這一組就只有他知道。
+ */
+async function resetPin() {
+  if (pinBusy.value || !selectedCode.value) return
+  pinBusy.value = true
+  pinError.value = ''
+  pinDone.value = false
+  try {
+    await adminApi.resetPlayerPin(adminToken.value, selectedCode.value, newPin.value)
+    pinDone.value = true
+    newPin.value = ''
+  } catch (e) {
+    pinError.value = e.message
+  } finally {
+    pinBusy.value = false
   }
 }
 
@@ -473,6 +500,25 @@ async function toggle(kind, asset) {
             <code v-if="claimCode" class="as-claim-code">{{ claimCode }}</code>
             <span v-if="claimCode" class="as-claim-note">{{ t('admin.claimHint') }}</span>
             <span v-if="claimError" class="as-error">{{ claimError }}</span>
+          </div>
+
+          <!-- 相對的那一半：已經有帳號的人忘記 PIN。認領碼對他們是拒絕的（那會變成把
+               帳號交給拿到碼的人），所以復原只能走重設 —— 帳號名不動，只換 PIN。 -->
+          <div v-if="detail.hasAccount" class="as-claim">
+            <input
+              v-model="newPin"
+              class="as-input as-pin"
+              type="text"
+              autocomplete="off"
+              :placeholder="t('admin.pinResetPlaceholder')"
+            >
+            <button
+              class="btn secondary as-claim-btn"
+              :disabled="pinBusy || newPin.length < 8"
+              @click="resetPin"
+            >{{ pinBusy ? t('admin.pinResetting') : t('admin.pinReset') }}</button>
+            <span v-if="pinDone" class="as-claim-note">{{ t('admin.pinResetDone') }}</span>
+            <span v-if="pinError" class="as-error">{{ pinError }}</span>
           </div>
 
           <div class="as-claim">
@@ -718,6 +764,7 @@ async function toggle(kind, asset) {
 
 .as-claim { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .as-claim-btn { padding: 0.3125rem 0.625rem; font-size: 0.6875rem; }
+.as-pin { flex: 1; min-width: 7rem; }
 /* Monospace and spaced out, because this gets read aloud or retyped from a screenshot and
    O/0 and I/1 have to be told apart. */
 .as-claim-code {

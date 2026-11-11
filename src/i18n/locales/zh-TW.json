@@ -211,6 +211,10 @@
     "claimMint": "發認領碼",
     "claimMinting": "產生中…",
     "claimHint": "傳給本人，他在登入頁「認領舊帳號」輸入。14 天後失效。",
+    "pinReset": "重設 PIN",
+    "pinResetting": "重設中…",
+    "pinResetPlaceholder": "新的 PIN（至少 8 碼）",
+    "pinResetDone": "已重設，請他登入後自己再改一次",
     "inherit": "繼承成績",
     "inheritDo": "確認繼承",
     "inheritBusy": "繼承中…",
@@ -920,7 +924,12 @@
     "rename": "更改名稱",
     "renameDo": "確認變更",
     "renameConfirm": "將顯示為「{name}」",
-    "lowData": "低流量模式"
+    "lowData": "低流量模式",
+    "changePin": "修改 PIN",
+    "pinCurrent": "目前的 PIN",
+    "pinNew": "新的 PIN（至少 8 碼）",
+    "pinSaving": "儲存中…",
+    "pinDone": "已更新"
   },
   "notice": {
   },

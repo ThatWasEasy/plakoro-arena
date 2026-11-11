@@ -211,6 +211,10 @@
     "claimMint": "クレームコード発行",
     "claimMinting": "発行中…",
     "claimHint": "本人に渡し、ログイン画面の「既存記録の引き継ぎ」で入力。14日で失効。",
+    "pinReset": "PIN を再設定",
+    "pinResetting": "再設定中…",
+    "pinResetPlaceholder": "新しい PIN（8 文字以上）",
+    "pinResetDone": "再設定しました。ログイン後に本人が変更してください",
     "inherit": "記録を引き継ぐ",
     "inheritDo": "実行",
     "inheritBusy": "処理中…",
@@ -921,7 +925,12 @@
     "rename": "名前を変更",
     "renameDo": "変更する",
     "renameConfirm": "「{name}」として表示されます",
-    "lowData": "低通信モード"
+    "lowData": "低通信モード",
+    "changePin": "PIN を変更",
+    "pinCurrent": "現在の PIN",
+    "pinNew": "新しい PIN（8 文字以上）",
+    "pinSaving": "保存中…",
+    "pinDone": "更新しました"
   },
   "notice": {
   },
