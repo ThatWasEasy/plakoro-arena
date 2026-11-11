@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  舊入口的轉址。
+
+  站以前住在 /dist/（GitHub Pages 的「從分支部署」只服務得了根目錄或 /docs，指定不了
+  dist，所以建置產物只能連同整個 repo 一起被送出去）。輸出改到 docs/ 之後，網址變成
+  乾淨的根目錄，但已經發出去的連結還指著舊的那個。
+
+  而且 GitHub 會把 shawnlin0201.github.io/plakoro-arena/* 整條路徑轉到自訂網域，所以
+  舊書籤最後會落在 https://plakoro.tw/dist/ —— 不留這一頁的話，那是一片空白。
+
+  query 與 hash 一起帶過去：綠界付完款導回來的網址是 /?ecpay=訂單編號，手冊的深連結是
+  /#/handbook。只轉到首頁的話，那些人會掉到一個沒有上下文的畫面。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PLAKORO ARENA</title>
+<script>
+  location.replace('/' + location.search + location.hash)
+</script>
+<!-- JavaScript 關掉的時候的退路。0 秒，所以正常情況下看不到下面那行字。 -->
+<meta http-equiv="refresh" content="0; url=/">
+<style>
+  body { margin:0; display:grid; place-items:center; min-height:100vh;
+         background:#F5F3EC; color:#3A3A3A;
+         font-family:"PingFang TC","Microsoft JhengHei",sans-serif; }
+  a { color:#A8571F; }
+</style>
+</head>
+<body>
+  <p>網址換新了 —— <a href="/">https://plakoro.tw</a></p>
+</body>
+</html>
