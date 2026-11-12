@@ -42,8 +42,9 @@ const { t } = useI18n()
    added a second shape to look at in a corner that should be glanceable. */
 .player-chip {
   position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
+  /* 絕對定位不吃 #app 的 safe-area padding（對齊的是 padding box 外緣），所以要自己加。 */
+  top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  left: calc(0.5rem + env(safe-area-inset-left, 0px));
   z-index: 300;
   display: flex;
   /* Stretch, so the text column is exactly as tall as the avatar and can space its own lines

@@ -331,8 +331,9 @@ onBeforeUnmount(uninstallButtonSfx)
 <style scoped>
 .home-exit-btn {
   position: absolute;
-  top: 0.375rem;
-  left: 0.375rem;
+  /* 絕對定位不吃 #app 的 safe-area padding（對齊的是 padding box 外緣），所以要自己加。 */
+  top: calc(0.375rem + env(safe-area-inset-top, 0px));
+  left: calc(0.375rem + env(safe-area-inset-left, 0px));
   z-index: 300;
   border: none;
   border-radius: 0.625rem;

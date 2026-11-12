@@ -64,8 +64,9 @@ watch(current, measure)
    a different corner of the screen. */
 .music-player {
   position: absolute;
-  top: 2.375rem;
-  right: 0.375rem;
+  /* 絕對定位不吃 #app 的 safe-area padding（對齊的是 padding box 外緣），所以要自己加。 */
+  top: calc(2.375rem + env(safe-area-inset-top, 0px));
+  right: calc(0.375rem + env(safe-area-inset-right, 0px));
   z-index: 300;
   display: flex;
   align-items: center;

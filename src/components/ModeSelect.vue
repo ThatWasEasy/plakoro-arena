@@ -541,11 +541,11 @@ const rows = computed(() => {
   position: absolute;
   /* 跟左上角的頭像切齊（PlayerChip 的 left 也是 0.5rem）。貼著邊的話，同一個畫面上
      會有兩條不一樣的左緣。 */
-  left: 0.5rem;
+  left: calc(0.5rem + env(safe-area-inset-left, 0px));
   /* Inset from the edge rather than flush against it — the board's own side padding stops at
      the flow content, and an absolutely positioned strip would otherwise sit tight to the
      screen edge while everything else breathes. */
-  right: 0.75rem;
+  right: calc(0.75rem + env(safe-area-inset-right, 0px));
   bottom: 4.25rem;
   display: flex;
   align-items: flex-end;
@@ -706,9 +706,12 @@ const rows = computed(() => {
   overflow: hidden;
   background: #1F1F1D;
   /* Full-bleed: the board has side padding, and a band that stops short of the edges reads as
-     a box rather than as a ticker running across the screen. */
-  margin-left: -0.625rem;
-  margin-right: -0.625rem;
+     a box rather than as a ticker running across the screen.
+     要拉出去的不只 .select-board 的 0.625rem —— #app 另外還有一層 safe-area 的
+     padding（見 style.css），橫握時那一層在瀏海那side是五十幾 px。只扣 0.625rem 的話
+     帶子會在兩邊各短一截，看起來就不是一條橫貫畫面的跑馬燈了。 */
+  margin-left: calc(-0.625rem - env(safe-area-inset-left, 0px));
+  margin-right: calc(-0.625rem - env(safe-area-inset-right, 0px));
   width: calc(100% + 1.25rem);
 }
 
