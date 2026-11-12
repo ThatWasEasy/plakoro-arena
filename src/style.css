@@ -72,7 +72,10 @@
   --tc-glow-b:220,239,252;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-html,body{margin:0;padding:0;width:100%;height:100%;background:#1A1A18;color:var(--ink);
+/* height 兩行：100% 給不支援 dvh 的瀏覽器，100dvh 給支援的。iOS standalone 在直向與
+   橫向之間切換時，以視窗高度為基準的百分比常常會把狀態列那一截算錯；dvh 跟著實際可視
+   區域走，不會。 */
+html,body{margin:0;padding:0;width:100%;height:100%;height:100dvh;background:#1A1A18;color:var(--ink);
   font-family:var(--ui-cjk);
   overflow:hidden;}
 

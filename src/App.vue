@@ -160,8 +160,7 @@ function closeSplash(id) {
   splashDone.value = [...splashDone.value, id]
 }
 
-const stageRef = ref(null)
-useStageLayout(stageRef)
+useStageLayout()
 
 const inBattleBoard = computed(() => IN_TURN_PHASES.includes(state.phase))
 
@@ -189,7 +188,7 @@ onBeforeUnmount(uninstallButtonSfx)
 </script>
 
 <template>
-  <div id="stage" ref="stageRef">
+  <div id="stage">
     <div id="app">
       <PlayerChip v-if="mode === null" @open="openMode(isSignedIn ? 'profile' : 'login')" />
       <GlobalTopBar />
