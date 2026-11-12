@@ -111,18 +111,27 @@ export function forcedRerollRolls(dice, cost, n, ownType = null) {
   if (subsets.length === 0) return enumerateRolls(dice)
 
   const out = []
+  const memo = new Map()
   const walk = (d, shown) => {
     if (d < dice.length) {
       for (let f = 0; f < 6; f++) walk(d + 1, [...shown, f])
       return
     }
     let best = null
-    subsets.forEach(subset => {
-      const results = enumerateRolls(subset.map(i => dice[i]))
-        .map(rethrown => [...shown.flatMap((f, i) => (subset.includes(i) ? [] : faces[i][f])), ...rethrown])
-      const payable = cost && cost.length > 0 ? results.filter(r => canPayCost(r, cost)).length : results.length
-      const own = ownType ? results.reduce((sum, r) => sum + r.filter(t => t === ownType).length, 0) : 0
-      if (!best || payable < best.payable || (payable === best.payable && own < best.own)) best = { payable, own, results }
+    subsets.forEach((subset, si) => {
+      // Only the dice left standing matter, so each (subset, kept faces) is worked out once.
+      const kept = shown.filter((_, i) => !subset.includes(i))
+      const key = `${si}|${kept.join(',')}`
+      let option = memo.get(key)
+      if (!option) {
+        const results = enumerateRolls(subset.map(i => dice[i]))
+          .map(rethrown => [...shown.flatMap((f, i) => (subset.includes(i) ? [] : faces[i][f])), ...rethrown])
+        const payable = cost && cost.length > 0 ? results.filter(r => canPayCost(r, cost)).length : results.length
+        const own = ownType ? results.reduce((sum, r) => sum + r.filter(t => t === ownType).length, 0) : 0
+        option = { payable, own, results }
+        memo.set(key, option)
+      }
+      if (!best || option.payable < best.payable || (option.payable === best.payable && option.own < best.own)) best = option
     })
     out.push(...best.results)
   }

@@ -499,6 +499,8 @@
       "tempoBindMove": "技を 1 つ封じる",
       "tempoGainDice1": "エネルギーダイス +1",
       "tempoGainDice2": "エネルギーダイス +2",
+      "tempoForcedReroll1": "エネルギーダイス 1 個振りなおし",
+      "tempoForcedReroll2": "エネルギーダイス 2 個振りなおし",
       "noteNeedsHp": "残りHPを入れると計算されます",
       "noteNeedsPrev": "上の前提条件に基づく数値",
       "noteMirrorDice": "相手のダイスもこの構成と同じと仮定",

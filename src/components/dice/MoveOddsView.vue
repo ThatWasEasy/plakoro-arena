@@ -188,7 +188,9 @@ const TEMPO_ROWS = [
   { key: 'nullifyDamage', label: 'tempoNullifyDamage', self: false },
   { key: 'bindMove', label: 'tempoBindMove', self: false },
   { key: 'gainDice1', label: 'tempoGainDice1', self: true },
-  { key: 'gainDice2', label: 'tempoGainDice2', self: true }
+  { key: 'gainDice2', label: 'tempoGainDice2', self: true },
+  { key: 'forcedReroll1', label: 'tempoForcedReroll1', self: false },
+  { key: 'forcedReroll2', label: 'tempoForcedReroll2', self: false }
 ]
 const tempoPriceRows = computed(() => {
   const table = tempoTable.value

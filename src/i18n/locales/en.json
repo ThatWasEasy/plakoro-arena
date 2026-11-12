@@ -499,6 +499,8 @@
       "tempoBindMove": "One move banned",
       "tempoGainDice1": "One die more",
       "tempoGainDice2": "Two dice more",
+      "tempoForcedReroll1": "Forced to reroll one die",
+      "tempoForcedReroll2": "Forced to reroll two dice",
       "noteNeedsHp": "Counted once you enter remaining HP",
       "noteNeedsPrev": "Based on the assumptions above",
       "noteMirrorDice": "Assumes the opponent rolls this same build",

@@ -499,6 +499,8 @@
       "tempoBindMove": "封住 1 個招式",
       "tempoGainDice1": "多 1 顆能量骰",
       "tempoGainDice2": "多 2 顆能量骰",
+      "tempoForcedReroll1": "被迫重擲 1 顆能量骰",
+      "tempoForcedReroll2": "被迫重擲 2 顆能量骰",
       "noteNeedsHp": "填入剩餘 HP 後才會計入",
       "noteNeedsPrev": "依上方前提條件計算",
       "noteMirrorDice": "假設對手骰組與本組相同",
