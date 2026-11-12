@@ -153,7 +153,7 @@ const charaDieFaceDown = ref(false)
 const CHARA_DIE_DOWN = '下'
 
 // Pricing what a move denies the opponent means running the whole roster against itself
-// several times over — a few hundred milliseconds, enough to drop a frame. It's held outside
+// several times over — about a second, enough to drop frames. It's held outside
 // the reactive graph and built once after the first paint, so the list appears immediately
 // and the tempo terms join it a moment later rather than delaying everything.
 const tempoTable = shallowRef(null)

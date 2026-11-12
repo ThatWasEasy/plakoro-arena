@@ -30,7 +30,7 @@ const metric = ref(METRIC_TOP_N)
 const perTurn = computed(() => metric.value === METRIC_PER_TURN)
 
 // Pricing the denial effects means evaluating the whole roster against itself several times
-// over, which is a few hundred milliseconds — long enough to drop a frame on the fixed stage.
+// over, which is about a second — long enough to drop frames on the fixed stage.
 // It's held outside the reactive graph and built once, after the first paint, so the screen
 // appears immediately with a note rather than arriving late in one lump.
 const tempoTable = shallowRef(null)

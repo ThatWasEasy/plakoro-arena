@@ -47,6 +47,14 @@ describe('forcedRerollRolls', () => {
     expect(rerolled).toBeGreaterThan(denied)
   })
 
+  it('on a tie, leaves fewer of the counted type', () => {
+    const mixed = { ...steel, dualSlots: [{ types: ['はがね', 'あく'] }, { types: ['あく', 'あく'] }] }
+    const set = [steel, mixed, mixed]
+    const mean = rolls => rolls.reduce((sum, r) => sum + r.filter(t => t === 'あく').length, 0) / rolls.length
+    // 沒費用時每種挑法付費機率都一樣，只剩平手規則在決定。
+    expect(mean(forcedRerollRolls(set, [], 1, 'あく'))).toBeLessThan(mean(forcedRerollRolls(set, [], 1, null)))
+  })
+
   it('a move with no cost cannot be broken', () => {
     expect(odds(forcedRerollRolls(dice, [], 2), [])).toBe(1)
   })

@@ -76,7 +76,7 @@ function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceI
   return sustainableValue(scores)
 }
 
-// 重擲分布只看骰子與費用、跟表無關，三輪迭代共用一份快取；不快取整張表會慢約 7 倍。
+// 重擲分布只看骰子與費用、跟表無關，三輪迭代共用一份快取。
 function rerolledFor(mv, dice, n, cache) {
   const counted = [mv.effectType, ...(mv.chara || []).map(ce => ce.type)]
     .map(type => /^DAMAGE_EXTRA_ENE_(.+)$/.exec(type || ''))
