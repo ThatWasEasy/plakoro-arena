@@ -81,11 +81,13 @@ export function tempoWorth(type, value, table, selfTable = null) {
     // and an understatement with a tempo marker beside it beats a guess.
     case 'SPECIAL_PICK_ENEMY_WAZA':
       return table.bindMove
-    // A reroll is not the same as denying a die, but it is measured against the same thing:
-    // the swing between rolling n dice and n-1. Forcing the opponent to rethrow their best
-    // result is worth a share of that, and two rerolls more than one.
-    case 'REROLL_DICE_ENEMY':
+    // 逼對手重擲不是拿走骰子：骰子還在，純屬骰重擲 5/6 仍有主屬。實算見 forcedRerollRolls；
+    // 舊表沒有這欄時才退回「拿走骰子」的粗估（它會高估，重擲兩顆約五倍）。
+    case 'REROLL_DICE_ENEMY': {
+      const measured = value >= 2 ? table.forcedReroll2 : table.forcedReroll1
+      if (typeof measured === 'number') return measured
       return value >= 2 ? table.denyDice2 : table.denyDice1
+    }
     // 自己的角色骰多看一次。這不是「骰子被拿走」的反面 —— 被拿走你得換招，重擲是照樣打
     // 同一招，只是命中率從 k/6 拉到 1-(1-k/6)^(r+1)。所以它的價錢只能從「自己最強的那幾招
     // 在命中率提高後多賺多少」實算，selfDiceValues 會量出來。沒量到就退回舊的粗估。

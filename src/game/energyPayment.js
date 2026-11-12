@@ -90,3 +90,42 @@ export function jointOdds(moveOdds, charaOdds) {
     total: moveOdds.total * charaOdds.total
   }
 }
+
+// The energy outcomes of a roll after the opponent has made the thrower rethrow `n` dice
+// (ほりかえす / ジュエルフラッシュ). The caster sees the roll and the move it is for, and must
+// name exactly n dice — the reroll picker won't submit fewer — so for every outcome this picks
+// the n that leave the move least likely to be paid, and the result keeps every original
+// outcome at equal weight (6^n entries each), ready for payableCount / moveExpectedValue.
+//
+// Ties go to whichever leaves fewer of the move's own type, which is what per-energy damage
+// counts. Being forced to name n also cuts the other way: a die showing one energy rethrows
+// to more on average, so a second reroll can rescue a roll that had already failed.
+export function forcedRerollRolls(dice, cost, n, ownType = null) {
+  const faces = dice.map(die => FACE_KEYS.map(key => faceTypes(die, key)))
+  const subsets = []
+  const pick = (start, chosen) => {
+    if (chosen.length === n) { subsets.push(chosen); return }
+    for (let i = start; i < dice.length; i++) pick(i + 1, [...chosen, i])
+  }
+  pick(0, [])
+  if (subsets.length === 0) return enumerateRolls(dice)
+
+  const out = []
+  const walk = (d, shown) => {
+    if (d < dice.length) {
+      for (let f = 0; f < 6; f++) walk(d + 1, [...shown, f])
+      return
+    }
+    let best = null
+    subsets.forEach(subset => {
+      const results = enumerateRolls(subset.map(i => dice[i]))
+        .map(rethrown => [...shown.flatMap((f, i) => (subset.includes(i) ? [] : faces[i][f])), ...rethrown])
+      const payable = cost && cost.length > 0 ? results.filter(r => canPayCost(r, cost)).length : results.length
+      const own = ownType ? results.reduce((sum, r) => sum + r.filter(t => t === ownType).length, 0) : 0
+      if (!best || payable < best.payable || (payable === best.payable && own < best.own)) best = { payable, own, results }
+    })
+    out.push(...best.results)
+  }
+  walk(0, [])
+  return out
+}

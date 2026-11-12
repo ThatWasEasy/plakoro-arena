@@ -26,7 +26,7 @@
 //     Three passes reach a fixed point.
 //
 // One more thing it does NOT do: average over everybody. See REFERENCE_COUNT.
-import { enumerateRolls } from './energyPayment'
+import { enumerateRolls, forcedRerollRolls } from './energyPayment'
 import { ASSUMED_ENEMY_LAST_DAMAGE, suggestedBuild } from './suggestedDice'
 import { sustainableValue, DECK_SIZE, NORMAL_DICE } from './turnValue'
 import { moveExpectedValue } from './moveExpectedValue'
@@ -53,14 +53,15 @@ export const REFERENCE_COUNT = 5
 
 // What the owner can sustain, under whatever restriction is being priced. The no-repeat
 // rule applies to them as much as to anyone, so this is their best two alternating.
-function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, charaDieRerolls = 0, nullifyDamage = false, bannedId = null, countDefensiveValue = true } = {}) {
+function bestCommittable(deck, dice, table, { dieCount = NORMAL_DICE, charaDiceInPlay = true, charaDieRerolls = 0, forcedRerolls = 0, nullifyDamage = false, bannedId = null, countDefensiveValue = true } = {}) {
   if (dieCount <= 0) return 0
   const rolls = enumerateRolls(dice.slice(0, dieCount))
   const scores = []
   deck.forEach(mv => {
     if (bannedId !== null && mv.id === bannedId) return
+    // A forced reroll is aimed at the move they picked, so its odds are per move.
     const result = moveExpectedValue(mv, {
-      rolls,
+      rolls: forcedRerolls > 0 ? forcedRerollRolls(dice.slice(0, dieCount), mv.cost, forcedRerolls, mv.type) : rolls,
       enemyDice: dice.slice(0, NORMAL_DICE),
       charaDiceInPlay,
       charaDieRerolls,
@@ -129,7 +130,9 @@ function tableFromPass(roster, previous, countDefensiveValue) {
       nullifyDamage: base - at({ nullifyDamage: true }),
       bindMove: base - at({ bannedId: topId }),
       gainDice1: at({ dieCount: NORMAL_DICE + 1 }) - base,
-      gainDice2: at({ dieCount: MAX_DICE }) - base
+      gainDice2: at({ dieCount: MAX_DICE }) - base,
+      forcedReroll1: base - at({ forcedRerolls: 1 }),
+      forcedReroll2: base - at({ forcedRerolls: 2 })
     })
   })
 
