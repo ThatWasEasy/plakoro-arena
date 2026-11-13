@@ -81,8 +81,8 @@ export function tempoWorth(type, value, table, selfTable = null) {
     // and an understatement with a tempo marker beside it beats a guess.
     case 'SPECIAL_PICK_ENEMY_WAZA':
       return table.bindMove
-    // 逼對手重擲不是拿走骰子：骰子還在，純屬骰重擲 5/6 仍有主屬。實算見 forcedRerollRolls；
-    // 舊表沒有這欄時才退回「拿走骰子」的粗估（它會高估，重擲兩顆約六倍）。
+    // 逼對手重擲不是扣掉骰子：骰子還在，純屬骰重擲 5/6 仍有主屬。實算見 forcedRerollRolls；
+    // 舊表沒有這欄時才退回「扣掉骰子」的粗估（它會高估，重擲兩顆約六倍）。
     case 'REROLL_DICE_ENEMY': {
       const measured = value >= 2 ? table.forcedReroll2 : table.forcedReroll1
       if (typeof measured === 'number') return measured
