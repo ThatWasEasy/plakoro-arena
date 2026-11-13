@@ -88,7 +88,7 @@ export function tempoWorth(type, value, table, selfTable = null) {
       if (typeof measured === 'number') return measured
       return value >= 2 ? table.denyDice2 : table.denyDice1
     }
-    // 自己的角色骰多看一次。這不是「骰子被拿走」的反面 —— 被拿走你得換招，重擲是照樣打
+    // 自己的角色骰多看一次。這不是「骰子被扣掉」的反面 —— 被扣掉你得換招，重擲是照樣打
     // 同一招，只是命中率從 k/6 拉到 1-(1-k/6)^(r+1)。所以它的價錢只能從「自己最強的那幾招
     // 在命中率提高後多賺多少」實算，selfDiceValues 會量出來。沒量到就退回舊的粗估。
     case 'REROLL_CHARADICE_SELF': {
